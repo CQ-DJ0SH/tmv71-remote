@@ -17,7 +17,12 @@ from .config import settings
 from .models import BandState, DtmfMemory, RadioInfo, RadioStatus
 from .state import ConnectionManager
 from .tmv71 import (TMV71, TMV71Error, ChannelData, MR_MODE, VFO_MODE,
-                    DATA_BAND_RX, DATA_BAND_IDX, TONE_1750_IDX)
+                    DATA_BAND_RX, DATA_BAND_IDX, TONE_1750_IDX, MODE_AM,
+                    align_step_index)
+
+# Reserved memory channel that backs the Band-A air band (see toggle_airband_a).
+AIRBAND_CH = 997
+AIRBAND_MIN_HZ, AIRBAND_MAX_HZ = 118_000_000, 136_975_000
 
 log = logging.getLogger("tmv71")
 
@@ -161,8 +166,47 @@ class RadioService:
                 pass
 
     # -- commands ----------------------------------------------------------
+    def _in_airband(self, band: int) -> bool:
+        """True while ``band`` sits on *any* memory channel inside the air band.
+
+        That covers both the 997 scratch entry and the M50+ air-band presets, so
+        tuning the dial never falls through to the VFO path (the VFO can't be
+        moved into the air band over CAT and gets stuck there if forced)."""
+        bs = self._status.bands[band] if band < len(self._status.bands) else None
+        return bool(bs and bs.mode == MR_MODE
+                    and AIRBAND_MIN_HZ <= (bs.rx_freq or 0) <= AIRBAND_MAX_HZ + 25_000)
+
+    def _set_airband_freq(self, freq_hz: int) -> None:
+        """Retune the air band by rewriting the 997 scratch channel and recalling it.
+
+        The VFO can't be moved into the air band over CAT, so a normal ``FO``
+        write would be rejected (and would strand Band A in the air band).
+        Instead we always tune via the reserved 997 channel — recalling a preset
+        (M50+) leaves it untouched; turning the dial lifts onto 997 at the new
+        frequency. Either way Band A stays in memory mode inside the air band.
+        """
+        if not (AIRBAND_MIN_HZ <= freq_hz <= AIRBAND_MAX_HZ):
+            raise TMV71Error(
+                f"{freq_hz / 1e6:.3f} MHz is outside the air band "
+                f"({AIRBAND_MIN_HZ // 10**6}–{AIRBAND_MAX_HZ / 1e6:.3f} MHz)")
+        cur = self.radio.get_memory(AIRBAND_CH)
+        if cur is None:
+            cur = ChannelData(index=AIRBAND_CH, rx_freq=freq_hz, step=7, shift=0,
+                              reverse=0, tone_on=0, ctcss_on=0, dcs_on=0,
+                              tone_idx=1, ctcss_idx=1, dcs_idx=0, offset=0,
+                              mode=MODE_AM, tx_freq=0, lockout=0)
+        else:
+            cur.rx_freq = freq_hz
+            cur.mode = MODE_AM
+        cur.step = align_step_index(freq_hz, cur.step)
+        self.radio.set_memory(cur)
+        self.radio.recall_memory(0, AIRBAND_CH)
+
     async def set_frequency(self, band: int, freq_hz: int) -> None:
-        await asyncio.to_thread(self.radio.set_vfo_frequency, band, freq_hz)
+        if band == 0 and self._in_airband(0):
+            await asyncio.to_thread(self._set_airband_freq, freq_hz)
+        else:
+            await asyncio.to_thread(self.radio.set_vfo_frequency, band, freq_hz)
         await self.refresh()
 
     async def set_band_mode(self, band: int, mode: int) -> None:
@@ -287,20 +331,26 @@ class RadioService:
             # back to 2 m (VHF) — VFO via reserved channel 998 at a 12.5 kHz step
             await self._prime_band(0, 144_000_000, 145_995_000, 0, 998, step=4)
         else:
-            # air band (UKW / aviation) — recall 997 at a 25 kHz step. Seed it if
-            # empty (edit the frequency to taste); only its step is corrected if it
-            # differs, the user's frequency is left alone.
-            cur = await asyncio.to_thread(self.radio.get_memory, 997)
+            # air band (UKW / aviation) — recall the 997 scratch channel. Seed it
+            # if empty; otherwise leave the user's frequency alone but make sure
+            # its tuning step actually divides that frequency and the mode is AM
+            # (the radio refuses an ME write whose freq isn't a step multiple).
+            cur = await asyncio.to_thread(self.radio.get_memory, AIRBAND_CH)
             if cur is None:
-                cur = ChannelData(index=997, rx_freq=119_000_000, step=7, shift=0,
-                                  reverse=0, tone_on=0, ctcss_on=0, dcs_on=0,
-                                  tone_idx=1, ctcss_idx=1, dcs_idx=0, offset=0,
-                                  mode=2, tx_freq=0, lockout=0)
+                # 5 kHz step (index 0): the universal air-band step — it divides
+                # every standard channel (25 kHz spacing and the 8.33 kHz labels).
+                cur = ChannelData(index=AIRBAND_CH, rx_freq=119_000_000, step=0,
+                                  shift=0, reverse=0, tone_on=0, ctcss_on=0,
+                                  dcs_on=0, tone_idx=1, ctcss_idx=1, dcs_idx=0,
+                                  offset=0, mode=MODE_AM, tx_freq=0, lockout=0)
                 await asyncio.to_thread(self.radio.set_memory, cur)
-            elif cur.step != 7:
-                cur.step = 7
-                await asyncio.to_thread(self.radio.set_memory, cur)
-            await asyncio.to_thread(self.radio.recall_memory, 0, 997)
+            else:
+                aligned = align_step_index(cur.rx_freq, cur.step)
+                if cur.step != aligned or cur.mode != MODE_AM:
+                    cur.step = aligned
+                    cur.mode = MODE_AM
+                    await asyncio.to_thread(self.radio.set_memory, cur)
+            await asyncio.to_thread(self.radio.recall_memory, 0, AIRBAND_CH)
         await self.refresh()
         await self.manager.broadcast(self._status.model_dump())
         return not in_air
@@ -625,7 +675,11 @@ class RadioService:
 
     def _write_memory(self, m) -> None:
         from .memory import model_to_channeldata
-        self.radio.set_memory(model_to_channeldata(m))
+        cd = model_to_channeldata(m)
+        # The radio refuses an ME write whose frequency is not a multiple of the
+        # channel step; snap the step to one that fits so the write succeeds.
+        cd.step = align_step_index(cd.rx_freq, cd.step)
+        self.radio.set_memory(cd)
         if m.name:
             self.radio.set_memory_name(m.channel, m.name)
 

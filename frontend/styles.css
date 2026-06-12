@@ -598,6 +598,17 @@ body.radio-off .scan-zone{opacity:.32; filter:grayscale(.6) brightness(.78)}
 body.ctrl-b .qbtn.qmem:hover{color:var(--cyan)} /* …or cyan when control band = B */
 .qbtn:active{transform:translateY(1px)}
 .qbtn.qdtmf.sending{color:#fff; background:var(--tx); border-color:var(--tx); box-shadow:0 0 12px -3px var(--tx-glow)}
+/* --- air band = receive-only: M-keys (M50–M59) glow in Band A amber; every TX
+   control (PTT, lock/roger/1750, DTMF column) is disabled. --- */
+body.airband #quick-mem .qbtn{
+  border-color:var(--amber); color:var(--amber); box-shadow:0 0 12px -4px var(--amber-glow);
+}
+body.airband #quick-mem .qbtn.empty{color:var(--amber); opacity:.5}
+body.airband #quick-mem .qbtn:hover{color:var(--amber)}
+body.airband .ptt,
+body.airband .ptt-lock-row,
+body.airband #quick-dtmf{ opacity:.28; pointer-events:none; filter:grayscale(.7); }
+body.airband .ptt-hint{color:var(--amber); opacity:.85}
 .ptt-meta{text-align:center; display:flex; flex-direction:column; gap:6px}
 .ptt-hint{font-size:10px; letter-spacing:.26em; color:var(--text-dim)}
 /* two-tone test active warning — emitted independent of PTT */

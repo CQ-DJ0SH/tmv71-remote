@@ -5,6 +5,8 @@ const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
 let last = null;          // last RadioStatus
+let memBase = 0;          // quick-key channel offset: 0 normally, 50 in the air band
+let airbandRx = false;    // Band A in the air band → receive-only, TX blocked
 let txActive = false;
 let pttLock = false;      // latched (continuous) transmit
 let lockConfirmed = false; // radio has actually reported TX since locking
@@ -115,6 +117,7 @@ function render(st) {
   document.body.classList.toggle("disconnected", !st.connected);
 
   (st.bands || []).forEach(renderBand);
+  updateMemBase(st);
 
   // control band highlight + per-band TX lamp + single-band dimming
   $$(".band").forEach(p => {
@@ -476,6 +479,7 @@ function bindControls() {
   // data band 0/2 -> A, 1/3 -> B. Mic audio only goes out if this == PTT band.
   const DATA_TX_BAND = { 0: 0, 1: 1, 2: 0, 3: 1 };
   const key = async (on) => {
+    if (on && airbandRx) { toast("Air band is receive-only — TX disabled", "err"); return; }
     if (keying === on) return; keying = on;
     // warn if the keyed band isn't where the USB-soundcard mic audio is routed:
     // the audio band (data band) TX side must match the PTT band, else nothing
@@ -602,6 +606,30 @@ function bindMemory() {
 }
 
 // ---- memory editor --------------------------------------------------------
+// The radio refuses a memory write whose frequency isn't a multiple of the
+// channel step. Keep the chosen step if it fits, else pick the finest that does
+// (so e.g. 123.780 MHz air-band channels save at a 5 kHz step instead of failing).
+function alignStepIndex(freqHz, preferred) {
+  if (STEP_HZ[preferred] && freqHz % STEP_HZ[preferred] === 0) return preferred;
+  const order = STEP_HZ.map((s, i) => i).sort((a, b) => STEP_HZ[a] - STEP_HZ[b]);
+  for (const i of order) if (STEP_HZ[i] && freqHz % STEP_HZ[i] === 0) return i;
+  return preferred;
+}
+// True when a frequency in MHz falls in the (RX-only, AM) air band.
+const isAirbandMHz = mhz => mhz >= 118 && mhz <= 137;
+
+// Normalise the RX field so the MHz.kHz decimal point is always shown: e.g.
+// "145" → "145.600"? no — "145" → "145.000", "123.78" → "123.780". Keeps finer
+// precision (down to 10 Hz) but never drops below 3 decimals (kHz separator).
+function fmtRxField(v) {
+  const f = parseFloat(v);
+  if (!isFinite(f)) return v;
+  let s = f.toFixed(5).replace(/0+$/, "");
+  if (s.endsWith(".")) s += "000";
+  if ((s.split(".")[1] || "").length < 3) s = f.toFixed(3);
+  return s;
+}
+
 function fillStepOptions(sel) {
   sel.innerHTML = STEP_HZ.map((s, i) =>
     `<option value="${i}">${s / 1000} kHz</option>`).join("");
@@ -627,7 +655,7 @@ function openEditor(ch, isNew = false) {
   const chIn = $("#ed-channel");
   chIn.value = ch ?? 0; chIn.disabled = !isNew;
   $("#ed-name").value = m?.name || "";
-  $("#ed-rx").value = m ? (m.rx_freq / 1e6).toFixed(4) : "";
+  $("#ed-rx").value = m ? fmtRxField(m.rx_freq / 1e6) : "";
   $("#ed-mode").value = String(m?.fm_mode ?? 0);
   fillStepOptions($("#ed-step")); $("#ed-step").value = String(m?.step ?? 4);
   $("#ed-shift").value = String(m?.shift ?? 0);
@@ -647,23 +675,40 @@ async function saveEditor() {
   const rx = Math.round(parseFloat($("#ed-rx").value) * 1e6);
   if (!rx || rx < 1e6) return toast("Invalid RX frequency", "err");
   const tt = $("#ed-tonetype").value, tv = Number($("#ed-toneval").value) || 1;
+  const chosenStep = Number($("#ed-step").value);
+  const step = alignStepIndex(rx, chosenStep);
+  if (step !== chosenStep) $("#ed-step").value = String(step);  // reflect the fix
+  // air-band channels are AM by definition — force it (and reflect in the UI)
+  const fm_mode = isAirbandMHz(rx / 1e6) ? 2 : Number($("#ed-mode").value);
+  if (fm_mode === 2) $("#ed-mode").value = "2";
   const m = {
     channel: ch, name: $("#ed-name").value.slice(0, 8), rx_freq: rx, tx_freq: 0,
-    step: Number($("#ed-step").value), shift: Number($("#ed-shift").value),
+    step, shift: Number($("#ed-shift").value),
     reverse: 0, offset: Math.round(Number($("#ed-offset").value) * 1000),
-    fm_mode: Number($("#ed-mode").value),
+    fm_mode,
     tone_on: tt === "tone", ctcss_on: tt === "ctcss", dcs_on: tt === "dcs",
     tone_idx: tt === "tone" ? tv : 1, ctcss_idx: tt === "ctcss" ? tv : 1,
     dcs_idx: tt === "dcs" ? tv : 0, lockout: 0,
   };
   try {
     await api("PUT", `/api/memories/${ch}`, m);
-    toast(`Channel ${ch} saved`, "ok");
+    const note = step !== chosenStep ? ` (step → ${STEP_HZ[step] / 1000} kHz)` : "";
+    toast(`Channel ${ch} saved${note}`, "ok");
     closeEditor(); loadMemories(); loadQuickMemNames();
   } catch (e) { toast("Save: " + e.message, "err"); }
 }
 
 function bindEditor() {
+  const rxIn = $("#ed-rx");
+  // always render the MHz.kHz decimal separator once the field loses focus
+  rxIn.addEventListener("blur", () => { if (rxIn.value.trim()) rxIn.value = fmtRxField(rxIn.value); });
+  // live: an air-band frequency is RX-only AM — switch the mode select to AM
+  // (and back off AM again if the frequency leaves the air band)
+  rxIn.addEventListener("input", () => {
+    const sel = $("#ed-mode");
+    if (isAirbandMHz(parseFloat(rxIn.value))) sel.value = "2";
+    else if (sel.value === "2") sel.value = "0";
+  });
   $("#ed-tonetype").addEventListener("change", () => fillToneOptions());
   $("#ed-save").addEventListener("click", saveEditor);
   $("#ed-cancel").addEventListener("click", closeEditor);
@@ -1218,7 +1263,25 @@ function tickClock() {
     (d.getTimezoneOffset() <= 0 ? "+" : "−") + Math.abs(d.getTimezoneOffset() / 60);
 }
 
-// ---- quick keys: memory recall (M0-M9) + DTMF send (D0-D9) ----------------
+// When Band A sits in the air band, the quick-memory keys switch from M0–M9 to
+// M50–M59 (a dedicated bank of air-band presets). Re-label only when the base
+// actually changes, so the live status stream doesn't trigger constant fetches.
+function updateMemBase(st) {
+  const b0 = (st.bands || [])[0];
+  const inAir = !!b0 && b0.rx_freq >= 118e6 && b0.rx_freq <= 137e6;
+  // The air band is receive-only: flag it, badge the panel, and let CSS border
+  // the M-keys in Band A's colour while disabling PTT/DTMF/side keys.
+  airbandRx = inAir;
+  document.body.classList.toggle("airband", inAir);
+  const hint = $(".ptt-hint");
+  if (hint) hint.textContent = inAir ? "AIR BAND · RECEIVE ONLY" : "HOLD SPACEBAR TO TRANSMIT";
+  const base = inAir ? 50 : 0;
+  if (base === memBase) return;
+  memBase = base;
+  loadQuickMemNames();
+}
+
+// ---- quick keys: memory recall (M0-M9 / M50-M59 in air band) + DTMF (D0-D9) -
 function bindQuickKeys() {
   const mem = $("#quick-mem"), dt = $("#quick-dtmf");
   if (!mem || !dt) return;
@@ -1227,9 +1290,10 @@ function bindQuickKeys() {
     m.className = "qbtn qmem empty"; m.dataset.ch = n; m.textContent = "M" + n;
     m.title = `Recall memory ${n} to the CTRL band`;
     m.addEventListener("click", async () => {
-      const band = last?.control_band ?? 0;
-      try { await api("POST", "/api/recall", { band, channel: n }); toast(`Memory ${n} → Band ${band ? "B" : "A"}`, "ok"); }
-      catch (e) { toast("M" + n + ": " + e.message, "err"); }
+      const ch = memBase + n;
+      const band = memBase ? 0 : (last?.control_band ?? 0);  // air-band presets → Band A
+      try { await api("POST", "/api/recall", { band, channel: ch }); toast(`Memory ${ch} → Band ${band ? "B" : "A"}`, "ok"); }
+      catch (e) { toast("M" + ch + ": " + e.message, "err"); }
     });
     mem.appendChild(m);
 
@@ -1250,19 +1314,20 @@ function bindQuickKeys() {
   loadQuickMemNames();
 }
 
-// Label the M0-M9 keys with the stored memory name (channel 0-9), or keep the
-// "M<n>" placeholder (dimmed) when the channel is empty — width stays fixed.
+// Label the quick keys with the stored memory name for the current bank
+// (channels memBase+0 … memBase+9), or keep the "M<ch>" placeholder (dimmed)
+// when the channel is empty — width stays fixed.
 async function loadQuickMemNames() {
   let rows;
-  try { rows = await api("GET", "/api/memories?start=0&end=9"); }
+  try { rows = await api("GET", `/api/memories?start=${memBase}&end=${memBase + 9}`); }
   catch { return; }
   const byCh = {}; rows.forEach(r => { byCh[r.channel] = r; });
   $$("#quick-mem .qbtn").forEach(b => {
-    const n = Number(b.dataset.ch), m = byCh[n];
+    const ch = memBase + Number(b.dataset.ch), m = byCh[ch];
     const name = (m && m.name && m.name.trim()) ? m.name.trim() : "";
-    b.textContent = name || ("M" + n);
+    b.textContent = name || ("M" + ch);
     b.classList.toggle("empty", !name);
-    b.title = name ? `Recall M${n} · ${name}` : `Memory ${n} (empty)`;
+    b.title = name ? `Recall M${ch} · ${name}` : `Memory ${ch} (empty)`;
   });
 }
 

@@ -31,6 +31,24 @@ import serial
 STEP_HZ = [5000, 6250, 28330, 10000, 12500, 15000, 20000, 25000,
            30000, 50000, 100000]
 
+
+def align_step_index(freq_hz: int, preferred: int = 0) -> int:
+    """Pick a ``STEP_HZ`` index whose step evenly divides ``freq_hz``.
+
+    The TM-V71 rejects an ``ME``/``FO`` write whose frequency is not an integer
+    multiple of the channel's tuning step (e.g. 123.780 MHz at a 12.5 kHz step
+    is refused with ``?``). Keep the caller's ``preferred`` step when it already
+    divides the frequency; otherwise return the *finest* step that does, so the
+    exact frequency is preserved. Falls back to ``preferred`` if none fits.
+    """
+    if 0 <= preferred < len(STEP_HZ) and STEP_HZ[preferred] \
+            and freq_hz % STEP_HZ[preferred] == 0:
+        return preferred
+    for i in sorted(range(len(STEP_HZ)), key=lambda i: STEP_HZ[i]):
+        if STEP_HZ[i] and freq_hz % STEP_HZ[i] == 0:
+            return i
+    return preferred
+
 # Standard Kenwood CTCSS tone table (Hz), 1-based as the radio reports it.
 CTCSS_TONES = [
     67.0, 69.3, 71.9, 74.4, 77.0, 79.7, 82.5, 85.4, 88.5, 91.5,

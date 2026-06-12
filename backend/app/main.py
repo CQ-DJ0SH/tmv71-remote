@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 from fastapi import (FastAPI, HTTPException, Response, UploadFile, WebSocket,
                      WebSocketDisconnect)
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import memory as memory_io
@@ -39,6 +39,7 @@ from .power_switch import PowerSwitch
 from .webrtc_audio import RadioAudio, RadioRxTrack, consume_mic
 from aiortc import RTCPeerConnection, RTCSessionDescription
 from .radio_service import RadioService
+from .tmv71 import TMV71Error
 from .state import ConnectionManager
 
 logging.basicConfig(level=logging.INFO)
@@ -164,6 +165,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="TM-V71 Remote", version=APP_VERSION + ".0", lifespan=lifespan)
+
+@app.exception_handler(TMV71Error)
+async def _radio_error_handler(request, exc: TMV71Error) -> JSONResponse:
+    """Turn a radio CAT rejection/timeout into a clean 400 with a readable
+    message, instead of a bare 500 the UI can't surface."""
+    return JSONResponse(status_code=400,
+                        content={"detail": f"Radio rejected the command ({exc})."})
+
 
 # LAN-only deployment: allow any origin on the local network.
 app.add_middleware(
