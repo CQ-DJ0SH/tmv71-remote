@@ -70,6 +70,10 @@ class HackRFSpectrum:
         self.amp = False
         self.error: Optional[str] = None
         self._fps = 0.0
+        # device-presence probe (hackrf_info), cached so the status endpoint
+        # stays cheap. None until first probed.
+        self._detected: Optional[bool] = None
+        self._detect_at = 0.0
 
     # -- subscriptions (WebSocket clients) --------------------------------
     def subscribe(self) -> asyncio.Queue:
@@ -96,13 +100,46 @@ class HackRFSpectrum:
 
     # -- status -----------------------------------------------------------
     def status(self) -> dict:
+        # "detected" = a HackRF is actually connected. While streaming we hold
+        # the device, so presence is implied; otherwise use the cached probe.
+        detected = True if self.running else self._detected
         return {
-            "available": self.available, "running": self.running, "mode": self.mode,
+            "available": self.available, "detected": detected,
+            "running": self.running, "mode": self.mode,
             "follow": self.follow, "center": self.center, "span": PAN_SAMPLE_RATE,
             "sweep_start": self.sweep_start, "sweep_stop": self.sweep_stop,
             "lna": self.lna, "vga": self.vga, "amp": self.amp,
             "bins": OUT_BINS, "fps": round(self._fps, 1), "error": self.error,
         }
+
+    def _probe_device_sync(self) -> bool:
+        """Blocking: ask hackrf_info whether a device is connected. A busy
+        device (we or someone else streaming) still counts as present."""
+        try:
+            r = subprocess.run(["hackrf_info"], capture_output=True,
+                               text=True, timeout=4)
+            out = (r.stdout or "") + (r.stderr or "")
+        except Exception:
+            return False
+        return ("Found HackRF" in out) or ("Resource busy" in out)
+
+    async def detect(self, max_age: float = 8.0) -> Optional[bool]:
+        """Refresh the cached device-presence flag (probes at most every
+        ``max_age`` seconds). Returns None if the binary is missing."""
+        if not self.available:
+            self._detected = False
+            return False
+        if self.running:
+            self._detected = True
+            return True
+        now = time.monotonic()
+        if self._detected is not None and (now - self._detect_at) < max_age:
+            return self._detected
+        present = await asyncio.get_running_loop().run_in_executor(
+            None, self._probe_device_sync)
+        self._detected = present
+        self._detect_at = now
+        return present
 
     # -- lifecycle --------------------------------------------------------
     async def start(self, **cfg) -> dict:

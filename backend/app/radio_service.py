@@ -17,7 +17,7 @@ from .config import settings
 from .models import BandState, DtmfMemory, RadioInfo, RadioStatus
 from .state import ConnectionManager
 from .tmv71 import (TMV71, TMV71Error, ChannelData, MR_MODE, VFO_MODE,
-                    DATA_BAND_RX, DATA_BAND_IDX, TONE_1750_IDX, MODE_AM,
+                    DATA_BAND_RX, DATA_BAND_IDX, MODE_AM,
                     align_step_index)
 
 # Reserved memory channel that backs the Band-A air band (see toggle_airband_a).
@@ -48,7 +48,12 @@ class RadioService:
         self.model: str | None = None
         self.transmitting: bool = False
         self.data_band: Optional[int] = None    # cached MU data band (lazy)
-        self.tone_1750: Optional[bool] = None    # cached MU 1750 Hz hold (lazy)
+        # 1750 Hz tone call is generated in software on the mic path (the radio's
+        # menu-402 hold does not key a tone on this unit), so it is *not* read
+        # from the radio menu — it tracks the software tone generator instead.
+        self.tone_1750: bool = False
+        # set by main.py: pushes the on/off state to the audio tone generator
+        self.tone_1750_sink = None
         self._status: RadioStatus = RadioStatus(connected=False)
         self._poll_task: asyncio.Task | None = None
         self._stop = asyncio.Event()
@@ -128,17 +133,14 @@ class RadioService:
         except TMV71Error:
             single = False
         bands = [self._read_band(0), self._read_band(1)]
-        if self.data_band is None or self.tone_1750 is None:
-            # read the MU menu once (both fields come from it), then cache
+        if self.data_band is None:
+            # read the MU menu once for the data band, then cache. (1750 Hz is
+            # software-generated and intentionally not sourced from the menu.)
             try:
                 menu = self.radio.get_menu()
                 self.data_band = int(menu[DATA_BAND_IDX])
-                self.tone_1750 = bool(int(menu[TONE_1750_IDX]))
             except (TMV71Error, ValueError, IndexError):
-                if self.data_band is None:
-                    self.data_band = 0
-                if self.tone_1750 is None:
-                    self.tone_1750 = False
+                self.data_band = 0
         return RadioStatus(
             connected=True, model=self.model,
             control_band=control, ptt_band=ptt,
@@ -288,16 +290,24 @@ class RadioService:
         await asyncio.to_thread(self._set_ptt_band, band)
         await self.refresh()
 
-    def _set_tone_1750(self, on: bool) -> None:
-        self.radio.set_tone_1750(on)
-        self.tone_1750 = on
-
     async def set_tone_1750(self, on: bool) -> RadioStatus:
-        """Toggle the 1750 Hz tone hold (menu 402)."""
-        await asyncio.to_thread(self._set_tone_1750, on)
-        await self.refresh()
-        await self.manager.broadcast(self._status.model_dump())
-        return self._status
+        """1750 Hz repeater tone call, generated in software on the mic path.
+        The radio's menu-402 hold does not key an actual tone on this unit, so
+        we drive a software tone generator on the TX audio instead — no serial
+        I/O. The tone only sounds while PTT is keyed."""
+        if self.tone_1750_sink is not None:
+            self.tone_1750_sink(on)
+        self.tone_1750 = on
+        # Build the status to return/broadcast in a local so a concurrent poll
+        # refresh can't swap self._status out from under us across the await.
+        status = self._status
+        if status is not None and status.connected:
+            status = status.model_copy(update={"tone_1750": on})
+            self._status = status
+        else:
+            status = await self.refresh()
+        await self.manager.broadcast(status.model_dump())
+        return status
 
     def _set_band_display(self, single: bool, band) -> None:
         if single:

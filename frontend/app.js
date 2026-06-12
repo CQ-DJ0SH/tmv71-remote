@@ -347,6 +347,16 @@ function buildSpinner(band) {
       const dot = document.createElement("span");
       dot.className = "fdot"; dot.textContent = "."; el.appendChild(dot);
     }
+    // Each digit is a column: clickable bar above (+1), the digit, bar below (-1).
+    const cell = document.createElement("div");
+    cell.className = "dcell";
+
+    const up = document.createElement("span");
+    up.className = "dbar dbar-up"; up.dataset.idx = idx;
+    up.title = "+1"; up.setAttribute("aria-label", "increment digit");
+    up.addEventListener("click", () => bump(band, idx, +1));
+    cell.appendChild(up);
+
     const dig = document.createElement("input");
     dig.className = "dig"; dig.type = "text"; dig.inputMode = "numeric";
     dig.maxLength = 1; dig.dataset.idx = idx;
@@ -370,7 +380,15 @@ function buildSpinner(band) {
         if (prev) { prev.focus(); prev.select(); }
       }
     });
-    el.appendChild(dig);
+    cell.appendChild(dig);
+
+    const dn = document.createElement("span");
+    dn.className = "dbar dbar-dn"; dn.dataset.idx = idx;
+    dn.title = "-1"; dn.setAttribute("aria-label", "decrement digit");
+    dn.addEventListener("click", () => bump(band, idx, -1));
+    cell.appendChild(dn);
+
+    el.appendChild(cell);
   });
   const unit = document.createElement("span");
   unit.className = "spin-unit"; unit.textContent = "MHz"; el.appendChild(unit);
@@ -664,7 +682,7 @@ function openEditor(ch, isNew = false) {
   $("#ed-mode").value = String(m?.fm_mode ?? 0);
   fillStepOptions($("#ed-step")); $("#ed-step").value = String(m?.step ?? 4);
   $("#ed-shift").value = String(m?.shift ?? 0);
-  $("#ed-offset").value = m ? (m.offset / 1000) : 600;
+  $("#ed-offset").value = m ? (m.offset / 1000) : 0;
   let tt = "none", sel = null;
   if (m?.ctcss_on) { tt = "ctcss"; sel = m.ctcss_idx; }
   else if (m?.tone_on) { tt = "tone"; sel = m.tone_idx; }
@@ -709,7 +727,11 @@ function bindEditor() {
   rxIn.addEventListener("blur", () => { if (rxIn.value.trim()) rxIn.value = fmtRxField(rxIn.value); });
   // live: an air-band frequency is RX-only AM — switch the mode select to AM
   // (and back off AM again if the frequency leaves the air band)
-  rxIn.addEventListener("input", () => {
+  rxIn.addEventListener("input", e => {
+    // auto-insert the MHz.kHz separator once three digits (the MHz part) are
+    // typed — but not while deleting, so backspacing past the dot still works.
+    const del = e.inputType && e.inputType.startsWith("delete");
+    if (!del && /^\d{3}$/.test(rxIn.value)) rxIn.value += ".";
     const sel = $("#ed-mode");
     if (isAirbandMHz(parseFloat(rxIn.value))) sel.value = "2";
     else if (sel.value === "2") sel.value = "0";
@@ -801,12 +823,16 @@ async function loadMixer() {
     box.innerHTML = '<p class="pane-hint">No mixer controls — this USB device has no software volume.</p>';
     return;
   }
+  // Friendly labels for the radio audio path: the USB card's PCM playback
+  // drives the radio mic (TX), its Mic capture is the radio RX into the Pi.
+  const MX_LABEL = { PCM: "TX", Mic: "RX" };
   box.innerHTML = "";
   d.controls.forEach(c => {
     const row = document.createElement("div");
     row.className = "mixer-row";
+    const label = MX_LABEL[c.name] || c.name;
     row.innerHTML =
-      `<span class="mx-name">${c.name} · ${c.kind}</span>` +
+      `<span class="mx-name">${label} · ${c.kind}</span>` +
       `<input type="range" class="mx-slider" min="0" max="100" step="1" value="${c.percent ?? 0}">` +
       `<span class="mx-val">${c.percent ?? 0}%</span>` +
       (c.has_switch ? `<label class="mx-mute"><input type="checkbox" class="mx-sw" ${c.switch_on ? "checked" : ""}>on</label>` : "");
@@ -1002,6 +1028,12 @@ function refreshPowerUi() {
   btn.classList.toggle("off", avail && on === false);
   // Dim the band panels while the radio is powered off (GPIO relay open).
   document.body.classList.toggle("radio-off", avail && on === false);
+  // Radio off -> also drop audio and the HackRF (the backend stops them too;
+  // this keeps the UI in sync). Idempotent: only acts when something is active.
+  if (avail && on === false) {
+    if (audioPc) audioDisconnect();
+    if (hrf.on) { hrf.on = false; updateHrfPower(); hrfSync(); }
+  }
   btn.title = !avail ? "GPIO-Pin in den Einstellungen festlegen"
     : on === true ? "Radio is ON — click to turn off"
     : on === false ? "Radio is OFF — click to turn on"
@@ -1764,9 +1796,18 @@ function updateHrfModeUi() {
 
 function bindHackRF() {
   if (!$("#hackrf-zone")) return;
-  // availability check — hide power if no HackRF
+  // availability check — show "HackRF ready" when a device is connected,
+  // otherwise disable the power button.
   api("GET", "/api/hackrf").then(s => {
-    if (s && s.available === false) { hrfStat("no HackRF detected"); $("#hrf-power").disabled = true; }
+    const present = s && s.available !== false && s.detected !== false;
+    const ready = $("#hrf-ready");
+    if (present) {
+      if (ready) ready.hidden = false;
+    } else {
+      if (ready) ready.hidden = true;
+      hrfStat(s && s.available === false ? "hackrf tools missing" : "no HackRF detected");
+      $("#hrf-power").disabled = true;
+    }
   }).catch(() => {});
 
   $("#hrf-power")?.addEventListener("click", () => { hrf.on = !hrf.on; updateHrfPower(); hrfSync(); });

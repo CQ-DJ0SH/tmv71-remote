@@ -201,7 +201,7 @@
       <div class="ptt-lock-row">
         <button class="ptt-side" id="btn-roger" type="button" aria-pressed="false" title="Roger beep on PTT release (toggle)">ROGER</button>
         <button class="ptt-lock" id="ptt-lock" type="button" aria-pressed="false" title="Latch transmit on/off">PTT-LOCK</button>
-        <button class="ptt-side" id="btn-1750" type="button" aria-pressed="false" title="Hold 1750 Hz tone call — menu 402 (toggle)">1.750 kHz</button>
+        <button class="ptt-side" id="btn-1750" type="button" aria-pressed="false" title="Arm the 1750 Hz tone call, then key PTT to transmit it (software-generated)">1.750 kHz</button>
       </div>
     </div>
     <div class="quick-col" id="quick-dtmf" title="Send DTMF memory 0–9 (DT)"></div>
@@ -226,11 +226,11 @@
     </div>
     <audio id="rx-audio" autoplay></audio>
     <div class="audio-ctl">
-      <label class="acg">RX
+      <label class="acg">RX Gain
         <input type="range" id="rx-gain" min="0" max="12" step="0.1" value="1">
         <span class="gv" id="rx-gain-val">1.0×</span>
       </label>
-      <label class="acg">MIC
+      <label class="acg">TX Gain
         <input type="range" id="tx-gain" min="0" max="4" step="0.1" value="1">
         <span class="gv" id="tx-gain-val">1.0×</span>
       </label>
@@ -250,6 +250,7 @@
       <h2>HACKRF WATERFALL</h2>
       <button class="hrf-power" id="hrf-power" type="button" aria-pressed="false" title="Start / stop the HackRF">OFF</button>
       <span class="panel-stat" id="hrf-stat"></span>
+      <span class="hrf-ready" id="hrf-ready" hidden><span class="dot"></span>HackRF ready</span>
       <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="hrf-body" title="Show / hide the HackRF waterfall">▲</button>
     </div>
     <div class="panel-body" id="hrf-body">
@@ -319,7 +320,7 @@
       <label>Mode<select id="ed-mode"><option value="0">FM</option><option value="1">NFM</option><option value="2">AM</option></select></label>
       <label>Step<select id="ed-step"></select></label>
       <label>Shift<select id="ed-shift"><option value="0">Simplex</option><option value="1">+</option><option value="2">−</option></select></label>
-      <label>Offset (kHz)<input type="number" id="ed-offset" step="5" placeholder="600"></label>
+      <label>Offset (kHz)<input type="number" id="ed-offset" step="5" placeholder="0"></label>
       <label>Tone type<select id="ed-tonetype"><option value="none">None</option><option value="ctcss">CTCSS</option><option value="tone">Tone</option><option value="dcs">DCS</option></select></label>
       <label>Tone value<select id="ed-toneval"></select></label>
     </div>

@@ -81,6 +81,23 @@ def touch_activity() -> None:
     _last_activity = time.monotonic()
 
 
+async def _shut_down_peripherals() -> None:
+    """When the radio is powered off, also stop the HackRF and drop any WebRTC
+    audio peers: there's nothing to listen to or control with the radio dark,
+    and the SDR shouldn't keep holding the USB device. Best-effort / idempotent."""
+    try:
+        await sdr.stop()
+    except Exception:  # noqa: BLE001
+        pass
+    for pc in list(pcs):
+        try:
+            await pc.close()
+        except Exception:  # noqa: BLE001
+            pass
+        pcs.discard(pc)
+    radio_audio.peers = 0
+
+
 async def _auto_power_off_loop() -> None:
     while True:
         await asyncio.sleep(2.0)
@@ -95,6 +112,7 @@ async def _auto_power_off_loop() -> None:
         if time.monotonic() - _last_activity >= settings.auto_power_off_seconds:
             try:
                 power_switch.set(False)
+                await _shut_down_peripherals()
                 logging.getLogger("tmv71").info(
                     "auto power off after %ds inactivity",
                     settings.auto_power_off_seconds)
@@ -163,6 +181,8 @@ async def lifespan(app: FastAPI):
         radio_audio.roger_beep = settings.roger_beep_enabled
         service.on_ptt = _couple_ptt
         service.on_unkey = _roger_beep
+        # 1750 Hz tone call is generated on the mic path, not by the radio
+        service.tone_1750_sink = lambda on: setattr(radio_audio, "tone_1750", on)
         # let the band scan read the live RX AF level
         service.level_provider = lambda: radio_audio.rx_db
         audio_wd = asyncio.create_task(_audio_watchdog())
@@ -254,7 +274,8 @@ async def set_data_band(req: DataBandRequest) -> RadioStatus:
 
 @app.post("/api/tone-1750", response_model=RadioStatus)
 async def set_tone_1750(req: Tone1750Request) -> RadioStatus:
-    """1750 Hz tone hold (menu 402)."""
+    """1750 Hz repeater tone call — generated in software on the mic path
+    (sounds while PTT is keyed); the radio's menu-402 hold is not used."""
     try:
         return await service.set_tone_1750(req.on)
     except Exception as exc:  # noqa: BLE001
@@ -388,6 +409,8 @@ async def set_power_switch(req: PowerSwitchRequest) -> dict:
         power_switch.set(req.on)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, str(exc))
+    if not req.on:
+        await _shut_down_peripherals()   # radio off -> stop HackRF + audio peers
     touch_activity()
     return _power_switch_status()
 
@@ -488,7 +511,7 @@ async def fetch_kenwood_logo() -> dict:
     """Download the Kenwood wordmark from Wikimedia Commons (server-side)."""
     req = urllib.request.Request(
         KENWOOD_LOGO_URL,
-        headers={"User-Agent": "tmv71-remote/1.3 (LAN ham radio remote)"})
+        headers={"User-Agent": "tmv71-remote/2.1 (LAN ham radio remote)"})
 
     def _download() -> bytes:
         with urllib.request.urlopen(req, timeout=15) as resp:
@@ -696,6 +719,7 @@ async def ws_status(ws: WebSocket) -> None:
 # --- HackRF spectrum / waterfall --------------------------------------------
 @app.get("/api/hackrf")
 async def hackrf_status() -> dict:
+    await sdr.detect()        # refresh the cached "device connected" probe
     return sdr.status()
 
 

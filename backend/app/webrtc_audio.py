@@ -75,8 +75,10 @@ class RadioAudio:
         self.peers = 0
         # TX tone generators (replace the browser mic on the radio mic path)
         self.test_tone = False        # continuous 700+1900 Hz two-tone while keyed
+        self.tone_1750 = False        # 1750 Hz repeater tone-call while keyed
         self.roger_beep = False       # short beep on un-key (preference)
         self._tone_phase = 0          # two-tone phase (sample counter, wraps)
+        self._t1750_phase = 0         # 1750 Hz tone phase
         self._beep_phase = 0          # roger-beep phase
         self._beep_left = 0           # remaining roger-beep samples
 
@@ -197,7 +199,9 @@ class RadioAudio:
         if self.test_tone:
             mono = self._gen_tone(frames, (700.0, 1900.0), 0.40, "_tone_phase")
         elif self._ptt_open:
-            if self._beep_left > 0:
+            if self.tone_1750:
+                mono = self._gen_tone(frames, (1750.0,), 0.5, "_t1750_phase")
+            elif self._beep_left > 0:
                 k = min(frames, self._beep_left)
                 mono[:k] = self._gen_tone(k, (1000.0,), 0.5, "_beep_phase")
                 self._beep_left -= k
@@ -300,7 +304,8 @@ class RadioAudio:
                 "rx_gain": self.rx_gain, "tx_gain": self.tx_gain,
                 "tx_buffer_ms": self.tx_buffer_ms, "ptt_tail_ms": self.ptt_tail_ms,
                 "device": self.device, "peers": self.peers,
-                "test_tone": self.test_tone, "roger_beep": self.roger_beep,
+                "test_tone": self.test_tone, "tone_1750": self.tone_1750,
+                "roger_beep": self.roger_beep,
                 "transport": "webrtc", "web_client": self.peers > 0}
 
 

@@ -59,6 +59,9 @@ body.theme-light .display .freq{text-shadow:0 0 6px var(--accent-glow)}
 /* light theme: flat frequency entry (the neon glow washes out on a light bg) */
 body.theme-light .dig{text-shadow:none}
 body.theme-light .dig:focus{background:#e6edf2}
+/* lighter tuning bars on the light background */
+body.theme-light .dbar{background:#c4cfd6}
+body.theme-light .dcell:focus-within .dbar{background:#aab8c0}
 body.theme-light .darr:hover{text-shadow:none}
 body.theme-light .freq-spin.pending{box-shadow:0 0 0 1px var(--accent)}
 body.theme-light .sm-bar{background:#dde5ea; border-color:#c4cfd6}
@@ -92,6 +95,10 @@ body.theme-light .audio-ctl .gv{color:#0c7b71}
 body.theme-light .sql-val{color:#46545f}
 /* memory table dark headers → light in the (now light) settings dialog */
 body.theme-light .mem-table-wrap th{background:#e4eaef; color:#46545f}
+/* row hover: the dark-theme near-black wash turns rows almost black on the
+   light dialog — use a light highlight instead */
+body.theme-light .mem-table tbody tr:hover{background:#dce6ec}
+body.theme-light .mem-table td{border-bottom-color:#dde4e9}
 
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -535,13 +542,22 @@ body.radio-off .hackrf-zone{opacity:.32; filter:grayscale(.6) brightness(.78)}
 }
 .darr:hover{color:var(--accent); text-shadow:0 0 8px var(--accent-glow)}
 .darr:active{transform:scale(.85)}
+.dcell{display:flex; flex-direction:column; align-items:center; gap:4px}
+/* clickable tuning bars above (+1) and below (-1) each digit */
+.dbar{
+  width:26px; height:4px; border-radius:2px; background:#26333d; cursor:pointer;
+  transition:.12s;
+}
+.dbar:hover{background:var(--accent); box-shadow:0 0 8px var(--accent-glow)}
+.dbar:active{transform:scaleY(.6)}
+.dcell:focus-within .dbar{background:#33454f}
 .dig{
   width:26px; font-family:var(--font-seg), var(--font-mono); font-size:26px; font-weight:500;
   color:var(--accent); text-shadow:0 0 8px var(--accent-glow);
-  background:transparent; border:none; border-bottom:1px solid #1c2730;
+  background:transparent; border:none;
   text-align:center; padding:1px 0; -moz-appearance:textfield;
 }
-.dig:focus{outline:none; border-bottom-color:var(--accent); background:#0e1820}
+.dig:focus{outline:none; background:#0e1820}
 .dig::-webkit-outer-spin-button,.dig::-webkit-inner-spin-button{-webkit-appearance:none}
 .fdot{
   font-family:var(--font-seg), var(--font-mono); font-size:26px; color:var(--accent);
@@ -1087,6 +1103,17 @@ body.disconnected .console{opacity:.5; filter:grayscale(.4); transition:.4s}
   border:1px solid var(--sw-edge); border-radius:6px; font-size:11px; line-height:1; transition:.15s;
 }
 .panel-head .panel-toggle{margin-left:auto}
+/* "HackRF ready" pill sits hard against the collapse arrow */
+.hrf-ready{
+  display:inline-flex; align-items:center; gap:7px; margin-left:auto;
+  font-family:var(--font-mono); font-size:10px; letter-spacing:.06em;
+  color:var(--text-dim); text-transform:uppercase;
+}
+.hrf-ready .dot{
+  width:8px; height:8px; border-radius:50%; flex:none;
+  background:#2fcf6b; box-shadow:0 0 7px 1px rgba(47,207,107,.75);
+}
+.hackrf-zone .panel-head .panel-toggle{margin-left:10px}
 .panel-toggle:hover{color:var(--accent); border-color:var(--accent)}
 .collapsed .panel-body{display:none}
 .hackrf-zone{padding:26px 30px 26px}
