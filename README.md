@@ -31,6 +31,10 @@ the theme toggle in the header (light is the default).*
   straight to the browser over **WebRTC/Opus** via `aiortc` — no extra app
   or proxy. Listen in the browser; the mic is fed to the radio only
   while PTT is engaged.
+- **SDR waterfall (optional, HackRF)** — if a HackRF One is connected, an extra
+  panel shows a live spectrum + waterfall: a real-time **panadapter** centred on
+  the tuned frequency (auto-following the radio) or a **wideband sweep** across a
+  range. Receive-only and entirely optional — see [below](#sdr-waterfall-optional-hackrf).
 - **No build step for the control UI** — the SPA is plain HTML/CSS/JS served
   directly by the backend. No Node toolchain required on the Pi.
 
@@ -72,6 +76,8 @@ Protocol reference: [LA3QMA/TM-V71_TM-D710-Kenwood](https://github.com/LA3QMA/TM
 - System packages: `portaudio19-dev` (sounddevice), `swig` + `liblgpio-dev`
   (build `lgpio` for the optional GPIO power switch). WebRTC/Opus audio is
   in-process via `aiortc` (pip) — no audio server needed.
+- Optional: a **HackRF One** plus the `hackrf` host tools for the SDR waterfall
+  (see [SDR waterfall](#sdr-waterfall-optional-hackrf)).
 
 ### Python dependencies
 
@@ -161,6 +167,33 @@ microphone. Listen there; hold the large **PTT** button to transmit.
 
 > ⚠️ Only transmit into a dummy load or with a valid amateur radio licence.
 
+## SDR waterfall (optional, HackRF)
+
+If a **HackRF One** is plugged into the Pi, the UI gains an extra collapsible
+**HACKRF WATERFALL** panel (above the band scan) with a live spectrum and
+waterfall. It is **receive-only** and **fully optional** — without a HackRF the
+panel just reports "no HackRF detected" and nothing else is affected.
+
+![HackRF waterfall panel](docs/waterfall.png)
+
+- **Panadapter** — live IQ via `hackrf_transfer`, FFT'd to a ~2 MHz span centred
+  on the tuned frequency. With *follow* on it tracks the radio as you retune; a
+  centre line marks the current frequency.
+- **Sweep** — a wideband power sweep (`hackrf_sweep`) across a chosen range, for
+  an overview of where the activity is.
+- **LNA / VGA / AMP** set the HackRF's RF gain; the **LEVEL** slider sets the
+  display contrast (peak height). **Hover** the graph to read frequency + dB;
+  **double-click to tune the control VFO** to that point.
+
+It needs the HackRF host tools (`hackrf_transfer`, `hackrf_sweep`):
+
+```bash
+sudo apt-get install -y hackrf
+```
+
+The HackRF is used exclusively while the panel is on; collapsing it or turning
+it off releases the device.
+
 ## Configuration
 
 All settings are overridable via `TMV71_*` environment variables (see
@@ -195,7 +228,10 @@ All settings are overridable via `TMV71_*` environment variables (see
 | `POST` | `/api/memories/import` | CSV import (multipart) |
 | `GET` | `/api/audio/status` | WebRTC audio bridge status + levels |
 | `POST` | `/api/webrtc/offer` | WebRTC SDP offer → answer (browser audio) |
+| `GET` | `/api/hackrf` | SDR waterfall status (optional HackRF) |
+| `POST` | `/api/hackrf/start` · `/stop` · `/config` | control the SDR waterfall |
 | `WS` | `/ws` | live status stream |
+| `WS` | `/ws/hackrf` | live spectrum / waterfall frames (optional HackRF) |
 
 ## Security
 
@@ -209,6 +245,7 @@ proxy with TLS + auth.
 - ✅ Direct two-way browser audio over WebRTC/Opus (`aiortc`)
 - ✅ GPIO power switch, single-band (DL), TX power, squelch, in-display S-meter
 - ✅ systemd packaging (see [`deploy/`](deploy/))
+- ✅ Optional HackRF SDR waterfall (panadapter + wideband sweep)
 - ⏳ Flutter Android app (reuses this REST + WebSocket API)
 
 ## Credits

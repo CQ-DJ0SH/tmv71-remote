@@ -222,3 +222,15 @@ class SerialConfig(BaseModel):
     """Serial link settings, changeable at runtime."""
     port: str
     baud: int = Field(gt=0)
+
+
+class HackRFConfig(BaseModel):
+    """HackRF waterfall settings (all optional; only sent fields are applied)."""
+    mode: Optional[str] = Field(default=None, pattern="^(pan|sweep)$")
+    follow: Optional[bool] = None
+    center: Optional[int] = Field(default=None, gt=0, description="Panadapter centre, Hz")
+    sweep_start: Optional[int] = Field(default=None, gt=0)
+    sweep_stop: Optional[int] = Field(default=None, gt=0)
+    lna: Optional[int] = Field(default=None, ge=0, le=40)
+    vga: Optional[int] = Field(default=None, ge=0, le=62)
+    amp: Optional[bool] = None

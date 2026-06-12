@@ -31,7 +31,8 @@ from .models import (AudioDeviceRequest, AudioGainRequest, AutoPowerOffRequest,
                      PttBandRequest, PttRequest, RadioInfo, RadioStatus,
                      Tone1750Request,
                      RecallRequest, ScanStartRequest, SerialConfig,
-                     SquelchRequest, StepRequest, VfoUpdate, WebRTCOffer)
+                     SquelchRequest, StepRequest, VfoUpdate, WebRTCOffer,
+                     HackRFConfig)
 from . import mixer
 from . import system_info
 from . import updater
@@ -40,12 +41,26 @@ from .webrtc_audio import RadioAudio, RadioRxTrack, consume_mic
 from aiortc import RTCPeerConnection, RTCSessionDescription
 from .radio_service import RadioService
 from .tmv71 import TMV71Error
+from .hackrf_sdr import HackRFSpectrum
 from .state import ConnectionManager
 
 logging.basicConfig(level=logging.INFO)
 
 manager = ConnectionManager()
 service = RadioService(manager)
+
+
+def _control_band_freq():
+    """Current control-band RX frequency (Hz) for the HackRF follow mode."""
+    try:
+        st = service.status
+        b = st.control_band or 0
+        return st.bands[b].rx_freq if st.bands and b < len(st.bands) else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+sdr = HackRFSpectrum(freq_getter=_control_band_freq)
 
 
 power_switch = PowerSwitch(settings.gpio_power_pin, settings.gpio_active_high)
@@ -156,6 +171,7 @@ async def lifespan(app: FastAPI):
     if audio_wd:
         audio_wd.cancel()
     apo_task.cancel()
+    await sdr.stop()
     for pc in list(pcs):
         await pc.close()
     pcs.clear()
@@ -187,7 +203,14 @@ async def _track_activity(request, call_next):
     # does not, so an idle-but-open page still relies on the WebSocket presence.
     if request.method in ("POST", "PUT", "DELETE"):
         touch_activity()
-    return await call_next(request)
+    response = await call_next(request)
+    # The GUI assets aren't content-hashed: force the browser to revalidate them
+    # (cheap ETag 304s) so a deploy or a VPN reconnect never leaves a stale page
+    # cached with a dead WebSocket — which looks exactly like "the API is down".
+    path = request.url.path
+    if not (path.startswith("/api") or path.startswith("/ws")):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 # --- control API ------------------------------------------------------------
@@ -668,6 +691,48 @@ async def ws_status(ws: WebSocket) -> None:
     except Exception:  # noqa: BLE001
         await manager.disconnect(ws)
 
+
+
+# --- HackRF spectrum / waterfall --------------------------------------------
+@app.get("/api/hackrf")
+async def hackrf_status() -> dict:
+    return sdr.status()
+
+
+@app.post("/api/hackrf/start")
+async def hackrf_start(cfg: HackRFConfig) -> dict:
+    return await sdr.start(**cfg.model_dump(exclude_none=True))
+
+
+@app.post("/api/hackrf/stop")
+async def hackrf_stop() -> dict:
+    return await sdr.stop()
+
+
+@app.post("/api/hackrf/config")
+async def hackrf_config(cfg: HackRFConfig) -> dict:
+    return await sdr.configure(**cfg.model_dump(exclude_none=True))
+
+
+@app.websocket("/ws/hackrf")
+async def ws_hackrf(ws: WebSocket) -> None:
+    await ws.accept()
+    q = sdr.subscribe()
+    try:
+        await ws.send_json({"t": "status", **sdr.status()})
+        while True:
+            try:
+                frame = await asyncio.wait_for(q.get(), timeout=15)
+            except asyncio.TimeoutError:
+                await ws.send_json({"t": "idle"})   # keep-alive / detect disconnect
+                continue
+            await ws.send_json(frame)
+    except WebSocketDisconnect:
+        pass
+    except Exception:  # noqa: BLE001
+        pass
+    finally:
+        sdr.unsubscribe(q)
 
 
 # --- static frontend (catch-all at "/", must be mounted last) ----------------

@@ -241,21 +241,22 @@ body.theme-light .power-switch.off .ps-icon{text-shadow:none}
   display:grid; gap:22px;
   --row-h:377px;                      /* band-panel height; keeps the grid square */
   grid-template-columns:1fr 1fr;
-  grid-template-rows:auto var(--row-h) auto;
-  grid-template-areas: "bands bands" "ptt audio" "scan scan";
+  grid-template-rows:auto var(--row-h) auto auto;
+  grid-template-areas: "bands bands" "ptt audio" "hackrf hackrf" "scan scan";
 }
 .bands{grid-area:bands; display:grid; grid-template-columns:1fr 1fr; gap:22px}
 .ptt-zone{grid-area:ptt}
 .audio{grid-area:audio}
+.hackrf-zone{grid-area:hackrf}
 .scan-zone{grid-area:scan}
 @media (max-width:860px){
   .console{grid-template-columns:1fr; grid-template-rows:none;
-           grid-template-areas:"bands" "ptt" "audio" "scan"}
+           grid-template-areas:"bands" "ptt" "audio" "hackrf" "scan"}
   .bands{grid-template-columns:1fr}
 }
 
 /* panel base — beveled aircraft instrument plate */
-.band, .ptt-zone, .audio, .scan-zone{
+.band, .ptt-zone, .audio, .scan-zone, .hackrf-zone{
   background:
     linear-gradient(180deg,var(--panel-2),var(--panel));
   border:1px solid var(--edge);
@@ -309,7 +310,8 @@ body.theme-light .screw::before{
   background:linear-gradient(145deg, #71787e, #9aa1a6);
   box-shadow:inset 0 1px 1px #00000045;
 }
-.band::before, .ptt-zone::before, .audio::before, .scan-zone::before{ /* color rail */
+.band::before, .ptt-zone::before, .audio::before, .scan-zone::before,
+.hackrf-zone::before{ /* color rail */
   content:""; position:absolute; left:0; top:14px; bottom:14px; width:3px;
   border-radius:3px; background:var(--accent); box-shadow:0 0 12px var(--accent-glow);
 }
@@ -320,6 +322,8 @@ body.theme-light .screw::before{
 .audio::before{box-shadow:0 0 9px -2px var(--accent-glow)}   /* subtler glow */
 .scan-zone{--accent:var(--sw-edge); --accent-glow:var(--sw-edge)}  /* scan = light grey */
 .scan-zone::before{box-shadow:0 0 6px -2px var(--accent-glow)}
+.hackrf-zone{--accent:#3a9ff0; --accent-glow:#3a9ff0}   /* HackRF = waterfall blue */
+.hackrf-zone::before{box-shadow:0 0 9px -2px var(--accent-glow)}
 /* VFO-panel switch borders in the band's accent colour (A=amber, B=cyan) */
 .band .seg, .band .seg .sg+.sg,
 .band .mode-toggle, .band .mode-toggle .mt+.mt,
@@ -330,11 +334,12 @@ body.theme-light .screw::before{
 /* ---------------- band panel ---------------- */
 .band{padding:26px 30px 26px}
 /* radio powered off (GPIO relay open) -> dim the band/PTT/audio/scan panels */
-.band, .ptt-zone, .audio, .scan-zone{transition:opacity .25s, filter .25s}
+.band, .ptt-zone, .audio, .scan-zone, .hackrf-zone{transition:opacity .25s, filter .25s}
 body.radio-off .band,
 body.radio-off .ptt-zone,
 body.radio-off .audio,
-body.radio-off .scan-zone{opacity:.32; filter:grayscale(.6) brightness(.78)}
+body.radio-off .scan-zone,
+body.radio-off .hackrf-zone{opacity:.32; filter:grayscale(.6) brightness(.78)}
 .band-head{display:flex; align-items:center; gap:10px; margin-bottom:6px; flex-wrap:wrap}
 /* per-band power/solo button (DL single-band toggle) */
 .band-power{
@@ -1071,3 +1076,64 @@ body.theme-light .toast.ok{border-color:#1f9d57; color:#1f7a44}
 
 /* connection-lost dim */
 body.disconnected .console{opacity:.5; filter:grayscale(.4); transition:.4s}
+
+/* ===================== collapsible panels + HackRF ===================== */
+.panel-head{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px}
+.panel-head h2{font-family:var(--font-disp); font-weight:700; letter-spacing:.16em; font-size:16px; color:var(--text); margin:0}
+.panel-stat{font-family:var(--font-mono); font-size:10px; color:var(--text-dim); letter-spacing:.05em}
+.panel-toggle{
+  width:28px; height:22px; flex:none; cursor:pointer; order:99; padding:0;
+  color:var(--text-dim); background:var(--ctrl-bg);
+  border:1px solid var(--sw-edge); border-radius:6px; font-size:11px; line-height:1; transition:.15s;
+}
+.panel-head .panel-toggle{margin-left:auto}
+.panel-toggle:hover{color:var(--accent); border-color:var(--accent)}
+.collapsed .panel-body{display:none}
+.hackrf-zone{padding:26px 30px 26px}
+.hackrf-zone.collapsed{padding-bottom:22px}
+/* switched off → dim the panel body (header with the ON button stays bright) */
+.hackrf-zone .panel-body{transition:opacity .25s, filter .25s}
+.hackrf-zone.hrf-off .panel-body{opacity:.4; filter:grayscale(.6) brightness(.82)}
+
+/* HackRF controls */
+.hrf-ctrls{display:flex; align-items:center; gap:11px 16px; flex-wrap:wrap; margin-bottom:12px}
+.hrf-power{
+  font-family:var(--font-mono); font-weight:700; font-size:12px; letter-spacing:.08em;
+  padding:6px 15px; border-radius:7px; cursor:pointer; transition:.15s;
+  color:var(--text-dim); background:var(--ctrl-bg); border:1px solid var(--sw-edge);
+}
+.hrf-power[aria-pressed="true"]{color:#06220f; background:var(--accent); border-color:var(--accent); box-shadow:0 0 12px -3px var(--accent-glow)}
+.hrf-modes{display:inline-flex; border:1px solid var(--sw-edge); border-radius:7px; overflow:hidden}
+.hrf-m{font-family:var(--font-mono); font-size:11px; padding:6px 11px; cursor:pointer; color:var(--text-dim);
+  background:var(--ctrl-bg); border:none; border-right:1px solid var(--sw-edge); transition:.15s}
+.hrf-m:last-child{border-right:none}
+.hrf-m:hover{color:var(--accent)}
+.hrf-m.active{color:#06220f; background:var(--accent); font-weight:600}
+.hrf-follow, .hrf-amp{display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono);
+  font-size:11px; color:var(--text-dim); cursor:pointer; user-select:none}
+.hrf-field{display:inline-flex; align-items:center; gap:7px; font-family:var(--font-mono); font-size:11px; color:var(--text-dim)}
+.hrf-field input[type=text]{width:96px; padding:4px 7px; font-family:var(--font-mono); font-size:12px;
+  color:var(--text); background:var(--field-bg); border:1px solid var(--sw-edge); border-radius:6px}
+.hrf-field input[type=text]:disabled{opacity:.45}
+.hrf-field input[type=range]{width:74px; accent-color:var(--accent)}
+.hrf-gains{display:inline-flex; align-items:center; gap:13px; flex-wrap:nowrap}
+.hrf-gv{min-width:18px; color:var(--accent); font-weight:600}
+.hrf-amp input, .hrf-follow input{accent-color:var(--accent)}
+
+/* HackRF graph: live spectrum stacked over the waterfall */
+.hrf-graph{position:relative; height:250px; border:1px solid #4a5a67; border-radius:10px; overflow:hidden; background:var(--panel)}
+body.theme-light .hrf-graph{border-color:var(--edge)}
+#hrf-spectrum, #hrf-wf{position:absolute; left:0; width:100%; display:block}
+#hrf-spectrum{top:0; height:38%}
+#hrf-wf{top:38%; height:62%}
+/* clear divider between the level spectrum (top) and the waterfall (bottom) */
+.hrf-split{position:absolute; left:0; right:0; top:38%; height:0; z-index:1; pointer-events:none;
+  border-top:2px solid var(--accent);
+  box-shadow:0 0 8px -1px var(--accent-glow), 0 1px 0 rgba(0,0,0,.45)}
+/* marker for the currently tuned frequency (centre in follow mode) */
+.hrf-centerline{position:absolute; top:0; bottom:0; width:0; z-index:2; pointer-events:none;
+  transform:translateX(-50%);
+  border-left:1px dashed rgba(255,255,255,0.7); box-shadow:0 0 7px rgba(255,255,255,0.35)}
+.hrf-centerline::before{content:""; position:absolute; top:0; left:-4px;
+  border-left:4px solid transparent; border-right:4px solid transparent;
+  border-top:5px solid rgba(255,255,255,0.85)}

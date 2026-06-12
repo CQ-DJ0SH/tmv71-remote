@@ -245,9 +245,45 @@
   </section>
 
   <!-- BAND SCAN -->
-  <section class="scan-zone">
+  <section class="hackrf-zone collapsed" id="hackrf-zone">
+    <div class="panel-head" id="hrf-head">
+      <h2>HACKRF WATERFALL</h2>
+      <button class="hrf-power" id="hrf-power" type="button" aria-pressed="false" title="Start / stop the HackRF">OFF</button>
+      <span class="panel-stat" id="hrf-stat"></span>
+      <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="hrf-body" title="Show / hide the HackRF waterfall">▲</button>
+    </div>
+    <div class="panel-body" id="hrf-body">
+      <div class="hrf-ctrls">
+        <div class="hrf-modes" role="group" aria-label="Waterfall mode">
+          <button class="hrf-m active" data-mode="pan" title="Live panadapter centred on the frequency (~2 MHz span)">Panadapter</button>
+          <button class="hrf-m" data-mode="sweep" title="Wideband sweep across a range">Sweep</button>
+        </div>
+        <label class="hrf-follow"><input type="checkbox" id="hrf-follow" checked> follow</label>
+        <label class="hrf-field hrf-pan-only">Center<input type="text" id="hrf-center-in" inputmode="decimal" placeholder="MHz" disabled></label>
+        <label class="hrf-field hrf-sweep-only" hidden>Range<input type="text" id="hrf-range-in" inputmode="decimal" placeholder="144–146"></label>
+        <div class="hrf-gains">
+          <label class="hrf-field">LNA<input type="range" id="hrf-lna" min="0" max="40" step="8" value="24"><span class="hrf-gv" id="hrf-lna-v">24</span></label>
+          <label class="hrf-field">VGA<input type="range" id="hrf-vga" min="0" max="62" step="2" value="20"><span class="hrf-gv" id="hrf-vga-v">20</span></label>
+          <label class="hrf-amp"><input type="checkbox" id="hrf-amp"> AMP</label>
+          <label class="hrf-field" title="Display level — sets the waterfall/peak height (does not touch the radio)">LEVEL<input type="range" id="hrf-level" min="0" max="100" step="1" value="50"><span class="hrf-gv" id="hrf-level-v">50</span></label>
+        </div>
+      </div>
+      <div class="hrf-graph">
+        <canvas id="hrf-spectrum" title="Hover to read frequency · double-click to tune the control VFO"></canvas>
+        <canvas id="hrf-wf"></canvas>
+        <div class="hrf-split"></div>
+        <div class="hrf-centerline" id="hrf-centerline" hidden></div>
+        <div class="scan-cur" id="hrf-cur" hidden></div>
+        <div class="scan-tip" id="hrf-tip" hidden></div>
+      </div>
+      <div class="scan-axis"><span id="hrf-f0">—</span><span id="hrf-fc">—</span><span id="hrf-f1">—</span></div>
+    </div>
+  </section>
+
+  <section class="scan-zone" id="scan-zone">
     <div class="scan-head">
       <h2>BAND SCAN</h2>
+      <button class="panel-toggle" type="button" aria-expanded="true" aria-controls="scan-body" title="Show / hide the band scan">▼</button>
       <div class="scan-bands" role="group" aria-label="Scan band">
         <button class="scan-band" data-band="2m">2 m</button>
         <button class="scan-band" data-band="70cm">70 cm</button>
@@ -257,16 +293,18 @@
       </div>
       <span class="scan-prog" id="scan-prog">Tap a band to scan</span>
     </div>
-    <div class="scan-graph">
-      <canvas id="scan-canvas" title="Hover to read frequency · double-click to tune the control VFO"></canvas>
-      <div class="scan-cur" id="scan-cur" hidden></div>
-      <div class="scan-tip" id="scan-tip" hidden></div>
-      <div class="scan-legend">
-        <span class="sg-spec">AF level · higher = more occupied</span>
-        <span class="sg-wf">Waterfall · one row per sweep</span>
+    <div class="panel-body" id="scan-body">
+      <div class="scan-graph">
+        <canvas id="scan-canvas" title="Hover to read frequency · double-click to tune the control VFO"></canvas>
+        <div class="scan-cur" id="scan-cur" hidden></div>
+        <div class="scan-tip" id="scan-tip" hidden></div>
+        <div class="scan-legend">
+          <span class="sg-spec">AF level · higher = more occupied</span>
+          <span class="sg-wf">Waterfall · one row per sweep</span>
+        </div>
       </div>
+      <div class="scan-axis"><span id="scan-f0">—</span><span id="scan-fc">—</span><span id="scan-f1">—</span></div>
     </div>
-    <div class="scan-axis"><span id="scan-f0">—</span><span id="scan-fc">—</span><span id="scan-f1">—</span></div>
   </section>
 </main>
 

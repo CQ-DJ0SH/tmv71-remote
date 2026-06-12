@@ -118,6 +118,11 @@ function render(st) {
 
   (st.bands || []).forEach(renderBand);
   updateMemBase(st);
+  // sweep in follow mode: re-centre the 20 MHz window when the radio drifts
+  if (hrf.ws && hrf.mode === "sweep" && hrf.follow) {
+    const cf = hrfControlFreq();
+    if (cf && Math.abs(cf - hrf.sweepCenter) > 5e6) hrfReconfig();
+  }
 
   // control band highlight + per-band TX lamp + single-band dimming
   $$(".band").forEach(p => {
@@ -1532,6 +1537,292 @@ function bindScan() {
   }).catch(() => {});
 }
 
+// ---- collapsible panels ----------------------------------------------------
+function bindPanels() {
+  $$(".panel-toggle").forEach(btn => {
+    const section = btn.closest("section");
+    if (!section) return;
+    const setState = collapsed => {
+      section.classList.toggle("collapsed", collapsed);
+      btn.setAttribute("aria-expanded", String(!collapsed));
+      btn.textContent = collapsed ? "▲" : "▼";   // down arrow when expanded
+    };
+    const saved = localStorage.getItem("tmv71.collapse." + section.id);
+    if (saved != null) setState(saved === "1");
+    btn.addEventListener("click", () => {
+      const collapsed = !section.classList.contains("collapsed");
+      setState(collapsed);
+      localStorage.setItem("tmv71.collapse." + section.id, collapsed ? "1" : "0");
+      if (section.id === "hackrf-zone") { if (!collapsed) sizeHrfCanvases(); hrfSync(); }
+      else if (!collapsed) sizeScanCanvas();        // re-measure scan on expand
+    });
+  });
+}
+
+// ---- HackRF waterfall ------------------------------------------------------
+const hrf = {
+  on: false, mode: "pan", follow: true, lna: 24, vga: 20, amp: false,
+  center: null, sweepStart: 144e6, sweepStop: 146e6, sweepCenter: 0,
+  ws: null, meta: null, floorEMA: null,   // auto-tracked noise floor (dB)
+  level: Number(localStorage.getItem("tmv71.hrf.level") || 50),  // display peak height
+};
+const HRF_BLUE = "#3a9ff0";
+// waterfall ramp low→high: blue "water" at the bottom, hot yellow→red for
+// strong signals — deep navy → blue → cyan → yellow → red.
+const HRF_PAL_DARK  = [[10,14,30],[26,60,150],[40,130,225],[70,205,225],[245,225,70],[220,55,40]];
+const HRF_PAL_LIGHT = [[223,230,239],[120,165,222],[40,120,212],[40,178,205],[232,195,55],[208,48,38]];
+function hrfHeatRGB(t) {
+  t = Math.max(0, Math.min(1, t));
+  const s = document.body.classList.contains("theme-light") ? HRF_PAL_LIGHT : HRF_PAL_DARK;
+  const x = t * (s.length - 1), i = Math.floor(x), f = x - i;
+  const a = s[i], b = s[Math.min(i + 1, s.length - 1)];
+  return [Math.round(a[0]+(b[0]-a[0])*f), Math.round(a[1]+(b[1]-a[1])*f), Math.round(a[2]+(b[2]-a[2])*f)];
+}
+function hrfHeat(t) { const c = hrfHeatRGB(t); return `rgb(${c[0]},${c[1]},${c[2]})`; }
+
+function hrfVisible() { const z = $("#hackrf-zone"); return z && !z.classList.contains("collapsed"); }
+function hrfShouldRun() { return hrf.on && hrfVisible(); }
+function hrfStat(msg) { const e = $("#hrf-stat"); if (e) e.textContent = msg; }
+function hrfMhz(h) { return (h / 1e6).toFixed(3); }
+
+function hrfControlFreq() {
+  try { const b = last?.control_band ?? 0; return last?.bands?.[b]?.rx_freq || null; }
+  catch { return null; }
+}
+function hrfCfg() {
+  const c = { mode: hrf.mode, follow: hrf.follow, lna: hrf.lna, vga: hrf.vga, amp: hrf.amp };
+  if (hrf.mode === "pan" && !hrf.follow && hrf.center) c.center = hrf.center;
+  if (hrf.mode === "sweep") {
+    if (hrf.follow) {                       // 20 MHz window centred on the radio
+      const cf = hrfControlFreq() || hrf.center || 145e6;
+      hrf.sweepCenter = cf;
+      c.sweep_start = cf - 10e6; c.sweep_stop = cf + 10e6;
+    } else { c.sweep_start = hrf.sweepStart; c.sweep_stop = hrf.sweepStop; }
+  }
+  return c;
+}
+
+async function hrfSync() {
+  if (hrfShouldRun() && !hrf.ws) {
+    try { await api("POST", "/api/hackrf/start", hrfCfg()); }
+    catch (e) { toast("HackRF: " + e.message, "err"); hrf.on = false; updateHrfPower(); return; }
+    openHrfWs();
+    hrfStat("starting…");
+  } else if (!hrfShouldRun() && hrf.ws) {
+    closeHrfWs();
+    try { await api("POST", "/api/hackrf/stop"); } catch {}
+    hrfStat("");
+    const cl = $("#hrf-centerline"); if (cl) cl.hidden = true;
+  }
+}
+async function hrfReconfig() {
+  if (!hrfShouldRun()) return;
+  try { applyHrfStatus(await api("POST", "/api/hackrf/config", hrfCfg())); }
+  catch (e) { toast("HackRF: " + e.message, "err"); }
+}
+
+function openHrfWs() {
+  closeHrfWs();
+  const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/hackrf`);
+  hrf.ws = ws;
+  ws.onmessage = ev => { try { hrfFrame(JSON.parse(ev.data)); } catch {} };
+  ws.onclose = () => { if (hrf.ws === ws) hrf.ws = null; };
+  ws.onerror = () => {};
+}
+function closeHrfWs() { if (hrf.ws) { try { hrf.ws.close(); } catch {} hrf.ws = null; } }
+
+function hrfFrame(m) {
+  if (m.t === "status") { applyHrfStatus(m); return; }
+  if (m.t !== "pan" && m.t !== "sweep") return;       // idle/ping
+  hrf.meta = m;
+  hrfUpdateFloor(m.db);
+  drawHrfWaterfall(m.db);
+  drawHrfSpectrum(m.db);
+  setHrfAxis(m);
+  updateHrfCenterline(m);
+  hrfStat(`${m.t === "pan" ? "PAN" : "SWEEP"} · ${hrfMhz(m.center)} MHz`);
+  if (m.t === "pan" && hrf.follow) {
+    const inp = $("#hrf-center-in");
+    if (inp && document.activeElement !== inp) inp.value = hrfMhz(m.center);
+  }
+}
+
+function applyHrfStatus(s) {
+  if (!s) return;
+  if (s.center) hrf.center = s.center;
+  if (s.error) hrfStat("⚠ " + s.error);
+}
+
+// Track the noise floor (slow EMA of a low percentile) so it sits at the bottom
+// of the waterfall in any RF/gain condition.
+function hrfUpdateFloor(db) {
+  const s = [...db].sort((a, b) => a - b);
+  const p = s[Math.floor(s.length * 0.10)];
+  hrf.floorEMA = hrf.floorEMA == null ? p : hrf.floorEMA * 0.93 + p * 0.07;
+}
+// dB→0..1 with the auto floor at the bottom; the LEVEL slider sets the dB span
+// above it (= peak height / contrast): more level → smaller span → taller peaks.
+function hrfNorm() {
+  const floor = hrf.floorEMA == null ? -60 : hrf.floorEMA;
+  const dr = Math.max(8, 80 - (hrf.level / 100) * 70);   // level 0→80 dB … 100→10 dB
+  return v => Math.max(0, Math.min(1, (v - floor) / dr));
+}
+
+function sizeHrfCanvases() {
+  const dpr = window.devicePixelRatio || 1;
+  ["#hrf-spectrum", "#hrf-wf"].forEach(sel => {
+    const cv = $(sel); if (!cv) return;
+    const r = cv.getBoundingClientRect();
+    cv.width = Math.max(1, Math.round(r.width * dpr));
+    cv.height = Math.max(1, Math.round(r.height * dpr));
+  });
+}
+
+let hrfRowCv = null;        // offscreen 1-row buffer (bin resolution)
+function drawHrfWaterfall(db) {
+  const cv = $("#hrf-wf"); if (!cv) return;
+  const ctx = cv.getContext("2d"), W = cv.width;
+  const dpr = window.devicePixelRatio || 1;
+  // sweeps land ~once every several seconds, so draw them as fat rows that
+  // visibly advance; the panadapter streams fast, so thin rows.
+  const sweep = hrf.meta && hrf.meta.t === "sweep";
+  const rowH = Math.max(1, Math.round((sweep ? 8 : 2) * dpr));
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(cv, 0, rowH);                          // crisp integer scroll down
+  // paint the new row at bin resolution into an offscreen strip…
+  const n = db.length, norm = hrfNorm();
+  if (!hrfRowCv || hrfRowCv.width !== n) {
+    hrfRowCv = document.createElement("canvas"); hrfRowCv.width = n; hrfRowCv.height = 1;
+  }
+  const rctx = hrfRowCv.getContext("2d"), img = rctx.createImageData(n, 1), d = img.data;
+  for (let i = 0; i < n; i++) {
+    const c = hrfHeatRGB(norm(db[i])), o = i * 4;
+    d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255;
+  }
+  rctx.putImageData(img, 0, 0);
+  // …then stretch it across the canvas with interpolation → smooth, not blocky
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(hrfRowCv, 0, 0, n, 1, 0, 0, W, rowH);
+}
+
+function drawHrfSpectrum(db) {
+  const cv = $("#hrf-spectrum"); if (!cv) return;
+  const ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = "rgba(127,140,150,0.12)"; ctx.lineWidth = 1;
+  for (let g = 1; g < 3; g++) { const y = Math.round(H * g / 3) + 0.5; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  const norm = hrfNorm(), n = db.length;
+  ctx.beginPath(); ctx.moveTo(0, H);
+  for (let i = 0; i < n; i++) ctx.lineTo(i / (n - 1) * W, H - norm(db[i]) * (H - 2));
+  ctx.lineTo(W, H); ctx.closePath();
+  ctx.fillStyle = "rgba(58,159,240,0.18)"; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(0, H - norm(db[0]) * (H - 2));
+  for (let i = 1; i < n; i++) ctx.lineTo(i / (n - 1) * W, H - norm(db[i]) * (H - 2));
+  ctx.strokeStyle = HRF_BLUE; ctx.lineWidth = 1.2 * dprOf(); ctx.stroke();
+}
+function dprOf() { return window.devicePixelRatio || 1; }
+
+function setHrfAxis(m) {
+  $("#hrf-f0").textContent = hrfMhz(m.f0);
+  $("#hrf-fc").textContent = hrfMhz(m.center);
+  $("#hrf-f1").textContent = hrfMhz(m.f1);
+}
+
+// vertical marker at the currently tuned radio frequency (centre in follow mode)
+function updateHrfCenterline(m) {
+  const el = $("#hrf-centerline"); if (!el) return;
+  const cf = hrfControlFreq();
+  if (!cf || !m || m.f1 <= m.f0) { el.hidden = true; return; }
+  const frac = (cf - m.f0) / (m.f1 - m.f0);
+  if (frac < 0 || frac > 1) { el.hidden = true; return; }
+  el.hidden = false; el.style.left = (frac * 100).toFixed(2) + "%";
+}
+
+function hrfFreqAtX(clientX) {
+  const m = hrf.meta; if (!m) return null;
+  const g = $(".hrf-graph"); if (!g) return null;
+  const r = g.getBoundingClientRect();
+  let frac = (clientX - r.left) / r.width;
+  frac = Math.max(0, Math.min(1, frac));
+  const n = m.db.length, idx = Math.max(0, Math.min(n - 1, Math.round(frac * (n - 1))));
+  return { freq: Math.round(m.f0 + frac * (m.f1 - m.f0)), db: m.db[idx],
+           xCss: frac * r.width, gw: r.width };
+}
+
+function updateHrfPower() {
+  const b = $("#hrf-power"); if (!b) return;
+  b.textContent = hrf.on ? "ON" : "OFF";
+  b.setAttribute("aria-pressed", String(hrf.on));
+  $("#hackrf-zone")?.classList.toggle("hrf-off", !hrf.on);   // dim the panel when off
+}
+function updateHrfModeUi() {
+  $$(".hrf-m").forEach(x => x.classList.toggle("active", x.dataset.mode === hrf.mode));
+  $$(".hrf-pan-only").forEach(x => x.hidden = hrf.mode !== "pan");
+  $$(".hrf-sweep-only").forEach(x => x.hidden = hrf.mode !== "sweep");
+  const ci = $("#hrf-center-in"); if (ci) ci.disabled = (hrf.mode === "pan" && hrf.follow);
+}
+
+function bindHackRF() {
+  if (!$("#hackrf-zone")) return;
+  // availability check — hide power if no HackRF
+  api("GET", "/api/hackrf").then(s => {
+    if (s && s.available === false) { hrfStat("no HackRF detected"); $("#hrf-power").disabled = true; }
+  }).catch(() => {});
+
+  $("#hrf-power")?.addEventListener("click", () => { hrf.on = !hrf.on; updateHrfPower(); hrfSync(); });
+  $$(".hrf-m").forEach(b => b.addEventListener("click", () => {
+    hrf.mode = b.dataset.mode; updateHrfModeUi();
+    if (hrfShouldRun()) hrfReconfig(); }));
+  $("#hrf-follow")?.addEventListener("change", e => {
+    hrf.follow = e.target.checked; updateHrfModeUi(); hrfReconfig(); });
+  $("#hrf-amp")?.addEventListener("change", e => { hrf.amp = e.target.checked; hrfReconfig(); });
+  const lna = $("#hrf-lna"), vga = $("#hrf-vga");
+  lna?.addEventListener("input", () => $("#hrf-lna-v").textContent = lna.value);
+  vga?.addEventListener("input", () => $("#hrf-vga-v").textContent = vga.value);
+  lna?.addEventListener("change", () => { hrf.lna = Number(lna.value); hrfReconfig(); });
+  vga?.addEventListener("change", () => { hrf.vga = Number(vga.value); hrfReconfig(); });
+  const lvl = $("#hrf-level");
+  if (lvl) {
+    lvl.value = hrf.level; $("#hrf-level-v").textContent = hrf.level;
+    lvl.addEventListener("input", () => {            // display-only: no radio restart
+      hrf.level = Number(lvl.value);
+      $("#hrf-level-v").textContent = lvl.value;
+      localStorage.setItem("tmv71.hrf.level", lvl.value);
+      if (hrf.meta) drawHrfSpectrum(hrf.meta.db);    // live preview on the spectrum line
+    });
+  }
+  $("#hrf-center-in")?.addEventListener("change", e => {
+    const mhz = parseFloat(e.target.value);
+    if (isFinite(mhz)) { hrf.center = Math.round(mhz * 1e6); hrfReconfig(); }
+  });
+  $("#hrf-range-in")?.addEventListener("change", e => {
+    const m = e.target.value.match(/(\d+(?:\.\d+)?)\s*[-–:]\s*(\d+(?:\.\d+)?)/);
+    if (m) { hrf.sweepStart = Math.round(parseFloat(m[1]) * 1e6); hrf.sweepStop = Math.round(parseFloat(m[2]) * 1e6); hrfReconfig(); }
+  });
+  // hover readout (frequency + dB) over the whole graph; double-click → VFO
+  const cv = $(".hrf-graph"), cur = $("#hrf-cur"), tip = $("#hrf-tip");
+  if (cv) {
+    cv.addEventListener("mousemove", e => {
+      const info = hrfFreqAtX(e.clientX);
+      if (!info) { cur.hidden = tip.hidden = true; return; }
+      cur.hidden = false; cur.style.left = info.xCss + "px";
+      tip.hidden = false;
+      tip.textContent = `${hrfMhz(info.freq)} MHz · ${Math.round(info.db)} dB`;
+      tip.style.left = Math.max(48, Math.min(info.gw - 48, info.xCss)) + "px";
+    });
+    cv.addEventListener("mouseleave", () => { cur.hidden = tip.hidden = true; });
+    cv.addEventListener("dblclick", e => {
+      const info = hrfFreqAtX(e.clientX);
+      if (!info) return;
+      setFreqHz(last?.control_band ?? 0, info.freq);
+      toast(`VFO → ${hrfMhz(info.freq)} MHz`, "ok");
+    });
+  }
+  window.addEventListener("resize", sizeHrfCanvases);
+  updateHrfPower(); updateHrfModeUi();
+  if (hrfVisible()) sizeHrfCanvases();
+}
+
 // ---- theme (hell / dunkel) ------------------------------------------------
 function applyTheme(light) {
   document.body.classList.toggle("theme-light", light);
@@ -1555,6 +1846,8 @@ function bindTheme() {
 bindTheme();
 bindQuickKeys();
 bindScan();
+bindPanels();
+bindHackRF();
 bindControls();
 bindMemory();
 bindEditor();
@@ -1582,7 +1875,7 @@ tickClock(); setInterval(tickClock, 1000);
 
 // decorative aircraft-panel corner screws (one set of four per panel)
 function addPanelScrews() {
-  document.querySelectorAll(".band, .ptt-zone, .audio, .scan-zone").forEach(p => {
+  document.querySelectorAll(".band, .ptt-zone, .audio, .scan-zone, .hackrf-zone").forEach(p => {
     if (p.querySelector(".screw")) return;
     ["tl", "tr", "bl", "br"].forEach(pos => {
       const s = document.createElement("span");
