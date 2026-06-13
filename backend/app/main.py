@@ -23,6 +23,7 @@ from . import memory as memory_io
 from .config import APP_VERSION, save_runtime, settings
 from .models import (AudioDeviceRequest, AudioGainRequest, AutoPowerOffRequest,
                      BandDisplayRequest, BandModeRequest, CallsignRequest,
+                     ThemeRequest,
                      ControlBandRequest, DataBandRequest,
                      DtmfMemory, FrequencyRequest, GpioConfigRequest,
                      AudioBufferRequest,
@@ -436,6 +437,39 @@ async def set_callsign(req: CallsignRequest) -> dict:
     settings.callsign = cs
     save_runtime(callsign=cs)
     return {"callsign": cs}
+
+
+@app.get("/api/theme")
+async def get_theme() -> dict:
+    return {"theme": settings.theme}
+
+
+@app.post("/api/theme")
+async def set_theme(req: ThemeRequest) -> dict:
+    settings.theme = req.theme
+    save_runtime(theme=req.theme)
+    return {"theme": req.theme}
+
+
+GITHUB_URL = "https://github.com/CQ-DJ0SH/tmv71-remote"
+
+
+def _build_date() -> str:
+    """Build date: the HEAD commit date, or this file's mtime as a fallback."""
+    d = updater.head_date()
+    if d:
+        return d
+    try:
+        import datetime
+        return datetime.date.fromtimestamp(os.path.getmtime(__file__)).isoformat()
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+@app.get("/api/version")
+async def get_version() -> dict:
+    """App version, build date + source link (radio-independent — page footer)."""
+    return {"version": APP_VERSION, "built": _build_date(), "repo": GITHUB_URL}
 
 
 @app.post("/api/gpio-config")

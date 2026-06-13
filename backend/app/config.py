@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     # Play a short beep on the radio mic at the end of each transmission.
     roger_beep_enabled: bool = False
 
+    # UI colour theme ("light" | "dark"). Persisted server-side so the choice
+    # survives across browsers/devices and storage clears.
+    theme: str = "light"
+
     # Highest memory channel number to scan when listing (TM-V71 has 0..999)
     max_memory_channels: int = 1000
 
@@ -74,7 +78,7 @@ _RUNTIME_KEYS = ("serial_port", "serial_baud", "gpio_power_pin",
                  "rx_gain", "tx_gain", "audio_device",
                  "tx_buffer_ms", "ptt_tail_ms",
                  "auto_power_off_enabled", "auto_power_off_seconds",
-                 "callsign", "roger_beep_enabled")
+                 "callsign", "roger_beep_enabled", "theme")
 
 
 def _load_runtime() -> dict:

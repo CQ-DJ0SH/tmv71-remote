@@ -5,7 +5,7 @@ app, so keep field names stable and JSON-friendly.
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -136,6 +136,11 @@ class AutoPowerOffRequest(BaseModel):
 class CallsignRequest(BaseModel):
     """Operator callsign, persisted server-side."""
     callsign: str = Field(default="", max_length=12)
+
+
+class ThemeRequest(BaseModel):
+    """UI colour theme, persisted server-side."""
+    theme: Literal["light", "dark"] = "light"
 
 
 class ScanStartRequest(BaseModel):

@@ -21,6 +21,16 @@ def _git(*args: str, timeout: int = 90) -> subprocess.CompletedProcess:
                           capture_output=True, text=True, timeout=timeout)
 
 
+def head_date() -> str | None:
+    """ISO date (YYYY-MM-DD) of the current HEAD commit — the build date of
+    this checkout. None if the deployment isn't a git repo."""
+    try:
+        r = _git("log", "-1", "--format=%cd", "--date=short", timeout=10)
+        return r.stdout.strip() or None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def status() -> dict:
     """Fetch and report how far behind/ahead the checkout is vs the remote."""
     if _git("rev-parse", "--is-inside-work-tree").returncode != 0:

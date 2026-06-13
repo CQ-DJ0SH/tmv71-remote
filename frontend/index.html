@@ -283,7 +283,7 @@
 
   <section class="scan-zone" id="scan-zone">
     <div class="scan-head">
-      <h2>BAND SCAN</h2>
+      <h2>BAND · MEMORY SCAN</h2>
       <button class="panel-toggle" type="button" aria-expanded="true" aria-controls="scan-body" title="Show / hide the band scan">▼</button>
       <div class="scan-bands" role="group" aria-label="Scan band">
         <button class="scan-band" data-band="2m">2 m</button>
@@ -307,6 +307,13 @@
       <div class="scan-axis"><span id="scan-f0">—</span><span id="scan-fc">—</span><span id="scan-f1">—</span></div>
     </div>
   </section>
+
+  <footer class="console-foot">
+    <a id="src-link" href="https://github.com/CQ-DJ0SH/tmv71-remote" target="_blank" rel="noopener">GitHub source</a>
+    <span class="foot-sep">·</span>
+    <span class="foot-ver">v<span id="foot-version">—</span></span>
+    <span class="foot-date" id="foot-date" hidden></span>
+  </footer>
 </main>
 
 <!-- Memory channel editor -->
@@ -336,7 +343,6 @@
   <div class="modal-card settings-card">
     <div class="settings-head">
       <h3>Settings</h3>
-      <span class="app-ver">Version <span id="app-version">1.3</span></span>
       <button id="set-close" class="set-x" title="Close" aria-label="Close">✕</button>
     </div>
 

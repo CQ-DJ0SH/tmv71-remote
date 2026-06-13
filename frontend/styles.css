@@ -248,17 +248,28 @@ body.theme-light .power-switch.off .ps-icon{text-shadow:none}
   display:grid; gap:22px;
   --row-h:377px;                      /* band-panel height; keeps the grid square */
   grid-template-columns:1fr 1fr;
-  grid-template-rows:auto var(--row-h) auto auto;
-  grid-template-areas: "bands bands" "ptt audio" "hackrf hackrf" "scan scan";
+  grid-template-rows:auto var(--row-h) auto auto auto;
+  grid-template-areas: "bands bands" "ptt audio" "hackrf hackrf" "scan scan" "foot foot";
 }
 .bands{grid-area:bands; display:grid; grid-template-columns:1fr 1fr; gap:22px}
 .ptt-zone{grid-area:ptt}
 .audio{grid-area:audio}
 .hackrf-zone{grid-area:hackrf}
 .scan-zone{grid-area:scan}
+/* source link + version, below the last panel, right-aligned */
+.console-foot{
+  grid-area:foot; display:flex; justify-content:flex-end; align-items:center; gap:8px;
+  margin-top:-6px; padding:0 4px;
+  font-family:var(--font-mono); font-size:11px; color:var(--text-dim); letter-spacing:.04em;
+}
+.console-foot a{color:var(--text-dim); text-decoration:none; transition:.12s}
+.console-foot a:hover{color:var(--accent)}
+.console-foot .foot-sep{opacity:.6}
+.console-foot .foot-date{color:var(--text-dim)}
+.console-foot .foot-date::before{content:"·"; opacity:.6; margin-right:8px}
 @media (max-width:860px){
   .console{grid-template-columns:1fr; grid-template-rows:none;
-           grid-template-areas:"bands" "ptt" "audio" "hackrf" "scan"}
+           grid-template-areas:"bands" "ptt" "audio" "hackrf" "scan" "foot"}
   .bands{grid-template-columns:1fr}
 }
 
@@ -564,6 +575,16 @@ body.radio-off .hackrf-zone{opacity:.32; filter:grayscale(.6) brightness(.78)}
   align-self:center; padding:0 2px;
 }
 .spin-unit{font-family:var(--font-mono); font-size:10px; letter-spacing:.2em; color:var(--text-dim); align-self:center; margin-left:4px}
+/* small apply button after the MHz unit — commit the entered frequency */
+.spin-apply{
+  align-self:center; flex:none; margin-left:7px; padding:0;
+  width:24px; height:24px; display:inline-flex; align-items:center; justify-content:center;
+  font-size:13px; line-height:1; cursor:pointer;
+  color:var(--accent); background:var(--field-bg);
+  border:1px solid var(--accent); border-radius:6px; transition:.12s;
+}
+.spin-apply:hover{background:var(--accent); color:#06222a; box-shadow:0 0 12px -3px var(--accent-glow)}
+.spin-apply:active{transform:scale(.9)}
 
 /* mic UP / DOWN keys: arrows beside the (shortened) tuner, full-height */
 .spin-wrap{display:flex; align-items:stretch; gap:10px}
@@ -584,7 +605,7 @@ body.radio-off .hackrf-zone{opacity:.32; filter:grayscale(.6) brightness(.78)}
 /* compact, elegant VFO / SPEICHER switch */
 .mode-toggle{display:inline-flex; align-self:flex-end; border:1px solid var(--sw-edge); border-radius:7px; overflow:hidden}
 .mode-toggle .mt{
-  padding:5px 16px; font-family:var(--font-ui); font-size:10px; letter-spacing:.18em;
+  padding:5px 9px; font-family:var(--font-ui); font-size:10px; letter-spacing:.1em;
   color:var(--text-dim); background:var(--field-bg); border:none; cursor:pointer; transition:.15s;
 }
 .mode-toggle .mt:hover{color:var(--accent)}

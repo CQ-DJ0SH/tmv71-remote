@@ -392,6 +392,12 @@ function buildSpinner(band) {
   });
   const unit = document.createElement("span");
   unit.className = "spin-unit"; unit.textContent = "MHz"; el.appendChild(unit);
+  // small apply button: commit the entered frequency to the radio
+  const apply = document.createElement("button");
+  apply.type = "button"; apply.className = "spin-apply"; apply.textContent = "✓";
+  apply.title = "Apply frequency"; apply.setAttribute("aria-label", "Apply frequency");
+  apply.addEventListener("click", () => applySpinner(band));
+  el.appendChild(apply);
 }
 
 function digitsOf(hz) {
@@ -1105,7 +1111,6 @@ async function loadInfo() {
   const yesno = v => v == null ? null : (v ? "yes" : "no");
   try {
     const i = await api("GET", "/api/info");
-    if (i.app_version) $("#app-version").textContent = i.app_version;
     set("inf-model", i.model); set("inf-serial", i.serial_number);
     set("inf-firmware", i.firmware);
     set("inf-market", i.market === "M" ? "M · EU" : i.market === "K" ? "K · US" : i.market);
@@ -1355,12 +1360,16 @@ function bindQuickKeys() {
 // (channels memBase+0 … memBase+9), or keep the "M<ch>" placeholder (dimmed)
 // when the channel is empty — width stays fixed.
 async function loadQuickMemNames() {
+  const base = memBase;          // capture: memBase can change while the fetch is in flight
   let rows;
-  try { rows = await api("GET", `/api/memories?start=${memBase}&end=${memBase + 9}`); }
+  try { rows = await api("GET", `/api/memories?start=${base}&end=${base + 9}`); }
   catch { return; }
+  // A newer call for a different bank superseded us (e.g. base 0 fetched at boot
+  // resolving after we've switched to the air-band M50 bank) — don't clobber it.
+  if (base !== memBase) return;
   const byCh = {}; rows.forEach(r => { byCh[r.channel] = r; });
   $$("#quick-mem .qbtn").forEach(b => {
-    const ch = memBase + Number(b.dataset.ch), m = byCh[ch];
+    const ch = base + Number(b.dataset.ch), m = byCh[ch];
     const name = (m && m.name && m.name.trim()) ? m.name.trim() : "";
     b.textContent = name || ("M" + ch);
     b.classList.toggle("empty", !name);
@@ -1865,7 +1874,7 @@ function bindHackRF() {
 }
 
 // ---- theme (hell / dunkel) ------------------------------------------------
-function applyTheme(light) {
+function applyTheme(light, persist = true) {
   document.body.classList.toggle("theme-light", light);
   const btn = $("#theme-toggle");
   if (btn) {                              // show the mode you'd switch TO
@@ -1873,12 +1882,20 @@ function applyTheme(light) {
     btn.setAttribute("aria-pressed", String(light));
     btn.title = light ? "Switch to dark" : "Switch to light";
   }
-  localStorage.setItem("tmv71.theme", light ? "light" : "dark");
+  const name = light ? "light" : "dark";
+  localStorage.setItem("tmv71.theme", name);   // local cache → no flash on reload
+  // persist server-side so the choice survives across browsers/devices
+  if (persist) api("POST", "/api/theme", { theme: name }).catch(() => {});
   // recolor the canvases that use a theme-dependent palette
   try { drawScan(); drawLevelGraph(); } catch {}
 }
 function bindTheme() {
-  applyTheme(localStorage.getItem("tmv71.theme") !== "dark");   // light is the default
+  // apply the cached theme at once (avoids a flash), then sync the
+  // server-persisted choice without re-saving it.
+  applyTheme(localStorage.getItem("tmv71.theme") !== "dark", false);   // light is the default
+  api("GET", "/api/theme").then(r => {
+    if (r && (r.theme === "light" || r.theme === "dark")) applyTheme(r.theme === "light", false);
+  }).catch(() => {});
   $("#theme-toggle").addEventListener("click",
     () => applyTheme(!document.body.classList.contains("theme-light")));
 }
@@ -1908,6 +1925,11 @@ buildSpinner(1);
 buildSmeter(0);
 buildSmeter(1);
 api("GET", "/api/status").then(render).catch(() => {});
+api("GET", "/api/version").then(v => {
+  if (v?.version) $("#foot-version").textContent = v.version;
+  if (v?.repo) $("#src-link").href = v.repo;
+  if (v?.built) { const d = $("#foot-date"); d.textContent = "built " + v.built; d.hidden = false; }
+}).catch(() => {});
 sizeLevelGraph();
 window.addEventListener("resize", sizeLevelGraph);
 refreshAudio();
