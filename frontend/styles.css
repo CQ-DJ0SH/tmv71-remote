@@ -594,7 +594,8 @@ body.theme-light .digi-decode{background:#f3f7f4; border-color:#cfe0d6;
 .digi-tx-row input:focus{outline:none; border-color:var(--accent)}
 .digi-send, .digi-clear{font-family:var(--font-ui); font-size:11px; letter-spacing:.12em;
   cursor:pointer; border-radius:7px; padding:8px 14px; transition:.15s; flex:0 0 auto}
-.digi-send{color:#06231a; background:var(--accent); border:1px solid var(--accent); font-weight:600}
+.digi-send{color:#06231a; background:var(--accent); border:1px solid var(--accent); font-weight:600;
+  padding:5px 10px; font-size:9px}
 .digi-send:hover{box-shadow:0 0 14px -4px var(--accent-glow)}
 .digi-send:disabled{opacity:.5; cursor:default; box-shadow:none}
 .digi-send.tx{color:#fff; background:var(--tx); border-color:var(--tx); box-shadow:0 0 16px -4px var(--tx-glow)}
@@ -908,14 +909,14 @@ body.theme-light .sm-seg.peak-tx{background:#8b99a2; box-shadow:none}
 /* mic UP / DOWN keys: arrows beside the (shortened) tuner, full-height */
 .spin-wrap{display:flex; align-items:stretch; gap:10px}
 .freq-spin{flex:0 0 auto}                 /* shrink to digits — shorter input */
-.step-btns{display:flex; flex-direction:column; gap:6px}
+.step-btns{display:flex; flex-direction:column; justify-content:center; gap:9px}
 .step-btn{
-  width:54px; flex:1 1 0; min-height:22px; display:grid; place-items:center; line-height:1;
-  font-size:14px; color:#06222a; background:var(--accent);
+  width:58px; flex:0 0 auto; min-height:0; height:20px; display:grid; place-items:center; line-height:1;
+  font-size:13px; color:#06222a; background:var(--accent);
   border:1px solid var(--accent); border-radius:7px; cursor:pointer;
   opacity:.85; transition:.15s;
 }
-.step-btn:hover{opacity:1; box-shadow:0 0 12px -3px var(--accent-glow)}
+.step-btn:hover{opacity:1}
 .step-btn:active{transform:translateY(1px)}
 
 /* VFO/SPEICHER toggle now rides in the tuner row, centered beside the ▲▼ keys */
