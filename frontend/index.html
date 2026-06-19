@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0c1115">
+<title>TM-V71 · REMOTE</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<!-- PWA: installable, full-screen on mobile (regains the cut-off browser chrome) -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TM-V71">
+<!-- Self-hosted fonts (Saira, Saira Condensed, IBM Plex Mono, DSEG7 Classic) —
+     no external Google/jsDelivr requests; works fully offline. -->
+<link rel="stylesheet" href="fonts/fonts.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="scanlines" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+
+<!-- launch / splash screen (fades out once the app has booted) -->
+<div class="launch" id="launch">
+  <div class="launch-box">
+    <img class="launch-logo" src="icons/icon-512.png?v=2" alt="TM-V71 Remote" width="104" height="104">
+
+    <div class="launch-title">TM-V71<span class="dot">·</span>REMOTE</div>
+    <div class="launch-sub">starting…</div>
+    <div class="launch-bar"><span></span></div>
+  </div>
+</div>
+
+<!-- portrait phones: prompt to rotate (the app runs in landscape) -->
+<div class="rotate-hint" id="rotate-hint" aria-hidden="true">
+  <div class="rotate-box">
+    <span class="rotate-ico">⟳</span>
+    <p>ROTATE TO LANDSCAPE</p>
+    <span class="rotate-sub">TM-V71 Remote runs in landscape</span>
+  </div>
+</div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark" id="brand-mark">▚</span>
+    <img class="brand-logo" id="brand-logo" alt="Logo" hidden>
+    <div class="callsign" id="callsign"></div>
+  </div>
+  <div class="title-center">
+    <span class="screw screw-l" aria-hidden="true"></span>
+    <h1 class="app-title">TM-V71<span class="dot">·</span>REMOTE</h1>
+    <span class="screw screw-r" aria-hidden="true"></span>
+  </div>
+  <div class="status-cluster">
+    <div class="stat" id="stat-radio">
+      <span class="led"></span><span class="stat-label">CAT</span>
+    </div>
+    <div class="audio-status"><span class="led" id="audio-led"></span><span id="audio-text">USB Audio</span></div>
+    <div class="clock" id="clock">--:--:--</div>
+    <button class="gear theme-toggle" id="theme-toggle" title="Toggle light/dark" aria-label="Toggle theme">☾</button>
+    <button class="gear hdr-hide" id="hdr-hide" title="Hide title bar" aria-label="Hide title bar">▴</button>
+    <button class="gear" id="open-settings" title="Settings" aria-label="Settings">⚙</button>
+    <button class="power-switch unavailable" id="power-switch" title="Radio on/off (GPIO)" aria-label="Radio on/off">
+      <span class="ps-icon">⏻</span>
+    </button>
+  </div>
+</header>
+<!-- reveal handle shown when the title bar is hidden (mobile) -->
+<button class="hdr-reveal" id="hdr-reveal" title="Show title bar" aria-label="Show title bar">▾</button>
+
+<!-- shown while the radio is powered off (GPIO) — tap to switch it on -->
+<div class="radio-hint" id="radio-hint" hidden>
+  <span class="rh-ico">⏻</span>
+  <span class="rh-txt">Radio is off — tap here (or the power button) to switch it on</span>
+  <button class="rh-x" id="radio-hint-x" title="Dismiss" aria-label="Dismiss">✕</button>
+</div>
+
+<main class="console">
+  <!-- BAND PANELS -->
+  <section class="bands">
+    <article class="band" id="band-0" data-band="0">
+      <div class="band-head">
+        <button class="band-power" data-band="0" title="Band active · toggle single-band" aria-label="Band on/off">⏻</button>
+        <span class="band-tag">BAND A</span>
+        <button class="air-btn" id="air-0" type="button" title="Tune Band A to the air band (memory 997); off → back to 2 m">AIR Band</button>
+        <button class="ctrl-band-btn" data-band="0">CTRL</button>
+        <button class="ptt-band-btn" data-band="0" title="Select transmit band (PTT)">PTT</button>
+        <span class="tx-lamp" title="Transmit indicator">TX</span>
+        <div class="seg pwr-seg" title="Transmit power">
+          <button class="sg" data-pwr="0">50W</button>
+          <button class="sg" data-pwr="1">10W</button>
+          <button class="sg" data-pwr="2">5W</button>
+        </div>
+      </div>
+      <div class="display" data-band="0">
+        <span class="ghost">188.8888</span>
+        <div class="top-badges">
+          <span class="busy-lamp" id="busy-0"><span class="bl-dot"></span>BUSY</span>
+          <span class="mem-badge" id="memname-0"></span>
+        </div>
+        <div class="freq-line">
+          <span class="freq" id="freq-0">000.0000</span>
+          <span class="unit">MHz</span>
+        </div>
+        <span class="freq-meta">
+          <span class="fm-mode" id="fmode-0" title="Modulation mode (AM automatic in the air band)">FM</span>
+          <span class="freq-step" id="step-0" title="Channel step"></span>
+        </span>
+        <div class="smeter" data-band="0" id="sm-0">
+          <div class="sm-scale sm-s"><span>S</span><span>1</span><span>3</span><span>5</span><span>7</span><span>9</span><span>+20</span><span>+40</span><span>+60</span></div>
+          <div class="sm-bar" id="sm-bar-0"></div>
+          <div class="sm-scale sm-po"><span>Po</span><span>0</span><span>1</span><span>5</span><span>10</span><span>20</span><span>50W</span></div>
+        </div>
+      </div>
+      <div class="sql-row" data-band="0">
+        <span class="sql-label">SQL</span>
+        <input type="range" class="sql-slider" id="sql-0" min="0" max="31" step="1" value="0" aria-label="Squelch Band A">
+        <span class="sql-val" id="sql-val-0">0</span>
+      </div>
+      <div class="vfo-params" data-band="0">
+        <div class="seg shift-seg" title="Shift direction">
+          <button class="sg" data-shift="0">S</button>
+          <button class="sg" data-shift="1">+</button>
+          <button class="sg" data-shift="2">−</button>
+        </div>
+        <label class="off-field" title="Shift offset (Enter to save)">
+          <input class="offset-in" inputmode="numeric" maxlength="5" aria-label="Offset in kHz">
+          <span class="off-unit">kHz</span>
+        </label>
+        <div class="seg bw-seg" title="Bandwidth">
+          <button class="sg" data-mode="0">FM</button>
+          <button class="sg" data-mode="1">NFM</button>
+        </div>
+        <select class="tone-tx-sel" aria-label="Tone (TX) frequency"></select>
+        <select class="tone-sel" aria-label="CTCSS tone"></select>
+      </div>
+      <div class="band-controls">
+        <div class="spin-wrap">
+          <div class="freq-spin" id="spin-0" aria-label="Frequency entry Band A"></div>
+          <div class="step-btns">
+            <button class="step-btn up" data-band="0" data-dir="up" title="Mic UP – one step up" aria-label="Step up">▲</button>
+            <button class="step-btn dn" data-band="0" data-dir="down" title="Mic DOWN – one step down" aria-label="Step down">▼</button>
+          </div>
+          <div class="mode-toggle" data-band="0">
+            <button data-mode="0" class="mt">VFO</button>
+            <button data-mode="1" class="mt">MEMORY</button>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="band" id="band-1" data-band="1">
+      <div class="band-head">
+        <button class="band-power" data-band="1" title="Band active · toggle single-band" aria-label="Band on/off">⏻</button>
+        <span class="band-tag">BAND B</span>
+        <button class="ctrl-band-btn" data-band="1">CTRL</button>
+        <button class="ptt-band-btn" data-band="1" title="Select transmit band (PTT)">PTT</button>
+        <span class="tx-lamp" title="Transmit indicator">TX</span>
+        <div class="seg pwr-seg" title="Transmit power">
+          <button class="sg" data-pwr="0">50W</button>
+          <button class="sg" data-pwr="1">10W</button>
+          <button class="sg" data-pwr="2">5W</button>
+        </div>
+      </div>
+      <div class="display" data-band="1">
+        <span class="ghost">188.8888</span>
+        <div class="top-badges">
+          <span class="busy-lamp" id="busy-1"><span class="bl-dot"></span>BUSY</span>
+          <span class="mem-badge" id="memname-1"></span>
+        </div>
+        <div class="freq-line">
+          <span class="freq" id="freq-1">000.0000</span>
+          <span class="unit">MHz</span>
+        </div>
+        <span class="freq-meta">
+          <span class="fm-mode" id="fmode-1" title="Modulation mode (AM automatic in the air band)">FM</span>
+          <span class="freq-step" id="step-1" title="Channel step"></span>
+        </span>
+        <div class="smeter" data-band="1" id="sm-1">
+          <div class="sm-scale sm-s"><span>S</span><span>1</span><span>3</span><span>5</span><span>7</span><span>9</span><span>+20</span><span>+40</span><span>+60</span></div>
+          <div class="sm-bar" id="sm-bar-1"></div>
+          <div class="sm-scale sm-po"><span>Po</span><span>0</span><span>1</span><span>5</span><span>10</span><span>20</span><span>50W</span></div>
+        </div>
+      </div>
+      <div class="sql-row" data-band="1">
+        <span class="sql-label">SQL</span>
+        <input type="range" class="sql-slider" id="sql-1" min="0" max="31" step="1" value="0" aria-label="Squelch Band B">
+        <span class="sql-val" id="sql-val-1">0</span>
+      </div>
+      <div class="vfo-params" data-band="1">
+        <div class="seg shift-seg" title="Shift direction">
+          <button class="sg" data-shift="0">S</button>
+          <button class="sg" data-shift="1">+</button>
+          <button class="sg" data-shift="2">−</button>
+        </div>
+        <label class="off-field" title="Shift offset (Enter to save)">
+          <input class="offset-in" inputmode="numeric" maxlength="5" aria-label="Offset in kHz">
+          <span class="off-unit">kHz</span>
+        </label>
+        <div class="seg bw-seg" title="Bandwidth">
+          <button class="sg" data-mode="0">FM</button>
+          <button class="sg" data-mode="1">NFM</button>
+        </div>
+        <select class="tone-tx-sel" aria-label="Tone (TX) frequency"></select>
+        <select class="tone-sel" aria-label="CTCSS tone"></select>
+      </div>
+      <div class="band-controls">
+        <div class="spin-wrap">
+          <div class="freq-spin" id="spin-1" aria-label="Frequency entry Band B"></div>
+          <div class="step-btns">
+            <button class="step-btn up" data-band="1" data-dir="up" title="Mic UP – one step up" aria-label="Step up">▲</button>
+            <button class="step-btn dn" data-band="1" data-dir="down" title="Mic DOWN – one step down" aria-label="Step down">▼</button>
+          </div>
+          <div class="mode-toggle" data-band="1">
+            <button data-mode="0" class="mt">VFO</button>
+            <button data-mode="1" class="mt">MEMORY</button>
+          </div>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <!-- PTT -->
+  <section class="ptt-zone">
+    <h2 class="ptt-title">PTT · MEMORY</h2>
+    <div class="quick-col" id="quick-mem" title="Quick recall memory 0–9"></div>
+    <div class="ptt-center">
+      <!-- mini VU bars flanking the PTT button (PWA only): RX left, TX right.
+           Absolutely placed so they never shift the button. -->
+      <div class="ptt-vu rx" aria-hidden="true">
+        <span class="ptt-vu-bar"><i id="ptt-vu-rx-mask"></i><b class="ptt-vu-pk" id="ptt-vu-rx-pk"></b></span>
+        <span class="ptt-vu-lbl">RX</span>
+      </div>
+      <div class="ptt-vu tx" aria-hidden="true">
+        <span class="ptt-vu-bar"><i id="ptt-vu-tx-mask"></i><b class="ptt-vu-pk" id="ptt-vu-tx-pk"></b></span>
+        <span class="ptt-vu-lbl">TX</span>
+      </div>
+      <div class="ptt-meta">
+        <span class="ptt-hint">HOLD SPACEBAR TO TRANSMIT</span>
+        <span class="ptt-band" id="ptt-band">PTT → BAND A</span>
+        <span class="ptt-warn" id="ptt-warn" hidden>⚠ TWO-TONE TEST</span>
+      </div>
+      <button class="ptt" id="ptt" aria-label="Push to talk">
+        <span class="ptt-ring"></span>
+        <span class="ptt-core">PTT</span>
+      </button>
+      <div class="ptt-lock-row">
+        <button class="ptt-side" id="btn-roger" type="button" aria-pressed="false" title="Roger beep on PTT release (toggle)">ROGER</button>
+        <button class="ptt-lock" id="ptt-lock" type="button" aria-pressed="false" title="Latch transmit on/off">PTT-LOCK</button>
+        <button class="ptt-side" id="btn-1750" type="button" aria-pressed="false" title="Arm the 1750 Hz tone call, then key PTT to transmit it (software-generated)">1.750 kHz</button>
+      </div>
+    </div>
+    <div class="quick-col" id="quick-dtmf" title="Send DTMF memory 0–9 (DT)"></div>
+  </section>
+
+  <!-- AUDIO (WebRTC/Opus) -->
+  <section class="audio">
+    <div class="audio-head">
+      <h2 class="audio-title">AUDIO · WEBRTC/OPUS</h2>
+    </div>
+    <div class="audio-conn">
+      <label class="acd">AUDIO BAND
+        <select id="audio-band-sel" title="Radio data band (MU 38) — which VFO's audio you hear / where you transmit">
+          <option value="0">A — RX/TX A</option>
+          <option value="1">B — RX/TX B</option>
+          <option value="3">RX A · TX B</option>
+          <option value="2">RX B · TX A</option>
+        </select>
+      </label>
+      <label class="switch-label mictest-toggle">
+        <span>MIC TEST</span>
+        <input type="checkbox" id="audio-mictest" class="switch">
+      </label>
+      <span class="audio-cap">AUDIO</span>
+      <button id="audio-toggle">CONNECT</button>
+    </div>
+    <audio id="rx-audio" autoplay></audio>
+    <div class="audio-ctl">
+      <label class="acg">RX Gain
+        <input type="range" id="rx-gain" min="0" max="12" step="0.1" value="1">
+        <span class="gv" id="rx-gain-val">1.0×</span>
+      </label>
+      <label class="acg">TX Gain
+        <input type="range" id="tx-gain" min="0" max="12" step="0.1" value="1">
+        <span class="gv" id="tx-gain-val">1.0×</span>
+      </label>
+    </div>
+    <div class="audio-graph">
+      <canvas id="level-graph"></canvas>
+      <div class="graph-axis"><span>30s</span><span>20s</span><span>10s</span><span>now</span></div>
+      <div class="graph-legend">
+        <span class="lg rx">RX</span><span class="lg mic">MIC</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- BAND SCAN -->
+  <section class="hackrf-zone collapsed" id="hackrf-zone">
+    <div class="panel-head" id="hrf-head">
+      <h2>HACKRF WATERFALL</h2>
+      <button class="hrf-power" id="hrf-power" type="button" aria-pressed="false" title="Start / stop the HackRF">OFF</button>
+      <span class="panel-stat" id="hrf-stat"></span>
+      <span class="hrf-ready" id="hrf-ready" hidden><span class="dot"></span>HackRF ready</span>
+      <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="hrf-body" title="Show / hide the HackRF waterfall">▲</button>
+    </div>
+    <div class="panel-body" id="hrf-body">
+      <div class="hrf-ctrls">
+        <div class="hrf-modes" role="group" aria-label="Waterfall mode">
+          <button class="hrf-m active" data-mode="pan" title="Live panadapter centred on the frequency (~2 MHz span)">Panadapter</button>
+          <button class="hrf-m" data-mode="sweep" title="Wideband sweep across a range">Sweep</button>
+        </div>
+        <label class="hrf-follow"><input type="checkbox" id="hrf-follow" checked> follow</label>
+        <label class="hrf-field hrf-pan-only">Center<input type="text" id="hrf-center-in" inputmode="decimal" placeholder="MHz" disabled></label>
+        <label class="hrf-field hrf-sweep-only" hidden>Range<input type="text" id="hrf-range-in" inputmode="decimal" placeholder="144–146"></label>
+        <div class="hrf-gains">
+          <label class="hrf-field">LNA<input type="range" id="hrf-lna" min="0" max="40" step="8" value="24"><span class="hrf-gv" id="hrf-lna-v">24</span></label>
+          <label class="hrf-field">VGA<input type="range" id="hrf-vga" min="0" max="62" step="2" value="20"><span class="hrf-gv" id="hrf-vga-v">20</span></label>
+          <label class="hrf-amp"><input type="checkbox" id="hrf-amp"> AMP</label>
+          <label class="hrf-field" title="Display level — sets the waterfall/peak height (does not touch the radio)">LEVEL<input type="range" id="hrf-level" min="0" max="100" step="1" value="50"><span class="hrf-gv" id="hrf-level-v">50</span></label>
+        </div>
+      </div>
+      <div class="hrf-graph">
+        <canvas id="hrf-spectrum" title="Hover to read frequency · double-click to tune the control VFO"></canvas>
+        <canvas id="hrf-wf"></canvas>
+        <div class="hrf-split"></div>
+        <div class="hrf-centerline" id="hrf-centerline" hidden></div>
+        <div class="scan-cur" id="hrf-cur" hidden></div>
+        <div class="scan-tip" id="hrf-tip" hidden></div>
+      </div>
+      <div class="scan-axis"><span id="hrf-f0">—</span><span id="hrf-fc">—</span><span id="hrf-f1">—</span></div>
+    </div>
+  </section>
+
+  <!-- SELCALL (classic 5-tone selective calling) -->
+  <section class="selcall-zone collapsed" id="selcall-zone">
+    <div class="panel-head">
+      <h2>SELCALL · 5-TONE</h2>
+      <label class="acd sel-std-field">STD
+        <select id="sel-standard">
+          <option value="zvei1">ZVEI-1</option>
+          <option value="zvei2">ZVEI-2</option>
+          <option value="ccir">CCIR</option>
+          <option value="eea">EEA</option>
+        </select>
+      </label>
+      <label class="switch-label sel-rx-toggle" title="Decode incoming 5-tone calls">
+        <span>DECODE</span><input type="checkbox" id="sel-rx" class="switch">
+      </label>
+      <div class="sel-call-field">
+        <span class="sel-label">CALL</span>
+        <div class="sel-digits" id="sel-code" data-target="code">
+          <input class="sel-d" maxlength="1" inputmode="numeric" aria-label="digit 1">
+          <input class="sel-d" maxlength="1" inputmode="numeric" aria-label="digit 2">
+          <input class="sel-d" maxlength="1" inputmode="numeric" aria-label="digit 3">
+          <input class="sel-d" maxlength="1" inputmode="numeric" aria-label="digit 4">
+          <input class="sel-d" maxlength="1" inputmode="numeric" aria-label="digit 5">
+        </div>
+        <button class="sel-call" id="sel-call" title="Transmit the 5-tone call (keys PTT)">CALL</button>
+      </div>
+      <div class="sel-own-field">
+        <span class="sel-label">MY ID</span>
+        <div class="sel-digits" id="sel-own" data-target="own">
+          <input class="sel-d" maxlength="1" inputmode="numeric" aria-label="own digit 1">
+          <input class="sel-d" maxlength="1" inputmode="numeric" aria-label="own digit 2">
+          <input class="sel-d" maxlength="1" inputmode="numeric" aria-label="own digit 3">
+          <input class="sel-d" maxlength="1" inputmode="numeric" aria-label="own digit 4">
+          <input class="sel-d" maxlength="1" inputmode="numeric" aria-label="own digit 5">
+        </div>
+        <button class="sel-mute" id="sel-mute" title="Mute RX until your ID code is received">MUTE</button>
+      </div>
+      <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="selcall-body" title="Show / hide selcall">▲</button>
+    </div>
+    <div class="panel-body" id="selcall-body">
+      <div class="sel-controls">
+        <div class="sel-row sel-tone-row">
+          <span class="sel-label">TONE</span>
+          <select id="sel-tone">
+            <option value="40">40 ms</option>
+            <option value="70" selected>70 ms</option>
+            <option value="100">100 ms</option>
+          </select>
+        </div>
+      </div>
+      <div class="sel-decode" id="sel-decode" aria-live="polite" aria-label="Received calls"></div>
+      <p class="sel-hint">Mutes RX until your ID code is received. FM AFSK — CALL keys PTT (use a dummy load).</p>
+    </div>
+  </section>
+
+  <!-- DIGIMODES (CW / RTTY) -->
+  <section class="digi-zone collapsed" id="digi-zone">
+    <div class="panel-head">
+      <h2>DIGIMODES</h2>
+      <div class="digi-modes" role="tablist" aria-label="Mode">
+        <button class="digi-mode active" data-mode="cw" role="tab">CW</button>
+        <button class="digi-mode" data-mode="rtty" role="tab">RTTY</button>
+      </div>
+      <label class="switch-label digi-rx-toggle" title="Decode the received audio">
+        <span>DECODE</span><input type="checkbox" id="digi-rx" class="switch">
+      </label>
+      <div class="digi-params" id="digi-params-cw">
+        <label class="acg">WPM<input type="range" id="digi-wpm" min="5" max="40" step="1" value="18"><span class="gv" id="digi-wpm-v">18</span></label>
+        <label class="digi-auto" title="Auto-detect the RX speed (WPM)"><span>AUTO</span><input type="checkbox" id="digi-auto" class="switch"></label>
+        <label class="acg">PITCH<input type="range" id="digi-pitch" min="400" max="1000" step="10" value="700"><span class="gv" id="digi-pitch-v">700 Hz</span></label>
+      </div>
+      <div class="digi-params" id="digi-params-rtty" hidden>
+        <label class="acd">BAUD
+          <select id="digi-baud"><option value="45.45">45.45</option><option value="50">50</option><option value="75">75</option></select>
+        </label>
+        <label class="acd">SHIFT
+          <select id="digi-shift"><option value="170">170</option><option value="425">425</option><option value="850">850</option></select>
+        </label>
+        <label class="acg">MARK<input type="range" id="digi-mark" min="800" max="2600" step="25" value="2125"><span class="gv" id="digi-mark-v">2125 Hz</span></label>
+      </div>
+      <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="digi-body" title="Show / hide digimodes">▲</button>
+    </div>
+    <div class="panel-body" id="digi-body">
+      <div class="digi-decode" id="digi-decode" aria-live="polite" aria-label="Decoded text"></div>
+      <div class="digi-tx-row">
+        <button class="digi-clear" id="digi-clear" title="Clear decoded text">CLEAR</button>
+        <input type="text" id="digi-text" placeholder="text to transmit…" autocomplete="off" autocapitalize="characters">
+        <button class="digi-send" id="digi-send" title="Encode &amp; transmit (keys PTT)">SEND</button>
+      </div>
+      <p class="digi-hint">FM MCW / AFSK — keys PTT while sending. Use a dummy load to set up.</p>
+    </div>
+  </section>
+
+  <section class="scan-zone collapsed" id="scan-zone">
+    <div class="scan-head">
+      <h2>BAND · MEMORY SCAN</h2>
+      <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="scan-body" title="Show / hide the band scan">▲</button>
+      <div class="scan-bands" role="group" aria-label="Scan band">
+        <button class="scan-band" data-band="2m">2 m</button>
+        <button class="scan-band" data-band="70cm">70 cm</button>
+        <button class="scan-band" data-band="air" title="VHF air band 118–137 MHz (AM, via memory 997)">Air</button>
+        <button class="scan-band" data-band="mem" title="Scan occupied memory channels 0–99 (empty ones skipped); repeats until stopped">MEM 0–99</button>
+        <button class="scan-clear" id="scan-clear" type="button" title="Clear the spectrum and waterfall history">CLEAR</button>
+      </div>
+      <span class="scan-prog" id="scan-prog">Tap a band to scan</span>
+    </div>
+    <div class="panel-body" id="scan-body">
+      <div class="scan-graph">
+        <canvas id="scan-canvas" title="Hover to read frequency · double-click to tune the control VFO"></canvas>
+        <div class="scan-cur" id="scan-cur" hidden></div>
+        <div class="scan-tip" id="scan-tip" hidden></div>
+        <div class="scan-legend">
+          <span class="sg-spec">AF level · higher = more occupied</span>
+          <span class="sg-wf">Waterfall · one row per sweep</span>
+        </div>
+      </div>
+      <div class="scan-axis"><span id="scan-f0">—</span><span id="scan-fc">—</span><span id="scan-f1">—</span></div>
+    </div>
+  </section>
+
+  <footer class="console-foot">
+    <a id="src-link" href="https://github.com/CQ-DJ0SH/tmv71-remote" target="_blank" rel="noopener">GitHub source</a>
+    <span class="foot-sep">·</span>
+    <span class="foot-ver">v<span id="foot-version">—</span></span>
+    <span class="foot-date" id="foot-date" hidden></span>
+  </footer>
+</main>
+
+<!-- Mobile panel deck navigation (swipe + tap); hidden on desktop via CSS -->
+<nav class="panel-tabs" id="panel-tabs" aria-label="Panels">
+  <button class="ptab" data-target="#band-0"><span class="ptab-ico">A</span><span class="ptab-lbl">VFO A</span></button>
+  <button class="ptab" data-target="#band-1"><span class="ptab-ico">B</span><span class="ptab-lbl">VFO B</span></button>
+  <button class="ptab" data-target=".ptt-zone"><span class="ptab-ico">●</span><span class="ptab-lbl">PTT</span></button>
+  <button class="ptab" data-target=".audio"><span class="ptab-ico">♪</span><span class="ptab-lbl">AUDIO</span></button>
+  <button class="ptab" data-target=".hackrf-zone"><span class="ptab-ico">≈</span><span class="ptab-lbl">HACKRF</span></button>
+  <button class="ptab" data-target=".selcall-zone"><span class="ptab-ico">☎</span><span class="ptab-lbl">SELCALL</span></button>
+  <button class="ptab" data-target=".digi-zone"><span class="ptab-ico">⠿</span><span class="ptab-lbl">DIGI</span></button>
+  <button class="ptab" data-target=".scan-zone"><span class="ptab-ico">⌕</span><span class="ptab-lbl">SCAN</span></button>
+</nav>
+
+<!-- Memory channel editor -->
+<div class="modal" id="editor">
+  <div class="modal-card">
+    <h3 id="ed-title">Memory channel</h3>
+    <div class="form-grid">
+      <label>Channel<input type="number" id="ed-channel" min="0" max="999"></label>
+      <label>Name<input type="text" id="ed-name" maxlength="8" placeholder="max. 8 chars"></label>
+      <label>RX frequency (MHz.kHz)<input type="text" id="ed-rx" inputmode="decimal" placeholder="e.g. 145.600"></label>
+      <label>Mode<select id="ed-mode"><option value="0">FM</option><option value="1">NFM</option><option value="2">AM</option></select></label>
+      <label>Step<select id="ed-step"></select></label>
+      <label>Shift<select id="ed-shift"><option value="0">Simplex</option><option value="1">+</option><option value="2">−</option></select></label>
+      <label>Offset (kHz)<input type="number" id="ed-offset" step="5" placeholder="0"></label>
+      <label>Tone type<select id="ed-tonetype"><option value="none">None</option><option value="ctcss">CTCSS</option><option value="tone">Tone</option><option value="dcs">DCS</option></select></label>
+      <label>Tone value<select id="ed-toneval"></select></label>
+    </div>
+    <div class="modal-actions">
+      <button id="ed-cancel" class="btn-ghost">CANCEL</button>
+      <button id="ed-save" class="btn-primary">SAVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings -->
+<div class="modal" id="settings">
+  <div class="modal-card settings-card">
+    <div class="settings-head">
+      <h3>Settings</h3>
+      <button id="set-close" class="set-x" title="Close" aria-label="Close">✕</button>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="general" role="tab">General</button>
+      <button class="tab" data-tab="audio" role="tab">Audio</button>
+      <button class="tab" data-tab="info" role="tab">Rig-Info</button>
+      <button class="tab" data-tab="memory" role="tab">Rig-Memory</button>
+      <button class="tab" data-tab="dtmf" role="tab">Rig-DTMF</button>
+      <button class="tab" data-tab="hardware" role="tab">Pi-Hardware</button>
+    </div>
+
+    <!-- GENERAL -->
+    <section class="tab-pane active" data-pane="general">
+      <div class="form-grid">
+        <label class="span-2">API backend URL<input type="text" id="set-apiurl" placeholder="empty = this server (e.g. https://192.168.1.50:8443)" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
+        <label>Own callsign<input type="text" id="set-callsign" maxlength="12" placeholder="e.g. DJ0SH" autocapitalize="characters"></label>
+        <label>Serial port<input type="text" id="set-port" list="port-list" placeholder="/dev/ttyUSB0"></label>
+        <datalist id="port-list"></datalist>
+        <label>Baud rate<select id="set-baud"></select></label>
+        <label>GPIO pin (power)<input type="number" id="set-gpio" min="0" max="27" placeholder="e.g. 17 · empty = off"></label>
+        <label class="check-label"><input type="checkbox" id="set-apo-on"> Auto power off</label>
+        <label>Auto power off after (sec.)<input type="number" id="set-apo-sec" min="10" max="86400" placeholder="60"></label>
+      </div>
+      <p class="pane-hint">Auto power off cuts the radio's power via GPIO when no command arrives and no browser is connected for this long — the Pi does it itself, even if the page is closed.</p>
+      <div class="logo-field">
+        <span class="logo-label">Logo (title bar)</span>
+        <div class="logo-row">
+          <span class="logo-preview" id="logo-preview" data-empty="no logo"></span>
+          <label class="mini-btn">Choose image…<input type="file" id="logo-file" accept="image/*" hidden></label>
+          <button type="button" id="logo-kenwood" class="mini-btn">Load Kenwood</button>
+          <button type="button" id="logo-remove" class="mini-btn danger">Remove</button>
+        </div>
+        <p class="pane-hint">The logo is stored only locally on the Pi and is not committed to the public GitHub repo (trademark).</p>
+      </div>
+      <div class="update-field">
+        <span class="logo-label">Software update (GitHub)</span>
+        <div class="logo-row">
+          <span class="update-status" id="update-status">click Check…</span>
+          <button type="button" id="update-check" class="mini-btn">Check</button>
+          <button type="button" id="update-apply" class="mini-btn" disabled>Update &amp; restart</button>
+        </div>
+        <p class="pane-hint">Pulls the latest code from GitHub and restarts the service. Local settings (runtime.json, logo, certs) are kept.</p>
+      </div>
+      <div class="cert-field" id="cert-field" hidden>
+        <span class="logo-label">Root CA (mobile / PWA install)</span>
+        <div class="logo-row">
+          <a id="ca-download" class="mini-btn" href="tm-v71-ca.crt" download>Download CA certificate</a>
+        </div>
+        <p class="pane-hint">Install on the phone (Settings → Security → Install a certificate → CA certificate) to trust this server's certificate — required so the PWA can be installed and the service worker runs.</p>
+      </div>
+      <div class="modal-actions">
+        <button id="set-cancel" class="btn-ghost">CLOSE</button>
+        <button id="set-save" class="btn-primary">SAVE</button>
+      </div>
+    </section>
+
+    <!-- AUDIO (device + USB mixer) -->
+    <section class="tab-pane" data-pane="audio">
+      <div class="form-grid">
+        <label>Audio device<select id="audio-device"></select></label>
+      </div>
+      <p class="pane-hint">The radio's USB sound interface (full-duplex: capture = RX, playback = TX to the mic).</p>
+      <div class="mixer-field">
+        <span class="logo-label">USB mixer levels</span>
+        <div id="mixer-list" class="mixer-list"></div>
+        <p class="pane-hint">Hardware levels of the USB sound card (persisted). Playback drives the radio mic on TX; if it's at 0 % nothing comes out. Capture is the RX level into the Pi.</p>
+      </div>
+      <div class="mixer-field">
+        <span class="logo-label">RX voice filter</span>
+        <label class="switch-label">
+          <input type="checkbox" id="set-rx-lowpass" class="switch">
+          <span>Low-pass (voice only, ≤ 3.5 kHz)</span>
+        </label>
+        <p class="pane-hint">Band-limits the received radio audio to the voice range, cutting high-frequency hiss/noise above ~3.5 kHz for more comfortable listening.</p>
+      </div>
+      <div class="mixer-field">
+        <span class="logo-label">TX voice filter</span>
+        <label class="switch-label">
+          <input type="checkbox" id="set-tx-lowpass" class="switch">
+          <span>Low-pass (voice only, ≤ 3.5 kHz)</span>
+        </label>
+        <p class="pane-hint">Band-limits the transmitted mic audio to the voice range, cutting hiss and high-frequency content above ~3.5 kHz for a cleaner, more intelligible signal.</p>
+      </div>
+      <div class="mixer-field">
+        <span class="logo-label">TX tones</span>
+        <label class="switch-label">
+          <input type="checkbox" id="set-testtone" class="switch">
+          <span>Two-tone test 700/1900 Hz</span>
+        </label>
+        <p class="pane-hint">Replaces the mic with a continuous 700 + 1900 Hz signal — for setting deviation; use a dummy load. The tone is emitted whether or not PTT is pressed; a ⚠ warning shows in the PTT panel while it is active.</p>
+      </div>
+      <div class="mixer-field">
+        <span class="logo-label">TX timing</span>
+        <div class="audio-ctl">
+          <label class="acg">BUFFER
+            <input type="range" id="tx-buffer" min="40" max="500" step="5" value="250">
+            <span class="gv" id="tx-buffer-val">250 ms</span>
+          </label>
+          <label class="acg">TRAIL
+            <input type="range" id="ptt-tail" min="0" max="500" step="10" value="250">
+            <span class="gv" id="ptt-tail-val">250 ms</span>
+          </label>
+        </div>
+        <p class="pane-hint">BUFFER: mic backlog cap — lower = less TX latency, higher = more tolerant of network jitter (default 250 ms). TRAIL: how long TX stays keyed after you release, so the buffered tail isn't chopped (default 250 ms).</p>
+      </div>
+      <div class="modal-actions">
+        <button id="set-cancel-audio" class="btn-ghost">CLOSE</button>
+      </div>
+    </section>
+
+    <!-- INFO (ID / AE / FV / TY) -->
+    <section class="tab-pane" data-pane="info">
+      <dl class="info-grid" id="info-grid">
+        <dt>Model (ID)</dt><dd id="inf-model">—</dd>
+        <dt>Serial number (AE)</dt><dd id="inf-serial">—</dd>
+        <dt>Firmware (FV)</dt><dd id="inf-firmware">—</dd>
+        <dt>Market (TY)</dt><dd id="inf-market">—</dd>
+        <dt>Crossband repeat</dt><dd id="inf-crossband">—</dd>
+        <dt>Device type (TY)</dt><dd id="inf-type">—</dd>
+      </dl>
+      <div class="modal-actions">
+        <button id="info-refresh" class="btn-ghost">REFRESH</button>
+      </div>
+    </section>
+
+    <!-- HARDWARE (Raspberry Pi host metrics) -->
+    <section class="tab-pane" data-pane="hardware">
+      <dl class="info-grid" id="sys-grid">
+        <dt>Model</dt><dd id="sys-model">—</dd>
+        <dt>CPU</dt><dd id="sys-cpu">—</dd>
+        <dt>Load avg (1/5/15m)</dt><dd id="sys-load">—</dd>
+        <dt>Temperature</dt><dd id="sys-temp">—</dd>
+        <dt>Memory</dt><dd id="sys-mem">—</dd>
+        <dt>Swap</dt><dd id="sys-swap">—</dd>
+        <dt>Disk (/)</dt><dd id="sys-disk">—</dd>
+        <dt>Uptime</dt><dd id="sys-uptime">—</dd>
+      </dl>
+      <p class="pane-hint">Live Raspberry Pi metrics — auto-refreshing while this tab is open.</p>
+      <div class="modal-actions">
+        <button id="sys-refresh" class="btn-ghost">REFRESH</button>
+      </div>
+    </section>
+
+    <!-- MEMORY -->
+    <section class="tab-pane" data-pane="memory">
+      <div class="mem-head">
+        <div class="mem-actions">
+          <label class="rng">FROM <input type="number" id="mem-start" value="0" min="0" max="999"></label>
+          <label class="rng">TO <input type="number" id="mem-end" value="49" min="0" max="999"></label>
+          <button id="mem-load">LOAD</button>
+          <button id="mem-new">+ CHANNEL</button>
+          <a id="mem-export" href="/api/memories.csv">CSV ↓</a>
+          <label class="import-btn">CSV ↑<input type="file" id="mem-import" accept=".csv" hidden></label>
+        </div>
+      </div>
+      <div class="mem-table-wrap">
+        <table class="mem-table">
+          <thead><tr><th>CH</th><th>NAME</th><th>RX</th><th>SHIFT</th><th>TONE</th><th>MODE</th><th>STEP</th><th></th></tr></thead>
+          <tbody id="mem-body"><tr><td colspan="8" class="empty">Press “LOAD” to fetch channels.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- DTMF (10 memories) -->
+    <section class="tab-pane" data-pane="dtmf">
+      <p class="pane-hint">10 DTMF memories (0–9), up to 16 digits each · allowed 0–9, A–D, ∗, #.</p>
+      <div class="dtmf-list" id="dtmf-list"></div>
+    </section>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="app.js"></script>
+<script>
+  // Register the app-shell service worker (PWA). Same-origin only; failures are
+  // non-fatal (e.g. when opened over plain http without TLS).
+  if ("serviceWorker" in navigator)
+    window.addEventListener("load", () =>
+      navigator.serviceWorker.register("service-worker.js").catch(() => {}));
+</script>
+</body>
+</html>

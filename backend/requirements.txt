@@ -1,0 +1,21 @@
+# Control backend
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.1
+pyserial==3.5
+python-multipart==0.0.20
+
+# Audio: direct 2-way WebRTC (Opus) between browser and backend via aiortc.
+# Replaces the former Mumble path (pymumble/murmur/mumble-web no longer used).
+aiortc==1.14.0
+sounddevice==0.5.1
+numpy>=2.1,<2.3
+# Legacy Mumble bridge (app/audio.py) is kept but unused; pymumble optional.
+# pymumble==1.6.1
+# opuslib==3.0.1
+
+# GPIO power switch (relay/MOSFET on the radio's DC line). lgpio backend works
+# on Raspberry Pi 5 / Debian 13. Needs system pkg liblgpio (liblgpio-dev to build).
+gpiozero==2.0.1
+lgpio==0.2.2.0

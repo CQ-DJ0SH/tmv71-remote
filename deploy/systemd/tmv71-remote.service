@@ -1,0 +1,20 @@
+[Unit]
+Description=TM-V71 Remote (web control + WebRTC audio)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+# Adjust User/paths to your install. The user must be in the 'dialout'
+# (serial) and 'audio' groups. Running as root also works on a dedicated Pi.
+WorkingDirectory=/root/tmv71-remote/backend
+# HTTPS (browser microphone access needs a secure context). certs/ are created
+# by deploy/install.sh. Drop the two --ssl-* flags to serve plain HTTP instead.
+ExecStart=/root/tmv71-remote/backend/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8443 --ssl-keyfile certs/key.pem --ssl-certfile certs/cert.pem
+Restart=on-failure
+RestartSec=3
+# Give the radio + audio device time to come up on boot
+TimeoutStartSec=30
+
+[Install]
+WantedBy=multi-user.target

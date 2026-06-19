@@ -1,0 +1,4 @@
+# Stable symlink for the TM-V71 FTDI programming cable -> /dev/tmv71
+# Install: sudo cp deploy/99-tmv71-serial.rules /etc/udev/rules.d/ && sudo udevadm control --reload
+# Then set TMV71_SERIAL_PORT=/dev/tmv71
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6015", SYMLINK+="tmv71", GROUP="dialout", MODE="0660"

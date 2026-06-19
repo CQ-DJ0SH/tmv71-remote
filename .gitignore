@@ -1,0 +1,20 @@
+# Python
+backend/.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+
+# Runtime / logs
+*.log
+*.wav
+backend/app/runtime.json
+
+# Title-bar logo (may be a trademarked brand logo — never commit it)
+backend/app/branding/
+
+# TLS certs
+backend/certs/
+
+# Downloadable root CA (public cert; offered for phone install)
+frontend/tm-v71-ca.crt

@@ -1,0 +1,1520 @@
+/* ============================================================
+   TM-V71 REMOTE — "Night-shift radio room" instrument panel
+   ============================================================ */
+:root{
+  --ink:        #07090b;
+  --ink-2:      #0b0f12;
+  --panel:      #11171c;
+  --panel-2:    #161e25;
+  --edge:       #232e38;
+  --edge-hi:    #324250;
+  --text:       #c9d6df;
+  --text-dim:   #93a6b4;   /* brighter so switch/label text reads clearly */
+  --ctrl-bg:    #0d141a;   /* control buttons / chrome surfaces */
+  --field-bg:   #0a1015;   /* inputs / selects                 */
+  --sw-edge:    #9aa6ae;   /* always-on light-grey switch border */
+  --amber:      #ffb23e;   /* Band A — phosphor amber  */
+  --amber-glow: #ff8a00;
+  --cyan:       #3fe0d0;   /* Band B — cool phosphor   */
+  --cyan-glow:  #00c9b7;
+  --tx:         #ff3b30;   /* transmit alarm           */
+  --tx-glow:    #ff5b4a;
+  --ok:         #59d98b;
+  --font-disp:  "Saira Condensed", "Arial Narrow", sans-serif;
+  --font-ui:    "Saira", system-ui, sans-serif;
+  --font-mono:  "IBM Plex Mono", ui-monospace, monospace;
+  --font-seg:   "DSEG7 Classic", "IBM Plex Mono", monospace;
+  /* declare support for BOTH schemes so the browser/WebView (esp. Android "auto
+     dark theme") never force-darkens the page — our own theme classes drive the
+     actual colours. Must stay "light dark"; a single value would let the WebView
+     re-darken the other theme. */
+  color-scheme: light dark;
+}
+
+/* ---------------- light ("hell") theme ---------------- */
+body.theme-light{
+  --ink:#c4ccd4; --ink-2:#dfe5ea;
+  --panel:#eef2f6; --panel-2:#ffffff;
+  --edge:#c5cfd8; --edge-hi:#a4b4c1;
+  --text:#1b2731; --text-dim:#5a6976;
+  --ctrl-bg:#e9eef3; --field-bg:#ffffff;
+  --ok:#1f9d57;
+  background:
+    radial-gradient(1100px 650px at 80% -10%, #ffffff 0%, transparent 60%),
+    linear-gradient(180deg, var(--ink-2), var(--ink));
+  /* the shorthand above resets background-attachment to scroll; restore fixed
+     (as on the base body) so the gradient maps to the viewport and doesn't
+     produce a brightness seam where the page content overflows. */
+  background-attachment:fixed;
+}
+body.theme-light .scanlines{opacity:.05}
+body.theme-light .grain{opacity:.02}
+body.theme-light .topbar{background:linear-gradient(180deg,#f4f7faf7,#f4f7faec)}
+/* light LCD: lighten the frequency display, its meter and contents */
+body.theme-light .display, body.theme-light .ptt{--text:#1b2731; --text-dim:#5a6976}
+body.theme-light .display{
+  background:linear-gradient(180deg,#fbfdff,#e6edf2);
+  border-color:#cdd7df;
+  box-shadow:inset 0 1px 3px #00000018, inset 0 0 0 1px #ffffff99;
+}
+/* darken the phosphor accent inside the (now light) LCD for contrast */
+body.theme-light #band-0 .display{--accent:#b3650f; --accent-glow:#e7ab63}
+body.theme-light #band-1 .display{--accent:#0c7b71; --accent-glow:#62c6bb}
+body.theme-light .display .freq{text-shadow:0 0 6px var(--accent-glow)}
+/* light theme: flat frequency entry (the neon glow washes out on a light bg) */
+body.theme-light .dig{text-shadow:none}
+body.theme-light .dig:focus{background:#e6edf2}
+/* lighter tuning bars on the light background */
+body.theme-light .dbar{background:#c4cfd6}
+body.theme-light .dcell:focus-within .dbar{background:#aab8c0}
+body.theme-light .darr:hover{text-shadow:none}
+body.theme-light .freq-spin.pending{box-shadow:0 0 0 1px var(--accent)}
+body.theme-light .sm-bar{background:#dde5ea; border-color:#c4cfd6}
+body.theme-light .sm-seg{background:#c8d2d9}
+/* lighten the unfilled (rest) part of the SQL / gain sliders on light bg */
+body.theme-light .sql-slider, body.theme-light .acg input[type=range],
+body.theme-light .hrf-field input[type=range]{--track-empty:#c8d2d9}
+/* lit segments need strong, dark colors to read on the light bar */
+body.theme-light #band-0 .sm-seg.on{background:#c8770f; box-shadow:none}
+body.theme-light #band-1 .sm-seg.on{background:#0c7b71; box-shadow:none}
+body.theme-light .sm-seg.on-tx{background:#d23b30; box-shadow:none}
+body.theme-light .display .mem-badge{background:#ffffffcc}
+/* PTT button — brushed light instead of dark */
+body.theme-light .ptt-ring{
+  background:conic-gradient(from 0deg,#eef2f6,#cdd7df,#eef2f6);
+  box-shadow:inset 0 0 0 2px #c1392f, inset 0 8px 18px #00000022, 0 12px 26px -12px #00000055;
+}
+body.theme-light .ptt-core{
+  background:radial-gradient(120% 120% at 50% 25%, #ffffff, #e2e9ee 60%, #d2dbe2);
+  box-shadow:inset 0 2px 8px #ffffffcc, inset 0 -10px 18px #0000001a, 0 0 0 1px #ffffff;
+}
+/* TX lamp idle state lightened (active stays red) */
+body.theme-light .tx-lamp{background:#e4eaef; color:#5a6976}
+/* accents on a light chassis → darken where they're text on light panels */
+body.theme-light .app-title{color:#0c7b71; text-shadow:none}
+body.theme-light .brand-mark{text-shadow:none}
+body.theme-light .modal-card h3{color:#0c7b71}
+body.theme-light #band-0 .band-tag{color:#b06b15; text-shadow:none}
+body.theme-light #band-1 .band-tag{color:#0c7b71; text-shadow:none}
+body.theme-light .chip{background:#e4eaef; color:#46545f}
+body.theme-light .audio-ctl .gv{color:#0c7b71}
+body.theme-light .sql-val{color:#46545f}
+/* memory table dark headers → light in the (now light) settings dialog */
+body.theme-light .mem-table-wrap th{background:#e4eaef; color:#46545f}
+/* row hover: the dark-theme near-black wash turns rows almost black on the
+   light dialog — use a light highlight instead */
+body.theme-light .mem-table tbody tr:hover{background:#dce6ec}
+body.theme-light .mem-table td{border-bottom-color:#dde4e9}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--font-ui);
+  color:var(--text);
+  background:
+    radial-gradient(1200px 700px at 78% -10%, #15202855 0%, transparent 60%),
+    radial-gradient(900px 600px at 5% 110%, #1a141055 0%, transparent 55%),
+    linear-gradient(180deg, var(--ink-2), var(--ink));
+  background-attachment:fixed;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+
+/* atmospheric overlays */
+.grain{
+  position:fixed; inset:0; pointer-events:none; z-index:1; opacity:.045;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+.scanlines{
+  position:fixed; inset:0; pointer-events:none; z-index:2; opacity:.35;
+  background:repeating-linear-gradient(180deg, transparent 0 3px, #0000000d 3px 4px);
+  mix-blend-mode:multiply;
+}
+
+/* ---------------- launch / splash screen ---------------- */
+.launch{
+  position:fixed; inset:0; z-index:400; display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(120% 90% at 50% 34%, #121a1e, #0a0e10);
+  transition:opacity .5s ease;
+}
+body.theme-light .launch{background:radial-gradient(120% 90% at 50% 34%, #ffffff, #e7edf1)}
+.launch.gone{opacity:0; pointer-events:none}
+/* installed PWA already gets a native splash from the manifest — don't show a
+   second in-app one on top of it */
+@media (display-mode:standalone){ .launch{display:none} }
+.launch-box{display:flex; flex-direction:column; align-items:center; gap:16px; padding:24px}
+.launch-logo{width:104px; height:104px; filter:drop-shadow(0 10px 26px #0009);
+  animation:launch-pop .5s cubic-bezier(.2,.9,.3,1.3) both}
+@keyframes launch-pop{from{opacity:0; transform:scale(.82)}to{opacity:1; transform:scale(1)}}
+.launch-title{font-family:'Neuropol',var(--font-disp); font-size:clamp(20px,5vw,28px);
+  letter-spacing:.12em; color:#bcd6c6}
+.launch-title .dot{color:#6fd89a}
+.launch-sub{font-family:var(--font-ui); font-size:10px; letter-spacing:.26em;
+  text-transform:uppercase; color:var(--text-dim)}
+.launch-bar{width:148px; height:3px; border-radius:3px; background:#ffffff14; overflow:hidden}
+.launch-bar span{display:block; height:100%; width:38%; border-radius:3px; background:#6fd89a;
+  animation:launch-slide 1.1s ease-in-out infinite}
+@keyframes launch-slide{0%{transform:translateX(-120%)}100%{transform:translateX(380%)}}
+
+/* ---------------- radio-off hint (GPIO power) ---------------- */
+.radio-hint{
+  display:flex; align-items:center; justify-content:center; gap:10px; cursor:pointer;
+  padding:9px 14px; color:#ffd9d4; background:#1a0f0fee; border-bottom:1px solid var(--tx);
+  font-family:var(--font-ui); font-size:12px; letter-spacing:.04em;
+}
+.radio-hint[hidden]{display:none}
+.radio-hint .rh-ico{color:var(--tx); font-size:15px; line-height:1}
+.radio-hint .rh-x{margin-left:6px; background:none; border:0; color:#ffd9d4aa;
+  font-size:13px; cursor:pointer; padding:2px 4px}
+.radio-hint .rh-x:hover{color:#fff}
+/* draw the eye to the power button while the radio is off */
+@keyframes ps-pulse{0%,100%{box-shadow:0 0 0 0 rgba(193,57,47,0)}50%{box-shadow:0 0 0 3px rgba(193,57,47,.4)}}
+#power-switch.off{animation:ps-pulse 1.7s ease-in-out infinite}
+
+/* ---------------- top bar ---------------- */
+.topbar{
+  position:sticky; top:0; z-index:20; gap:12px;
+  display:grid; grid-template-columns:1fr auto 1fr; align-items:center;
+  padding:18px clamp(16px,4vw,40px);
+  border-bottom:1px solid var(--edge);
+  background:linear-gradient(180deg,#0c1115f7,#0c1115ec);
+  backdrop-filter:blur(8px);
+}
+.brand{display:flex; align-items:center; gap:14px; justify-self:start}
+.status-cluster{justify-self:end}
+
+/* centered, prominent app title (cyan like Band B) */
+.title-center{
+  justify-self:center; display:flex; flex-direction:row; align-items:center;
+  justify-content:center; gap:5px; text-align:center; min-width:0;
+  position:relative; padding:9px 46px;
+  background:linear-gradient(180deg,var(--panel-2),var(--panel));
+  border:1px solid var(--edge); border-radius:12px;
+  box-shadow:
+    inset 0 1px 0 #ffffff18,
+    inset 0 -1px 1px #00000075,
+    inset 0 0 0 1px #00000045,
+    0 2px 0 #0000002e,
+    0 18px 38px -24px #000;
+}
+/* nameplate screws (centred on the left/right edges) */
+.screw-l{left:9px;  top:50%; transform:translateY(-50%)}
+.screw-r{right:9px; top:50%; transform:translateY(-50%)}
+.app-title{
+  font-family:'Neuropol', var(--font-disp); font-weight:400; font-size:clamp(20px,3vw,32px);
+  letter-spacing:.14em; line-height:1; color:#bcd6c6;
+  text-shadow:none; white-space:nowrap;
+}
+.app-title .dot{color:var(--text-dim); margin:0 .22em}
+.brand-mark{
+  font-size:30px; color:var(--amber);
+  text-shadow:0 0 14px var(--amber-glow);
+  transform:translateY(-2px);
+}
+/* optional brand logo — shown on a light badge plate so dark wordmarks read */
+.brand-logo{
+  height:30px; width:auto; max-width:200px; display:block;
+  background:#b4b8bc; border-radius:7px; padding:5px 9px;
+  box-shadow:inset 0 0 0 1px #0004, 0 3px 10px -3px #000;
+  /* tone the wordmark down at display time so it survives a "Load Kenwood"
+     re-download (which overwrites the SVG file with the bright original). */
+  filter:brightness(.9) contrast(1.03);
+}
+
+.status-cluster{display:flex; align-items:center; gap:22px}
+.stat{display:flex; align-items:center; gap:9px}
+.stat-label{font-size:11px; letter-spacing:.24em; color:var(--text-dim)}
+.led{
+  width:9px; height:9px; border-radius:50%;
+  background:#3a4650; box-shadow:inset 0 0 4px #000;
+  transition:.3s;
+}
+.stat.online .led{background:var(--ok); box-shadow:0 0 10px var(--ok), inset 0 0 3px #fff8}
+.stat.fault .led{background:var(--tx); box-shadow:0 0 10px var(--tx)}
+.clock{font-family:var(--font-mono); font-size:13px; color:var(--text-dim); letter-spacing:.1em}
+.gear{
+  font-size:18px; line-height:1; color:var(--text-dim); background:transparent;
+  border:1px solid var(--edge); border-radius:8px; width:34px; height:34px;
+  cursor:pointer; transition:.25s;
+}
+.gear:hover{color:var(--amber); border-color:var(--amber); transform:rotate(45deg)}
+.theme-toggle{font-size:16px}
+.theme-toggle:hover{color:var(--cyan); border-color:var(--cyan); transform:none}
+
+/* prominent GPIO power switch */
+.power-switch{
+  display:inline-flex; align-items:center; justify-content:center; cursor:pointer;
+  color:var(--text-dim); background:var(--ctrl-bg); border:1px solid var(--edge);
+  border-radius:9px; width:38px; height:38px; padding:0; transition:.18s;
+  margin-left:-10px;   /* tighten the gap to the settings gear (cluster gap is 22px) */
+}
+.power-switch .ps-icon{font-size:18px; line-height:1}
+.power-switch:hover{border-color:var(--edge-hi); color:var(--text)}
+.power-switch.on{
+  color:#04220f; background:#48b074; border-color:#48b074;   /* dampened green */
+  box-shadow:0 0 13px -5px #48b074;
+}
+.power-switch.off{color:var(--tx); background:#160d0e; border-color:#5a2a2d}
+.power-switch.off .ps-icon{text-shadow:0 0 9px var(--tx-glow)}
+/* light theme: the dark "off" fill reads as a black box on the bright bar */
+body.theme-light .power-switch.off{color:#c62f26; background:#fbe3e1; border-color:#e3a7a2}
+body.theme-light .power-switch.off .ps-icon{text-shadow:none}
+.power-switch.unavailable{opacity:.45}
+
+/* station callsign — secondary line under the centered title */
+.callsign{
+  font-family:var(--font-disp); font-weight:700; letter-spacing:.2em; font-size:30px;
+  color:#bcd6c6; text-shadow:none; white-space:nowrap;
+}
+.callsign:empty{display:none}
+body.theme-light .callsign{color:#0c7b71; text-shadow:none}
+
+/* VFO live parameter controls: shift / bandwidth / CTCSS */
+.vfo-params{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:14px}
+.seg{display:inline-flex; border:1px solid var(--sw-edge); border-radius:7px; overflow:hidden}
+.seg .sg{
+  padding:5px 11px; min-width:30px; font-family:var(--font-mono); font-size:11px;
+  color:var(--text-dim); background:var(--field-bg); border:none; cursor:pointer; transition:.15s;
+}
+.seg .sg+.sg{border-left:1px solid var(--sw-edge)}
+.seg .sg:hover{color:var(--accent)}
+.seg .sg.active{color:#06222a; background:var(--accent); font-weight:600; box-shadow:0 0 10px -3px var(--accent-glow)}
+.tone-sel, .tone-tx-sel{
+  font-family:var(--font-mono); font-size:11px; color:var(--text);
+  background:var(--field-bg); border:1px solid var(--edge); border-radius:7px; padding:6px 8px; cursor:pointer;
+}
+/* a bit of breathing room between the kHz offset field and the FM/NFM segment */
+.vfo-params .bw-seg{margin-left:10px}
+.tone-sel:focus, .tone-tx-sel:focus{outline:none; border-color:var(--accent)}
+/* active Tone / CTCSS: dark text on a glowing accent background (like the segment buttons) */
+.tone-sel.active, .tone-tx-sel.active{
+  color:#06222a; background:var(--accent); border-color:var(--accent); font-weight:600;
+  box-shadow:0 0 12px -3px var(--accent-glow);
+}
+.off-field{display:inline-flex; align-items:center; gap:4px; flex:1 1 6ch; min-width:6ch}
+.offset-in{
+  flex:1 1 0; min-width:0; font-family:var(--font-mono); font-size:14px; font-weight:500; color:var(--text); text-align:center;
+  background:var(--field-bg); border:1px solid var(--edge); border-radius:8px; padding:6px 6px;
+}
+.offset-in:focus{outline:none; border-color:var(--accent); color:var(--accent)}
+.off-unit{font-family:var(--font-mono); font-size:12px; color:var(--text-dim); letter-spacing:.1em}
+
+/* ---------------- console layout ---------------- */
+.console{
+  position:relative; z-index:4;
+  max-width:1220px; margin:0 auto; padding:clamp(16px,3vw,32px);
+  display:grid; gap:22px;
+  --row-h:377px;                      /* band-panel height; keeps the grid square */
+  grid-template-columns:1fr 1fr;
+  grid-template-rows:auto var(--row-h) auto auto auto auto auto;
+  grid-template-areas: "bands bands" "ptt audio" "hackrf hackrf" "sel sel" "digi digi" "scan scan" "foot foot";
+}
+.bands{grid-area:bands; display:grid; grid-template-columns:1fr 1fr; gap:22px}
+.ptt-zone{grid-area:ptt}
+.audio{grid-area:audio}
+.hackrf-zone{grid-area:hackrf}
+.selcall-zone{grid-area:sel}
+.digi-zone{grid-area:digi}
+.scan-zone{grid-area:scan}
+/* source link + version, below the last panel, right-aligned */
+.console-foot{
+  grid-area:foot; display:flex; justify-content:flex-end; align-items:center; gap:8px;
+  margin-top:-6px; padding:0 4px;
+  font-family:var(--font-mono); font-size:11px; color:var(--text-dim); letter-spacing:.04em;
+}
+.console-foot a{color:var(--text-dim); text-decoration:none; transition:.12s}
+.console-foot a:hover{color:var(--accent)}
+.console-foot .foot-sep{opacity:.6}
+.console-foot .foot-date{color:var(--text-dim)}
+.console-foot .foot-date::before{content:"·"; opacity:.6; margin-right:8px}
+@media (max-width:860px) and (min-width:761px){
+  .console{grid-template-columns:1fr; grid-template-rows:none;
+           grid-template-areas:"bands" "ptt" "audio" "hackrf" "sel" "digi" "scan" "foot"}
+  .bands{grid-template-columns:1fr}
+}
+
+/* ===================== mobile: installable PWA swipe deck =====================
+   Phones run in landscape (forced — see the rotate hint below). The screen is
+   split into columns: the title bar as a narrow vertical strip (left, text
+   rotated 180°), the swipe "deck" of panels (center, full height), and a narrow
+   icon tab-rail (right). Keyed on a short viewport (phone, not tablet). */
+.panel-tabs{display:none}            /* hidden on desktop */
+.hdr-hide, .hdr-reveal{display:none} /* title-bar hide toggle: mobile only */
+.ptt-vu{display:none}                /* mini mic VU: PWA/mobile only */
+
+/* portrait phone: cover the (cramped) layout and ask to rotate to landscape */
+.rotate-hint{display:none}
+@media (orientation:portrait) and (max-width:600px){
+  .rotate-hint{position:fixed; inset:0; z-index:300;
+    display:flex; align-items:center; justify-content:center; text-align:center; padding:24px;
+    background:#0c1115}
+  body.theme-light .rotate-hint{background:#f4f7fa}
+  .rotate-box{display:flex; flex-direction:column; align-items:center; gap:14px; color:var(--text)}
+  .rotate-ico{font-size:56px; line-height:1; color:#6fd89a;
+    animation:rot-nudge 2.4s ease-in-out infinite}
+  .rotate-hint p{margin:0; font-family:var(--font-disp); font-weight:700;
+    letter-spacing:.12em; font-size:18px}
+  .rotate-sub{font-family:var(--font-ui); font-size:11px; letter-spacing:.1em; color:var(--text-dim)}
+  @keyframes rot-nudge{0%,55%{transform:rotate(0)}80%,100%{transform:rotate(-90deg)}}
+}
+
+@media (orientation:landscape) and (max-height:600px){
+  html, body{height:100%; overflow:hidden}
+  /* left → right: tab rail · title-bar strip · deck (full height) */
+  body{display:flex; flex-direction:row; height:100vh; height:100dvh}
+
+  /* ---- right: vertical panel-tab rail (small icon + label) ---- */
+  .panel-tabs{order:2; flex:0 0 48px; display:flex; flex-direction:column;
+    justify-content:space-around; align-items:stretch; gap:2px; z-index:20;
+    overflow-y:auto; scrollbar-width:none;
+    border-left:1px solid var(--edge);
+    background:linear-gradient(90deg,#0c1115ec,#0c1115);
+    padding:calc(5px + env(safe-area-inset-top)) 3px calc(5px + env(safe-area-inset-bottom))}
+  .panel-tabs::-webkit-scrollbar{display:none}
+  body.theme-light .panel-tabs{background:linear-gradient(90deg,#f4f7fa,#f4f7faec)}
+  .ptab{flex:0 0 auto; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:1px; padding:4px 1px; cursor:pointer;
+    color:var(--text-dim); background:transparent; border:0;
+    border-left:2px solid transparent; border-radius:7px; transition:.15s}
+  .ptab .ptab-ico{font-size:14px; line-height:1}
+  .ptab .ptab-lbl{font-family:var(--font-ui); font-size:7px; letter-spacing:.02em; line-height:1}
+  .ptab.active{color:#6fd89a; border-left-color:#6fd89a;
+    text-shadow:0 0 8px rgba(111,216,154,.55); background:#6fd89a14}
+
+  /* ---- left: title bar as a narrow vertical strip (rotated 180°) ----
+     column-reverse + status-cluster reverse so that, read bottom→top (matching
+     the 180°-rotated title), the elements run in the same order as the desktop
+     "OS" bar: brand · title · CAT · audio · theme · settings · power. */
+  .topbar{order:0; position:static; flex:0 0 44px; z-index:20;
+    display:flex; flex-direction:column-reverse; align-items:center; justify-content:space-between;
+    gap:6px; grid-template-columns:none; overflow-y:auto;
+    border-bottom:none; border-right:1px solid var(--edge);
+    padding:calc(8px + env(safe-area-inset-top)) 2px calc(8px + env(safe-area-inset-bottom))}
+  .brand{flex-direction:column; gap:6px; justify-self:auto; min-width:0}
+  .brand .brand-mark, .brand .brand-logo{display:none}
+  .brand .callsign{writing-mode:vertical-rl; transform:rotate(180deg);
+    font-size:12px; letter-spacing:.08em; max-height:70px; overflow:hidden}
+  .title-center{writing-mode:vertical-rl; transform:none; padding:0; gap:2px;
+    max-width:none; max-height:none; background:none; border:none; box-shadow:none; overflow:visible}
+  .title-center .screw{display:none}
+  .app-title{writing-mode:vertical-rl; transform:rotate(180deg); text-orientation:mixed;
+    font-size:13px; letter-spacing:.1em; white-space:nowrap; overflow:visible; text-overflow:clip}
+  .status-cluster{flex-direction:column-reverse; align-items:center; gap:9px; justify-self:auto}
+  .topbar .clock{display:none}
+  #audio-text, .stat-label{display:none}
+  /* normalise the controls so they sit centred in the strip (the desktop power
+     button has a negative margin + larger size that looked off-centre here);
+     also kill the gear hover-rotate that "sticks" after a tap on touch screens */
+  .topbar .gear, .topbar .power-switch{margin:0; width:30px; height:30px; flex:0 0 auto}
+  .topbar .gear{font-size:15px}
+  .topbar .gear:hover, .topbar .power-switch:hover{transform:none}
+  .topbar .theme-toggle, .topbar .theme-toggle:hover{transform:rotate(-90deg)}  /* 90° left */
+  .topbar .power-switch .ps-icon{font-size:15px}
+  .hdr-hide, .hdr-reveal{display:none}   /* not needed: the title bar is always docked */
+
+  /* ---- center: the swipe deck, full height ---- */
+  .console{order:1; flex:1 1 auto; min-width:0; height:100dvh;
+    display:flex; flex-flow:row nowrap; gap:0; max-width:none; margin:0; padding:0;
+    overflow-x:auto; overflow-y:hidden; scrollbar-width:none;
+    scroll-snap-type:x mandatory; scroll-behavior:smooth; -webkit-overflow-scrolling:touch}
+  .console::-webkit-scrollbar{display:none}
+  /* unwrap the two-band wrapper so VFO A and VFO B are their own deck pages */
+  .bands{display:contents}
+  #band-0, #band-1,
+  .ptt-zone, .audio, .hackrf-zone, .selcall-zone, .digi-zone, .scan-zone{
+    flex:0 0 100%; width:100%; min-width:100%;
+    scroll-snap-align:start; scroll-snap-stop:always;
+    overflow-y:auto; -webkit-overflow-scrolling:touch;
+    margin:0; border-radius:0; box-sizing:border-box;
+    /* top & bottom padding clear the decorative corner screws (at 8px, 18px tall)
+       so panel graphs/canvases don't run over them */
+    padding:30px 14px 30px}
+  .console-foot{display:none}
+  /* deck pages always show their body (ignore the desktop collapse toggle).
+     Higher specificity than the later base ".collapsed .panel-body{display:none}"
+     so the bodies (graphs/decoders) actually render in the deck. */
+  .console .collapsed .panel-body{display:block}
+  .panel-head .panel-toggle{display:none}
+  /* shrink the fixed 250px graphs so HackRF/Scan fit the short landscape height
+     (head + controls + graph) without scrolling */
+  .hrf-graph, .scan-graph{height:32vh; min-height:84px; max-height:150px}
+  .digi-decode{height:32vh; min-height:70px; max-height:150px}
+
+  /* radio-off hint: thin overlay across the top, between the tab rail and the
+     title strip */
+  .radio-hint{position:fixed; top:0; left:44px; right:48px; z-index:25; margin:0;
+    justify-content:center; border-bottom:1px solid var(--tx); padding:6px 10px; font-size:11px}
+
+  /* compact the band panel's vertical rhythm so it fits without scrolling */
+  .band-head{margin-bottom:4px}
+  .band .display{margin:5px 0 7px; padding:10px 14px 9px}
+  .band .smeter{margin-top:6px}
+  .band .sql-row{margin:0 0 7px}
+  .band .vfo-params{margin-bottom:7px}
+  .band .band-controls{gap:8px}
+  .band .freq-spin{padding:5px 10px}
+
+  /* mini VU bars flanking the PTT button (absolute → button stays put):
+     vertical, RX just left, TX just right of the button, with RX/TX labels. */
+  .ptt-center{position:relative}
+  .ptt-center .ptt-vu{display:flex; flex-direction:column; align-items:center; gap:4px;
+    position:absolute; top:50%; transform:translate(-50%,-50%); z-index:2}
+  /* centred in the empty half between the PTT button (radius ~56px) and the
+     memory columns: midpoint of [panel edge … button edge] */
+  .ptt-vu.rx{left:calc(25% - 58px); right:auto}
+  .ptt-vu.tx{left:calc(75% + 58px); right:auto}
+  .ptt-vu-bar{position:relative; width:13px; height:40vh; max-height:158px; min-height:80px;
+    border-radius:6px; border:1px solid var(--edge-hi); box-shadow:inset 0 0 0 1px #00000055;
+    overflow:hidden; background:linear-gradient(0deg,#59d98b 0%,#ffb23e 72%,#ff3b30 100%)}
+  /* translucent overlay dims the unfilled (top) part so the gradient track is
+     always visible and the level fills brightly from the bottom */
+  .ptt-vu-bar i{position:absolute; top:0; left:0; width:100%; height:100%;
+    background:rgba(6,10,13,.74); transition:height .09s linear}
+  body.theme-light .ptt-vu-bar i{background:rgba(244,247,250,.72)}
+  .ptt-vu-pk{position:absolute; left:0; right:0; bottom:0; height:2px; z-index:3;
+    background:#dbe7ee; box-shadow:0 0 4px #dbe7ee; transition:bottom .12s linear}
+  body.theme-light .ptt-vu-pk{background:#37464f; box-shadow:none}
+  .ptt-vu-lbl{font-family:var(--font-ui); font-size:9px; letter-spacing:.14em; color:var(--text-dim)}
+
+  /* PTT panel: drop the overlapping absolute title; the 10-button quick columns
+     drive the height, so tighten them and the centre stack/button */
+  .ptt-zone{padding:8px 12px}
+  .ptt-title{display:none}
+  .quick-col{gap:3px}
+  .qbtn{padding:4px 6px; font-size:10px}
+  .ptt-center{gap:8px}
+  .ptt{width:112px; height:112px}
+  .ptt-core{font-size:24px}
+}
+
+/* panel base — beveled aircraft instrument plate */
+.band, .ptt-zone, .audio, .scan-zone, .hackrf-zone, .digi-zone, .selcall-zone{
+  background:
+    linear-gradient(180deg,var(--panel-2),var(--panel));
+  border:1px solid var(--edge);
+  border-radius:14px;
+  box-shadow:
+    inset 0 1px 0 #ffffff18,       /* top sheen */
+    inset 0 -1px 1px #00000075,     /* bottom shade -> raised plate */
+    inset 0 0 0 1px #00000045,
+    0 2px 0 #0000002e,              /* thin lip */
+    0 24px 50px -26px #000;         /* deep drop shadow */
+  position:relative;
+}
+/* four recessed corner screws (experiment) — real round elements injected by
+   JS (addPanelScrews) with an Allen/hex (Inbus) socket. Purely decorative. */
+.screw{
+  position:absolute; width:18px; height:18px; border-radius:50%;
+  pointer-events:none; z-index:3;
+  background:radial-gradient(circle at 36% 31%,
+    #9da2a6, #6e7276 36%, #44484b 64%, #26292b 84%, #15171a 100%);
+  box-shadow:
+    inset 0 1px 1px #ffffff55,        /* top specular */
+    inset 0 -1.5px 2px #000000b0,      /* domed underside */
+    0 1px 2px #00000090,               /* drop into the plate */
+    0 0 0 1px #00000070;               /* recess rim */
+}
+.screw::before{                        /* hex socket (Inbus) */
+  content:""; position:absolute; inset:20%;
+  background:linear-gradient(145deg, #050607, #24272a);
+  clip-path:polygon(50% 2%, 94% 27%, 94% 73%, 50% 98%, 6% 73%, 6% 27%);
+  box-shadow:inset 0 1px 1px #00000090;
+}
+.screw-tl{left:8px;  top:8px}
+.screw-tr{right:8px; top:8px}
+.screw-bl{left:8px;  bottom:8px}
+.screw-br{right:8px; bottom:8px}
+.screw-tr::before{transform:rotate(15deg)}   /* vary socket angle a touch */
+.screw-bl::before{transform:rotate(-22deg)}
+.screw-br::before{transform:rotate(9deg)}
+/* light theme: polished-steel screws with a soft recess (the dark gunmetal +
+   heavy black shadows read too harsh on the light panels) */
+body.theme-light .screw{
+  background:radial-gradient(circle at 36% 31%,
+    #ffffff, #d6dbdf 36%, #abb2b7 64%, #888f94 84%, #6d747a 100%);
+  box-shadow:
+    inset 0 1px 1px #ffffffcc,
+    inset 0 -1.5px 2px #0000003a,
+    0 1px 2px #0000002e,
+    0 0 0 1px #0000002b;
+}
+body.theme-light .screw::before{
+  background:linear-gradient(145deg, #71787e, #9aa1a6);
+  box-shadow:inset 0 1px 1px #00000045;
+}
+.band::before, .ptt-zone::before, .audio::before, .scan-zone::before,
+.hackrf-zone::before, .digi-zone::before, .selcall-zone::before{ /* color rail */
+  content:""; position:absolute; left:0; top:14px; bottom:14px; width:3px;
+  border-radius:3px; background:var(--accent); box-shadow:0 0 12px var(--accent-glow);
+}
+#band-0{--accent:var(--amber); --accent-glow:var(--amber-glow)}
+#band-1{--accent:var(--cyan);  --accent-glow:var(--cyan-glow)}
+.ptt-zone{--accent:#c1392f; --accent-glow:#c1392f}   /* PTT panel = red */
+.audio{--accent:#8b7ad6; --accent-glow:#8b7ad6}      /* audio = violet/indigo */
+.audio::before{box-shadow:0 0 9px -2px var(--accent-glow)}   /* subtler glow */
+.scan-zone{--accent:var(--sw-edge); --accent-glow:var(--sw-edge)}  /* scan = light grey */
+.scan-zone::before{box-shadow:0 0 6px -2px var(--accent-glow)}
+.hackrf-zone{--accent:#3a9ff0; --accent-glow:#3a9ff0}   /* HackRF = waterfall blue */
+.hackrf-zone::before{box-shadow:0 0 9px -2px var(--accent-glow)}
+.digi-zone{--accent:#6fd89a; --accent-glow:#6fd89a}   /* digimodes = light green */
+.digi-zone::before{box-shadow:0 0 9px -2px var(--accent-glow)}
+.digi-zone{padding:22px 26px}
+.digi-modes{display:inline-flex; border:1px solid var(--accent); border-radius:7px; overflow:hidden}
+.digi-mode{font-family:var(--font-ui); font-size:11px; letter-spacing:.12em; padding:5px 12px;
+  color:var(--text-dim); background:var(--ctrl-bg); border:none; cursor:pointer; transition:.15s}
+.digi-mode+.digi-mode{border-left:1px solid var(--accent)}
+.digi-mode.active{color:#06231a; background:var(--accent); font-weight:600;
+  box-shadow:0 0 12px -3px var(--accent-glow)}
+.digi-rx-toggle{margin-left:6px; font-family:var(--font-ui); font-size:10px;
+  letter-spacing:.16em; color:var(--text-dim)}
+.digi-params{display:flex; flex-wrap:wrap; align-items:center; gap:16px; margin:0}
+.digi-params[hidden]{display:none}
+.digi-params .acg{display:flex; align-items:center; gap:14px;
+  font-family:var(--font-ui); font-size:10px; letter-spacing:.16em; color:var(--text-dim)}
+.digi-params input[type=range]{--g-accent:#6fd89a}
+.digi-params .gv{color:#6fd89a; font-size:11px; letter-spacing:.02em; min-width:46px}
+.digi-auto{display:flex; align-items:center; gap:7px; margin-left:-13px; margin-right:18px;
+  font-family:var(--font-ui); font-size:10px; letter-spacing:.14em; color:var(--text-dim)}
+.digi-params select{font-family:var(--font-mono); font-size:12px; color:var(--text);
+  background:var(--field-bg); border:1px solid var(--edge); border-radius:7px; padding:6px 8px}
+.digi-decode{font-family:var(--font-mono); font-size:13px; line-height:1.5;
+  color:var(--accent); text-shadow:0 0 7px var(--accent-glow);
+  background:radial-gradient(120% 140% at 50% 0%, #0c1418, #060a0d);
+  border:1px solid #05080a; border-radius:9px; padding:10px 12px;
+  height:170px; overflow-y:auto; white-space:pre-wrap; word-break:break-word}
+body.theme-light .digi-decode{background:#f3f7f4; border-color:#cfe0d6;
+  color:#147a52; text-shadow:none}
+.digi-decode:empty::before{content:"— decoder idle —"; color:var(--text-dim);
+  text-shadow:none; opacity:.6}
+.digi-tx-row{display:flex; align-items:center; gap:8px; margin-top:10px}
+.digi-tx-row input{flex:1 1 auto; min-width:0; font-family:var(--font-mono); font-size:13px;
+  color:var(--text); background:var(--field-bg); border:1px solid var(--edge);
+  border-radius:7px; padding:8px 10px}
+.digi-tx-row input:focus{outline:none; border-color:var(--accent)}
+.digi-send, .digi-clear{font-family:var(--font-ui); font-size:11px; letter-spacing:.12em;
+  cursor:pointer; border-radius:7px; padding:8px 14px; transition:.15s; flex:0 0 auto}
+.digi-send{color:#06231a; background:var(--accent); border:1px solid var(--accent); font-weight:600}
+.digi-send:hover{box-shadow:0 0 14px -4px var(--accent-glow)}
+.digi-send:disabled{opacity:.5; cursor:default; box-shadow:none}
+.digi-send.tx{color:#fff; background:var(--tx); border-color:var(--tx); box-shadow:0 0 16px -4px var(--tx-glow)}
+.digi-clear{color:var(--text-dim); background:var(--ctrl-bg); border:1px solid var(--edge)}
+.digi-clear:hover{color:var(--accent); border-color:var(--accent)}
+.digi-hint{margin:8px 0 0; font-family:var(--font-ui); font-size:10px;
+  letter-spacing:.04em; color:var(--text-dim); opacity:.8}
+
+/* ---------------- selcall (5-tone) — muted bronze ---------------- */
+.selcall-zone{--accent:#c9a066; --accent-glow:#c9a066; padding:22px 26px}
+.selcall-zone::before{box-shadow:0 0 9px -2px var(--accent-glow)}
+.sel-std-field{display:flex; align-items:center; gap:8px;
+  font-family:var(--font-ui); font-size:10px; letter-spacing:.16em; color:var(--text-dim)}
+.sel-std-field select, #sel-tone{font-family:var(--font-mono); font-size:12px; color:var(--text);
+  background:var(--field-bg); border:1px solid var(--edge); border-radius:7px; padding:6px 8px}
+.sel-rx-toggle{margin-left:6px; font-family:var(--font-ui); font-size:10px;
+  letter-spacing:.16em; color:var(--text-dim)}
+/* CALL + MY ID live in the panel head, right-aligned next to the toggle */
+.sel-call-field, .sel-own-field{display:flex; align-items:center; gap:9px}
+.sel-call-field{margin-left:auto}
+.sel-own-field{margin-left:26px}
+.sel-call-field .sel-label, .sel-own-field .sel-label{min-width:auto}
+.sel-call-field .sel-digits, .sel-own-field .sel-digits{gap:5px}
+.sel-call-field .sel-d, .sel-own-field .sel-d{width:26px; height:32px; font-size:17px; border-radius:6px}
+.sel-call-field .sel-call, .sel-own-field .sel-mute{padding:7px 12px; font-size:10px}
+.sel-call-field .sel-call{padding:5px 10px; font-size:9px}
+.selcall-zone .panel-head .panel-toggle{margin-left:12px}
+.sel-controls{display:flex; flex-wrap:wrap; align-items:center; gap:14px 24px}
+.sel-row{display:flex; align-items:center; gap:12px; margin:0; flex-wrap:wrap}
+.sel-label{font-family:var(--font-ui); font-size:10px; letter-spacing:.18em;
+  color:var(--text-dim); min-width:42px}
+.sel-digits{display:flex; gap:6px}
+.sel-d{width:34px; height:42px; text-align:center; font-family:var(--font-seg), var(--font-mono);
+  font-size:22px; font-weight:600; color:var(--accent); text-shadow:0 0 8px var(--accent-glow);
+  background:radial-gradient(120% 140% at 50% 0%, #0c1418, #060a0d);
+  border:1px solid var(--edge); border-radius:8px; caret-color:var(--accent)}
+.sel-d:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--accent)}
+body.theme-light .sel-d{background:#f6f1e8; color:#8a6a2f; text-shadow:none; border-color:#ddcdb0}
+.sel-call, .sel-mute{font-family:var(--font-ui); font-size:11px; letter-spacing:.12em;
+  cursor:pointer; border-radius:7px; padding:9px 16px; transition:.15s; flex:0 0 auto}
+.sel-call{color:#241803; background:var(--accent); border:1px solid var(--accent); font-weight:600}
+.sel-call:hover{box-shadow:0 0 14px -4px var(--accent-glow)}
+.sel-call:disabled{opacity:.5; cursor:default; box-shadow:none}
+.sel-call.tx{color:#fff; background:var(--tx); border-color:var(--tx); box-shadow:0 0 16px -4px var(--tx-glow)}
+.sel-mute{color:var(--text-dim); background:var(--ctrl-bg); border:1px solid var(--edge)}
+.sel-mute:hover{color:var(--accent); border-color:var(--accent)}
+.sel-mute.armed{color:#fff; background:var(--tx); border-color:var(--tx);
+  box-shadow:0 0 14px -4px var(--tx-glow); animation:lockpulse 1.3s ease-in-out infinite}
+.sel-tone-row select{max-width:120px}
+.sel-decode{font-family:var(--font-mono); font-size:13px; line-height:1.5; color:var(--accent);
+  background:radial-gradient(120% 140% at 50% 0%, #0c1418, #060a0d); border:1px solid #05080a;
+  border-radius:9px; padding:8px 12px; height:150px; overflow-y:auto; margin-top:6px}
+body.theme-light .sel-decode{background:#f6f1e8; color:#8a6a2f; border-color:#ddcdb0}
+.sel-decode:empty::before{content:"— no calls —"; color:var(--text-dim); opacity:.6}
+.sel-decode .mine{color:var(--ok); font-weight:700}
+.sel-hint{margin:8px 0 0; font-family:var(--font-ui); font-size:10px;
+  letter-spacing:.04em; color:var(--text-dim); opacity:.8}
+
+/* VFO-panel switch borders in the band's accent colour (A=amber, B=cyan) */
+.band .seg, .band .seg .sg+.sg,
+.band .mode-toggle, .band .mode-toggle .mt+.mt,
+.band .ctrl-band-btn, .band .ptt-band-btn, .band .air-btn,
+.band .band-power, .band .chip.mode,
+.band .offset-in, .band .tone-sel, .band .tone-tx-sel{ border-color:var(--accent) }
+
+/* ---------------- band panel ---------------- */
+.band{padding:26px 30px 26px}
+/* radio powered off (GPIO relay open) -> dim the band/PTT/audio/scan panels */
+.band, .ptt-zone, .audio, .scan-zone, .hackrf-zone, .digi-zone, .selcall-zone{transition:opacity .25s, filter .25s}
+body.radio-off .band,
+body.radio-off .ptt-zone,
+body.radio-off .audio,
+body.radio-off .scan-zone,
+body.radio-off .digi-zone,
+body.radio-off .selcall-zone,
+body.radio-off .hackrf-zone{opacity:.32; filter:grayscale(.6) brightness(.78)}
+.band-head{display:flex; align-items:center; gap:10px; margin-bottom:6px; flex-wrap:wrap}
+/* per-band power/solo button (DL single-band toggle) */
+.band-power{
+  width:24px; height:24px; flex:none; display:grid; place-items:center; padding:0;
+  font-size:13px; line-height:1; color:var(--text-dim);
+  background:var(--ctrl-bg); border:1px solid var(--sw-edge); border-radius:6px; cursor:pointer; transition:.15s;
+}
+.band-power:hover{color:var(--accent)}
+.band:not(.is-off) .band-power{
+  color:var(--accent); border-color:var(--accent); box-shadow:0 0 9px -2px var(--accent-glow);
+}
+/* dim + disable everything except the head when the band is switched off */
+.band.is-off > *:not(.band-head){opacity:.35; filter:grayscale(.5); pointer-events:none; transition:.2s}
+.band.is-off::before{opacity:.25}
+/* transmit-power switch (50W / 10W / 5W) in the band head */
+.pwr-seg .sg{min-width:0; padding:5px 9px; font-size:10px; letter-spacing:.02em}
+.band-tag{
+  font-family:var(--font-disp); font-weight:700; letter-spacing:.18em;
+  font-size:15px; color:var(--accent); text-shadow:0 0 10px var(--accent-glow);
+}
+.ctrl-band-btn{
+  margin-left:auto; font-family:var(--font-ui); font-size:10px; letter-spacing:.2em;
+  color:var(--text-dim); background:var(--ctrl-bg); border:1px solid var(--sw-edge);
+  padding:4px 10px; border-radius:6px; cursor:pointer; transition:.2s;
+}
+.ctrl-band-btn:hover{color:var(--accent)}
+.band.is-ctrl .ctrl-band-btn{
+  color:#06222a; background:var(--accent); border-color:var(--accent);
+  box-shadow:0 0 14px var(--accent-glow); font-weight:600;
+}
+.ptt-band-btn{
+  font-family:var(--font-ui); font-size:10px; letter-spacing:.2em;
+  color:var(--text-dim); background:var(--ctrl-bg); border:1px solid var(--sw-edge);
+  padding:4px 10px; border-radius:6px; cursor:pointer; transition:.2s;
+}
+.ptt-band-btn:hover{color:var(--accent)}
+.band.is-ptt .ptt-band-btn{
+  color:#06222a; background:var(--accent); border-color:var(--accent);
+  box-shadow:0 0 14px var(--accent-glow); font-weight:600;
+}
+.tx-lamp{
+  font-size:10px; letter-spacing:.2em; padding:3px 8px; border-radius:5px;
+  border:1px solid var(--edge); color:#33404a; background:#0c1217; transition:.15s;
+}
+.band.is-tx .tx-lamp{
+  color:#fff; background:var(--tx); border-color:var(--tx);
+  box-shadow:0 0 12px var(--tx-glow);
+}
+
+/* segment display */
+.display{
+  position:relative; margin:10px 0 16px; padding:14px 16px 12px;
+  border-radius:10px;
+  background:radial-gradient(120% 140% at 50% 0%, #0c1418, #060a0d);
+  border:1px solid #05080a;
+  box-shadow:inset 0 2px 14px #000, inset 0 0 0 1px #ffffff05;
+  overflow:hidden;
+}
+.display .ghost,.display .freq{
+  font-family:var(--font-seg);
+  font-size:clamp(34px,7vw,54px); line-height:1; letter-spacing:.02em;
+  display:block;
+}
+.display .ghost{
+  position:absolute; left:16px; top:14px; color:var(--accent); opacity:.06;
+  user-select:none;
+}
+.display .freq{
+  position:relative; color:var(--accent);
+  text-shadow:0 0 8px var(--accent-glow), 0 0 22px var(--accent-glow);
+}
+.freq-line{position:relative; display:flex; align-items:baseline; gap:10px}
+/* top badge row (top-right of the LCD): mode badge + memory name.
+   min-width keeps the (left) mode badge anchored even when the memory badge
+   is hidden in VFO mode, so FM doesn't slide to the right edge. */
+.top-badges{
+  position:absolute; top:9px; right:12px; z-index:2;
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  min-width:185px; min-height:26px;   /* badge height, so BUSY stays put in VFO mode */
+}
+.display .unit{
+  font-family:var(--font-mono); font-size:12px; letter-spacing:.25em; color:var(--text-dim);
+}
+/* combined mode + channel-step field, right-aligned and vertically
+   centred to the MHz unit, borderless */
+.freq-meta{
+  position:absolute; right:12px; top:51px; z-index:2;
+  display:inline-flex; align-items:center; line-height:1;
+}
+.freq-meta .fm-mode{
+  font-family:var(--font-disp); font-weight:700; letter-spacing:.1em; font-size:13px;
+  color:var(--accent); text-shadow:0 0 10px var(--accent-glow);
+}
+.freq-meta .freq-step{
+  font-family:var(--font-mono); font-size:12px; letter-spacing:.04em; color:var(--accent); white-space:nowrap;
+}
+/* divider + spacing only when a channel step is present */
+.freq-meta .freq-step:not(:empty){margin-left:8px; padding-left:8px; border-left:1px solid var(--accent)}
+.freq-meta .freq-step:empty{display:none}
+
+/* busy lamp — left of the top-badge row (where the mode badge used to sit) */
+.busy-lamp{
+  display:inline-flex; align-items:center; gap:5px;
+  font-family:var(--font-mono); font-size:9px; letter-spacing:.2em; color:#33404a; transition:.15s;
+}
+.busy-lamp .bl-dot{
+  width:9px; height:9px; border-radius:50%;
+  background:#28313a; box-shadow:inset 0 0 3px #000; transition:.15s;
+}
+.band.is-busy .busy-lamp{color:var(--accent)}
+.band.is-busy .busy-lamp .bl-dot{
+  background:var(--accent); box-shadow:0 0 10px var(--accent-glow), inset 0 0 2px #fff8;
+}
+
+/* S-meter (RX audio level) / Po power scale (TX) */
+.smeter{position:relative; margin-top:12px; display:flex; flex-direction:column; gap:3px}
+.sm-scale{
+  display:flex; font-family:var(--font-mono); font-size:9px; letter-spacing:.02em; color:var(--text-dim);
+}
+.sm-scale span{flex:1; text-align:center}
+.sm-scale span:first-child{text-align:left; color:var(--accent); opacity:.75}
+.sm-bar{
+  display:flex; gap:1.5px; height:11px; padding:2px;
+  border-radius:4px; background:#05080a; border:1px solid #0c151b;
+}
+.sm-seg{flex:1; border-radius:1px; background:#121c24; transition:background .06s, box-shadow .06s}
+.sm-seg.on{background:var(--accent); box-shadow:0 0 5px -1px var(--accent-glow)}
+.sm-seg.on-tx{background:var(--tx); box-shadow:0 0 6px -1px var(--tx-glow)}
+/* peak-hold marker: a soft cap held ~1 s at the highest recent level */
+.sm-seg.peak{background:#9fb4c2; box-shadow:none}
+.sm-seg.peak-tx{background:#c79a93; box-shadow:none}
+body.theme-light .sm-seg.peak,
+body.theme-light .sm-seg.peak-tx{background:#8b99a2; box-shadow:none}
+/* the Po (watt) scale is reference only — power isn't shown in the bar */
+.smeter .sm-po{opacity:.45}
+/* TX bar (mic/modulation level) glows red via .sm-seg.on-tx */
+.display .mem-badge:empty{display:none}
+.display .mem-badge{
+  font-family:var(--font-mono); font-size:14px; font-weight:600; letter-spacing:.04em;
+  color:var(--accent); background:#0c1c20cc; border:1px solid var(--accent);
+  border-radius:6px; padding:3px 10px; text-shadow:0 0 8px var(--accent-glow);
+}
+
+/* squelch slider under the frequency display */
+.sql-row{display:flex; align-items:center; gap:11px; margin:0 0 14px}
+.sql-label{font-family:var(--font-disp); font-weight:700; letter-spacing:.14em; font-size:11px; color:var(--text-dim); width:30px}
+.sql-slider{
+  flex:1; -webkit-appearance:none; appearance:none; height:5px; border-radius:3px; cursor:pointer; outline:none;
+  background:linear-gradient(90deg, var(--accent) var(--sqlpct,0%), var(--track-empty,#0c151b) var(--sqlpct,0%));
+}
+.sql-slider::-webkit-slider-thumb{
+  -webkit-appearance:none; appearance:none; width:15px; height:15px; border-radius:50%;
+  background:var(--accent); box-shadow:0 0 8px -1px var(--accent-glow), inset 0 0 2px #fff8; cursor:pointer;
+}
+.sql-slider::-moz-range-thumb{
+  width:15px; height:15px; border:none; border-radius:50%;
+  background:var(--accent); box-shadow:0 0 8px -1px var(--accent-glow); cursor:pointer;
+}
+.sql-val{font-family:var(--font-mono); font-size:12px; color:var(--accent); width:22px; text-align:right}
+
+.readouts{display:flex; flex-wrap:wrap; gap:7px; margin-bottom:16px}
+.chip{
+  font-family:var(--font-mono); font-size:11px; letter-spacing:.06em;
+  padding:4px 9px; border-radius:6px; color:var(--text-dim);
+  background:#0c1318; border:1px solid var(--edge);
+}
+.chip.mode{color:var(--accent); border-color:var(--sw-edge)}
+/* air-band quick switch (VFO A only), next to the channel-step chip */
+.air-btn{
+  font-family:var(--font-ui); font-size:10px; letter-spacing:.2em;
+  color:var(--text-dim); background:var(--ctrl-bg); border:1px solid var(--sw-edge);
+  border-radius:6px; padding:4px 10px; cursor:pointer; transition:.15s;
+}
+.air-btn:hover{color:var(--accent)}
+.air-btn.active{color:#06222a; background:var(--accent); border-color:var(--accent);
+  font-weight:700; box-shadow:0 0 14px var(--accent-glow)}
+/* in the band head: centered in the gap between the BAND tag and CTRL */
+.band-head .air-btn{margin-left:auto}
+.chip.memname:empty{display:none}
+.chip.memname{
+  color:var(--accent); border-color:var(--accent); background:#0c1c20;
+  font-size:15px; font-weight:600; letter-spacing:.05em; padding:5px 13px;
+}
+
+/* band controls */
+.band-controls{display:flex; flex-direction:column; gap:12px}
+/* per-digit frequency tuner: ▲ / digit / ▼ per column */
+.freq-spin{
+  display:flex; align-items:center; justify-content:center; gap:3px;
+  background:var(--field-bg); border:1px solid var(--edge); border-radius:10px;
+  padding:8px 12px; transition:.15s;
+}
+.freq-spin.pending{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent), 0 0 16px -5px var(--accent-glow)}
+.dcol{display:flex; flex-direction:column; align-items:center; gap:2px}
+.darr{
+  width:28px; height:20px; line-height:1; font-size:15px; cursor:pointer;
+  color:var(--text-dim); background:transparent; border:none; padding:0;
+  transition:.12s; border-radius:4px;
+}
+.darr:hover{color:var(--accent); text-shadow:0 0 8px var(--accent-glow)}
+.darr:active{transform:scale(.85)}
+.dcell{display:flex; flex-direction:column; align-items:center; gap:4px}
+/* clickable tuning bars above (+1) and below (-1) each digit */
+.dbar{
+  width:26px; height:4px; border-radius:2px; background:#26333d; cursor:pointer;
+  transition:.12s;
+}
+.dbar:hover{background:var(--accent); box-shadow:0 0 8px var(--accent-glow)}
+.dbar:active{transform:scaleY(.6)}
+.dcell:focus-within .dbar{background:#33454f}
+.dig{
+  width:26px; font-family:var(--font-seg), var(--font-mono); font-size:26px; font-weight:500;
+  color:var(--accent); text-shadow:0 0 8px var(--accent-glow);
+  background:transparent; border:none;
+  text-align:center; padding:1px 0; -moz-appearance:textfield;
+}
+.dig:focus{outline:none; background:#0e1820}
+.dig::-webkit-outer-spin-button,.dig::-webkit-inner-spin-button{-webkit-appearance:none}
+.fdot{
+  font-family:var(--font-seg), var(--font-mono); font-size:26px; color:var(--accent);
+  align-self:center; padding:0 2px;
+}
+.spin-unit{font-family:var(--font-mono); font-size:10px; letter-spacing:.2em; color:var(--text-dim); align-self:center; margin-left:4px}
+/* small apply button after the MHz unit — commit the entered frequency */
+.spin-apply{
+  align-self:center; flex:none; margin-left:7px; padding:0;
+  width:24px; height:24px; display:inline-flex; align-items:center; justify-content:center;
+  font-size:13px; line-height:1; cursor:pointer;
+  color:var(--accent); background:var(--field-bg);
+  border:1px solid var(--accent); border-radius:6px; transition:.12s;
+}
+.spin-apply:hover{background:var(--accent); color:#06222a; box-shadow:0 0 12px -3px var(--accent-glow)}
+.spin-apply:active{transform:scale(.9)}
+
+/* mic UP / DOWN keys: arrows beside the (shortened) tuner, full-height */
+.spin-wrap{display:flex; align-items:stretch; gap:10px}
+.freq-spin{flex:0 0 auto}                 /* shrink to digits — shorter input */
+.step-btns{display:flex; flex-direction:column; gap:6px}
+.step-btn{
+  width:54px; flex:1 1 0; min-height:22px; display:grid; place-items:center; line-height:1;
+  font-size:14px; color:#06222a; background:var(--accent);
+  border:1px solid var(--accent); border-radius:7px; cursor:pointer;
+  opacity:.85; transition:.15s;
+}
+.step-btn:hover{opacity:1; box-shadow:0 0 12px -3px var(--accent-glow)}
+.step-btn:active{transform:translateY(1px)}
+
+/* VFO/SPEICHER toggle now rides in the tuner row, centered beside the ▲▼ keys */
+.spin-wrap .mode-toggle{align-self:center}
+
+/* compact, elegant VFO / SPEICHER switch */
+.mode-toggle{display:inline-flex; align-self:flex-end; border:1px solid var(--sw-edge); border-radius:7px; overflow:hidden}
+.mode-toggle .mt{
+  padding:5px 9px; font-family:var(--font-ui); font-size:10px; letter-spacing:.1em;
+  color:var(--text-dim); background:var(--field-bg); border:none; cursor:pointer; transition:.15s;
+}
+.mode-toggle .mt:hover{color:var(--accent)}
+.mode-toggle .mt+.mt{border-left:1px solid var(--sw-edge)}
+.mode-toggle .mt.active{color:#06222a; background:var(--accent); font-weight:600; box-shadow:0 0 12px -3px var(--accent-glow)}
+
+/* ---------------- PTT ---------------- */
+.ptt-zone{
+  padding:26px 30px; display:flex; flex-direction:row;
+  align-items:center; justify-content:space-between; gap:12px;
+}
+/* centred panel title in the panel's rail red */
+.ptt-title{
+  position:absolute; top:8px; left:0; right:0; margin:0; text-align:center;
+  font-family:var(--font-disp); font-weight:700; letter-spacing:.16em; font-size:16px;
+  color:var(--accent); pointer-events:none;
+}
+.ptt-center{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; flex:1 1 auto; min-width:0}
+/* quick-access columns: memory recall (left) + DTMF send (right) */
+.quick-col{display:flex; flex-direction:column; gap:5px; flex:0 0 auto}
+.qbtn{
+  width:78px; padding:6px 6px; line-height:1; cursor:pointer; transition:.14s;
+  font-family:var(--font-mono); font-size:11px; font-weight:600; letter-spacing:.03em;
+  color:var(--text-dim); background:var(--ctrl-bg); border:1px solid #c1392f; border-radius:6px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center;
+}                                              /* DTMF: red border like the PTT button */
+/* memory keys keep the base red border, matching the DTMF keys */
+.qbtn.qmem.empty{color:#566472; opacity:.7; font-weight:500}   /* placeholder */
+.qbtn:hover{opacity:1}
+.qbtn.qdtmf:hover{color:var(--tx)}              /* DTMF keys: red on hover */
+.qbtn.qmem:hover{color:var(--amber)}            /* memory keys: control-band colour (A) */
+body.ctrl-b .qbtn.qmem:hover{color:var(--cyan)} /* …or cyan when control band = B */
+.qbtn:active{transform:translateY(1px)}
+/* memory channel currently loaded on the radio: glowing text in the control-band colour */
+.qbtn.qmem.active{color:var(--amber); text-shadow:0 0 9px var(--amber-glow); opacity:1}
+body.ctrl-b .qbtn.qmem.active{color:var(--cyan); text-shadow:0 0 9px var(--cyan-glow)}
+.qbtn.qdtmf.sending{color:#fff; background:var(--tx); border-color:var(--tx); box-shadow:0 0 12px -3px var(--tx-glow)}
+/* --- air band = receive-only: M-keys (M50–M59) use the Band A amber border as a
+   bank cue, but (like normal mode) only the loaded memory's text glows; every TX
+   control (PTT, lock/roger/1750, DTMF column) is disabled. --- */
+body.airband #quick-mem .qbtn{border-color:var(--amber)}
+body.airband #quick-mem .qbtn.empty{color:#566472; opacity:.6}
+body.airband #quick-mem .qbtn:hover{color:var(--amber)}
+body.airband #quick-mem .qbtn.active{color:var(--amber); text-shadow:0 0 9px var(--amber-glow)}
+body.airband .ptt,
+body.airband .ptt-lock-row,
+body.airband #quick-dtmf{ opacity:.28; pointer-events:none; filter:grayscale(.7); }
+body.airband .ptt-hint{color:var(--amber); opacity:.85}
+.ptt-meta{text-align:center; display:flex; flex-direction:column; gap:6px}
+.ptt-hint{font-size:10px; letter-spacing:.26em; color:var(--text-dim)}
+/* two-tone test active warning — emitted independent of PTT */
+.ptt-warn{
+  align-self:center; font-family:var(--font-disp); font-weight:700; font-size:11px;
+  letter-spacing:.16em; color:#fff; background:var(--tx); border:1px solid var(--tx);
+  border-radius:6px; padding:4px 11px; box-shadow:0 0 16px -3px var(--tx-glow);
+  animation:lockpulse 1.2s ease-in-out infinite;
+}
+.ptt-warn[hidden]{display:none}
+.ptt-band{font-family:var(--font-disp); font-weight:600; letter-spacing:.14em;
+  color:var(--amber); text-shadow:0 0 12px var(--amber-glow)}     /* Band A */
+.ptt-band.is-b{color:var(--cyan); text-shadow:0 0 12px var(--cyan-glow)}  /* Band B */
+.ptt{
+  position:relative; width:168px; height:168px; border-radius:50%;
+  border:none; cursor:pointer; background:none; touch-action:none;
+  -webkit-tap-highlight-color:transparent;
+}
+.ptt-ring{
+  position:absolute; inset:0; border-radius:50%;
+  background:conic-gradient(from 0deg,#1c262e,#0d1419,#1c262e);
+  /* red outline on RX (idle); turns bright red + glow on TX (.ptt.tx) */
+  box-shadow:inset 0 0 0 2px #c1392f, inset 0 8px 22px #000, 0 14px 30px -10px #000;
+}
+.ptt-core{
+  position:absolute; inset:18px; border-radius:50%; display:grid; place-items:center;
+  font-family:var(--font-disp); font-weight:700; font-size:34px; letter-spacing:.1em;
+  color:var(--text);
+  background:radial-gradient(120% 120% at 50% 25%, #243039, #121a20 60%, #0c1217);
+  box-shadow:inset 0 2px 8px #ffffff0f, inset 0 -10px 18px #000, 0 0 0 1px #0008;
+  transition:.12s;
+}
+.ptt:hover .ptt-core{color:var(--tx-glow)}
+.ptt:active .ptt-core, .ptt.tx .ptt-core{
+  color:#fff; transform:scale(.97);
+  background:radial-gradient(120% 120% at 50% 25%, #ff6a5e, #d8281d 60%, #a01910);
+  box-shadow:inset 0 2px 10px #fff6, 0 0 26px var(--tx-glow);
+}
+.ptt.tx .ptt-ring{box-shadow:inset 0 0 0 2px var(--tx), 0 0 40px -4px var(--tx-glow)}
+.ptt-lock{
+  font-family:var(--font-disp); font-weight:700; letter-spacing:.3em; font-size:14px;
+  color:var(--text-dim); padding:6px 16px; border:1px solid #c1392f; border-radius:6px;
+  background:var(--ctrl-bg); cursor:pointer; transition:.18s;
+}
+.ptt-lock:hover{color:var(--tx)}
+.ptt-lock.locked{color:#fff; background:var(--tx); border-color:var(--tx);
+  box-shadow:0 0 22px var(--tx-glow); animation:lockpulse 1.2s ease-in-out infinite}
+@keyframes lockpulse{0%,100%{box-shadow:0 0 14px var(--tx-glow)}50%{box-shadow:0 0 26px var(--tx-glow)}}
+/* clickable ROGER / 1750 toggles — flanking PTT-LOCK, equal size */
+.ptt-lock-row{display:flex; align-items:center; justify-content:center; gap:12px}
+.ptt-side{
+  font-family:var(--font-disp); font-weight:700; letter-spacing:.14em; font-size:10px;
+  min-width:80px; padding:4px 9px; border-radius:5px; border:1px solid #c1392f; white-space:nowrap;
+  color:var(--text-dim); background:var(--ctrl-bg); cursor:pointer; transition:.18s;
+}
+.ptt-side:hover{color:var(--tx); border-color:var(--tx)}
+/* active ROGER / 1750 glow red */
+.ptt-side.on{color:#fff;
+  background:var(--tx); border-color:var(--tx); box-shadow:0 0 14px -3px var(--tx-glow)}
+/* whole-frame TX alarm glow */
+body.transmitting::after{
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:3;
+  box-shadow:inset 0 0 120px -20px var(--tx-glow), inset 0 0 0 2px #ff3b3040;
+  animation:txpulse 1.4s ease-in-out infinite;
+}
+@keyframes txpulse{0%,100%{opacity:.55}50%{opacity:1}}
+
+/* ---------------- memory ---------------- */
+.memory{padding:18px 20px 20px; display:flex; flex-direction:column; min-height:0}
+.mem-head{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:12px}
+.mem-head h2{font-family:var(--font-disp); font-weight:700; letter-spacing:.16em; font-size:16px; color:var(--text)}
+.mem-actions{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+.rng{font-size:10px; letter-spacing:.16em; color:var(--text-dim); display:flex; align-items:center; gap:5px}
+.rng input{width:54px; font-family:var(--font-mono); font-size:12px; color:var(--text); background:var(--field-bg); border:1px solid var(--edge); border-radius:6px; padding:5px 6px; text-align:center; color-scheme:dark}
+body.theme-light .rng input{color-scheme:light}
+.mem-actions button, .mem-actions a, .import-btn{
+  font-family:var(--font-ui); font-size:11px; letter-spacing:.14em; cursor:pointer;
+  color:var(--text); background:var(--ctrl-bg); border:1px solid var(--edge); border-radius:7px;
+  padding:7px 12px; text-decoration:none; transition:.15s;
+}
+.mem-actions button:hover, .mem-actions a:hover, .import-btn:hover{border-color:var(--cyan); color:var(--cyan)}
+
+.mem-table-wrap{overflow:auto; border:1px solid var(--edge); border-radius:10px; max-height:340px}
+.mem-table{width:100%; border-collapse:collapse; font-family:var(--font-mono); font-size:12px}
+.mem-table th{
+  position:sticky; top:0; background:#0c1217; color:var(--text-dim);
+  font-weight:500; letter-spacing:.12em; text-align:left; padding:9px 10px;
+  border-bottom:1px solid var(--edge); font-size:10px; z-index:1;
+}
+.mem-table td{padding:8px 10px; border-bottom:1px solid #161f26; color:var(--text)}
+.mem-table tbody tr{transition:.12s; cursor:default}
+.mem-table tbody tr:hover{background:#121b22}
+.mem-table .ch{color:var(--cyan)}
+.mem-table .name{color:var(--amber)}
+.mem-table .empty{color:var(--text-dim); text-align:center; padding:26px; font-family:var(--font-ui); letter-spacing:.08em}
+.row-actions{display:flex; gap:6px; justify-content:flex-end}
+.row-actions button{
+  font-family:var(--font-ui); font-size:10px; letter-spacing:.1em; cursor:pointer;
+  background:var(--ctrl-bg); border:1px solid var(--edge); border-radius:5px; padding:4px 8px; color:var(--text-dim); transition:.12s;
+}
+.row-actions .recall:hover{border-color:var(--cyan); color:var(--cyan)}
+.row-actions .del:hover{border-color:var(--tx); color:var(--tx)}
+
+/* ---------------- audio panel ---------------- */
+.audio{padding:26px 30px 26px; display:flex; flex-direction:column}
+.audio-head{display:flex; align-items:center; justify-content:center; gap:12px; margin:-18px 0 14px}
+.audio-head h2{font-family:var(--font-disp); font-weight:700; letter-spacing:.16em; font-size:16px; color:var(--accent)}
+/* audio status (LED + label) now lives in the title-bar status cluster, next to CAT */
+.audio-status{display:flex; align-items:center; gap:9px; white-space:nowrap; font-size:11px; letter-spacing:.16em; color:var(--text-dim)}
+.audio-status .led{width:9px;height:9px;border-radius:50%;background:#3a4650;box-shadow:inset 0 0 4px #000}
+.audio-status .led.on{background:var(--ok);box-shadow:0 0 10px var(--ok)}
+.audio-status .led.off{background:var(--tx);box-shadow:0 0 10px var(--tx)}
+/* connect row: device selector (left, grows wide) + connect button (right) */
+.audio-conn{display:flex; align-items:center; gap:8px; margin-bottom:12px}
+.audio-conn .acd{display:flex; align-items:center; gap:8px; flex:0 0 auto; min-width:150px;
+  white-space:nowrap;
+  font-family:var(--font-ui); font-size:10px; letter-spacing:.16em; color:var(--text-dim)}
+.audio-conn .acd select{flex:0 0 auto; width:auto;
+  font-family:var(--font-mono); font-size:12px; color:var(--text);
+  background:var(--field-bg); border:1px solid var(--accent); border-radius:7px; padding:6px 8px}
+.audio-conn .acd select:focus{outline:none; border-color:var(--accent)}
+/* "AUDIO" caption just before the CONNECT button */
+.audio-cap{font-family:var(--font-ui); font-size:10px; letter-spacing:.16em; color:var(--text-dim)}
+#audio-toggle{
+  margin-left:0; font-family:var(--font-ui); font-size:10px; letter-spacing:.12em; cursor:pointer;
+  color:var(--text); background:var(--ctrl-bg); border:1px solid var(--accent); border-radius:6px; padding:5px 10px; transition:.15s;
+  /* fixed width so CONNECT / DISCONNECT are the same size and the device text
+     doesn't shift when the connection state changes */
+  min-width:96px; box-sizing:border-box; text-align:center;
+}
+#audio-toggle:hover{border-color:var(--accent); color:var(--accent)}
+#audio-toggle.connected{   /* filled in the audio-panel colour while connected */
+  color:#120e22; background:var(--accent); border-color:var(--accent); font-weight:600;
+  box-shadow:0 0 16px -5px var(--accent);
+}
+#audio-toggle.connected:hover{color:#120e22}
+/* light theme: the violet accent fill reads too dark/heavy — lighten it */
+body.theme-light #audio-toggle.connected,
+body.theme-light #audio-toggle.connected:hover{
+  color:#2a2350; background:#b3a6e6; border-color:#9b8bdb;
+  box-shadow:0 0 16px -7px #8b7ad6;
+}
+.audio-frame-wrap{border:1px solid var(--edge); border-radius:10px; overflow:hidden; background:#0a0f13; height:200px}
+#audio-frame{width:100%; height:100%; border:0; display:block}
+.audio-hint{margin-top:10px; font-size:10px; letter-spacing:.1em; color:var(--text-dim)}
+
+/* audio controls: device select + RX/MIC gain */
+.audio-ctl{display:flex; flex-wrap:wrap; align-items:center; gap:16px; margin:4px 0 12px}
+.audio-conn .mictest-toggle{flex:1 1 auto; justify-content:center; gap:8px;
+  font-family:var(--font-ui); font-size:10px; letter-spacing:.16em; color:var(--text-dim)}
+.audio-ctl label{display:flex; align-items:center; gap:8px;
+  font-family:var(--font-ui); font-size:10px; letter-spacing:.16em; color:var(--text-dim)}
+.audio-ctl select{font-family:var(--font-mono); font-size:12px; color:var(--text);
+  background:var(--field-bg); border:1px solid var(--edge); border-radius:7px; padding:6px 8px; max-width:240px}
+.audio-ctl select:focus{outline:none; border-color:var(--cyan)}
+/* gain/timing + HackRF sliders share one custom style: dark track with a
+   colored fill (--gpct) and a colored thumb — never the white native slider */
+.acg input[type=range], .hrf-field input[type=range]{
+  -webkit-appearance:none; appearance:none; height:5px; border-radius:3px;
+  cursor:pointer; outline:none;
+  background:linear-gradient(90deg, var(--g-accent) var(--gpct,0%), var(--track-empty,#26333d) var(--gpct,0%));
+}
+.acg input[type=range]{width:120px}
+.acg input[type=range]::-webkit-slider-thumb, .hrf-field input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; appearance:none; width:14px; height:14px; border-radius:50%;
+  background:var(--g-accent); box-shadow:0 0 7px -1px var(--g-accent); cursor:pointer;
+}
+.acg input[type=range]::-moz-range-thumb, .hrf-field input[type=range]::-moz-range-thumb{
+  width:14px; height:14px; border:none; border-radius:50%; background:var(--g-accent); cursor:pointer;
+}
+#rx-gain{--g-accent:#8b7ad6}   /* RX in the audio-panel colour (violet) */
+#tx-gain{--g-accent:#cf6159}   /* MIC gain slider: muted red */
+/* TX timing sliders: muted cyan — without --g-accent the gradient is invalid
+   and the browser falls back to a glaring default track */
+#tx-buffer, #ptt-tail{--g-accent:#3fa6b3}
+#tx-buffer-val, #ptt-tail-val{color:#5cc3cf}
+.audio-ctl .gv{font-family:var(--font-mono); font-size:11px; color:var(--cyan); width:40px; text-align:right}
+#rx-gain-val{color:#8b7ad6}   /* RX value: audio-panel violet */
+#tx-gain-val{color:#cf6159}   /* MIC value: muted red */
+
+/* scrolling RX/MIC level history graph (newest on the right) */
+.audio-graph{
+  display:flex; flex-direction:column;
+  margin-top:2px; flex:1 1 auto; min-height:160px; overflow:hidden;
+  border:1px solid #4a5a67; border-radius:10px; background:var(--field-bg);
+  box-shadow:inset 0 1px 6px #00000033;
+}
+#level-graph{flex:1 1 auto; width:100%; min-height:0; display:block}
+.graph-axis{
+  flex:none; display:flex; justify-content:space-between;
+  padding:3px 8px 4px; border-top:1px solid var(--edge);
+  font-family:var(--font-mono); font-size:9px; letter-spacing:.1em;
+  color:rgba(127,140,150,0.7);
+}
+.graph-legend{
+  flex:none; display:flex; justify-content:center; gap:20px;
+  padding:5px 10px; border-top:1px solid var(--edge);
+  font-family:var(--font-mono); font-size:9px; letter-spacing:.16em;
+}
+.graph-legend .lg{display:flex; align-items:center; gap:6px; color:var(--text-dim)}
+.graph-legend .lg::before{content:""; width:10px; height:10px; border-radius:2px; display:inline-block}
+.graph-legend .lg.rx::before{background:#8b7ad6; box-shadow:0 0 6px #8b7ad688}
+.graph-legend .lg.mic::before{background:#cf6159; box-shadow:0 0 6px #cf615988}
+
+/* ---------------- band scan ---------------- */
+.scan-zone{padding:26px 30px 26px}
+.scan-head{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:12px}
+.scan-head h2{font-family:var(--font-disp); font-weight:700; letter-spacing:.16em; font-size:16px; color:var(--text)}
+.scan-bands{display:inline-flex; gap:6px}
+.scan-band{
+  font-family:var(--font-ui); font-size:11px; letter-spacing:.12em; cursor:pointer;
+  color:var(--text); background:var(--ctrl-bg); border:1px solid var(--sw-edge);
+  border-radius:7px; padding:6px 12px; transition:.15s;
+}
+.scan-band:hover{color:var(--cyan); border-color:var(--cyan)}
+.scan-band.active{color:#06222a; background:var(--cyan); border-color:var(--cyan); font-weight:600}
+.scan-band.running{color:#fff; background:var(--tx); border-color:var(--tx); font-weight:600;
+  animation:lockpulse 1.2s ease-in-out infinite}
+/* clear the graph — set apart from the band buttons */
+.scan-clear{
+  font-family:var(--font-ui); font-size:11px; letter-spacing:.12em; cursor:pointer;
+  color:var(--text-dim); background:transparent; border:1px solid var(--edge);
+  border-radius:7px; padding:6px 12px; margin-left:6px; transition:.15s;
+}
+.scan-clear:hover{color:var(--amber); border-color:var(--amber)}
+#scan-toggle{
+  font-family:var(--font-ui); font-size:11px; letter-spacing:.14em; cursor:pointer;
+  color:var(--text); background:var(--ctrl-bg); border:1px solid var(--edge);
+  border-radius:7px; padding:7px 16px; transition:.15s;
+}
+#scan-toggle:hover:not(:disabled){border-color:var(--cyan); color:var(--cyan)}
+#scan-toggle:disabled{opacity:.45; cursor:default}
+#scan-toggle.running{color:#fff; background:var(--tx); border-color:var(--tx)}
+.scan-prog{margin-left:auto; font-family:var(--font-mono); font-size:11px; color:var(--text-dim); letter-spacing:.06em}
+.scan-graph{position:relative; height:250px; border:1px solid #4a5a67; border-radius:10px;
+  background:var(--field-bg); overflow:hidden; box-shadow:inset 0 1px 6px #00000033}
+/* keep the light theme's lighter panel edge for both graphs */
+body.theme-light .audio-graph, body.theme-light .scan-graph{border-color:var(--edge)}
+#scan-canvas{display:block; width:100%; height:100%; cursor:crosshair}
+/* hover readout: vertical cursor line + frequency/occupancy tooltip */
+.scan-cur{position:absolute; top:0; bottom:0; width:1px; z-index:2; pointer-events:none;
+  background:rgba(255,255,255,0.55); box-shadow:0 0 6px rgba(255,255,255,0.4)}
+.scan-tip{position:absolute; top:4px; transform:translateX(-50%); z-index:3; pointer-events:none;
+  font-family:var(--font-mono); font-size:10px; letter-spacing:.04em; white-space:nowrap;
+  /* fixed light-on-dark: the tip floats over the (always dark) scan canvas,
+     so it must not follow the theme's --text (unreadable in the light theme) */
+  color:#eef3f6; background:rgba(8,12,16,0.92); border:1px solid rgba(255,255,255,0.28);
+  border-radius:5px; padding:2px 7px}
+.scan-legend{position:absolute; top:6px; left:10px; right:10px; display:flex; justify-content:space-between;
+  pointer-events:none; font-family:var(--font-mono); font-size:9px; letter-spacing:.1em; color:var(--text-dim)}
+.scan-axis{display:flex; justify-content:space-between; margin-top:5px;
+  font-family:var(--font-mono); font-size:10px; color:var(--text-dim); letter-spacing:.06em}
+
+/* ---------------- memory editor modal ---------------- */
+.modal{
+  position:fixed; inset:0; z-index:40; display:none;
+  align-items:center; justify-content:center; padding:20px;
+  background:#04070acc; backdrop-filter:blur(4px);
+}
+.modal.open{display:flex}
+/* the channel editor is a sub-dialog opened from inside the settings modal */
+#editor{z-index:50}
+.modal-card{
+  width:min(560px,94vw); max-height:90vh; overflow:auto;
+  background:linear-gradient(180deg,var(--panel-2),var(--panel));
+  border:1px solid var(--edge-hi); border-radius:14px; padding:22px;
+  box-shadow:0 30px 70px -20px #000, inset 0 1px 0 #ffffff0a;
+}
+.modal-card h3{
+  font-family:var(--font-disp); font-weight:700; letter-spacing:.14em;
+  font-size:18px; color:var(--cyan); margin-bottom:18px;
+}
+.form-grid{display:grid; grid-template-columns:1fr 1fr; gap:13px}
+.form-grid .span-2{grid-column:1 / -1}
+.form-grid label{
+  display:flex; flex-direction:column; gap:5px;
+  font-family:var(--font-ui); font-size:10px; letter-spacing:.16em; color:var(--text-dim);
+}
+.form-grid input, .form-grid select{
+  font-family:var(--font-mono); font-size:14px; color:var(--text);
+  background:var(--field-bg); border:1px solid var(--edge); border-radius:8px; padding:9px 11px;
+}
+/* dark-scheme the number spinners so the up/down arrows aren't glaring light */
+.form-grid input[type=number]{color-scheme:dark}
+body.theme-light .form-grid input[type=number]{color-scheme:light}
+.form-grid input:focus, .form-grid select:focus{
+  outline:none; border-color:var(--cyan); box-shadow:0 0 0 1px var(--cyan);
+}
+.form-grid input:disabled{opacity:.5}
+.form-grid .check-label{flex-direction:row; align-items:center; gap:9px; align-self:end; padding-bottom:9px}
+.form-grid .check-label input{width:16px; height:16px; accent-color:var(--cyan); color-scheme:dark}
+body.theme-light .form-grid .check-label input{color-scheme:light}
+
+/* toggle switch (e.g. settings ▸ Audio ▸ two-tone test) */
+.switch-label{display:flex; align-items:center; gap:11px; cursor:pointer;
+  font-family:var(--font-ui); font-size:11px; letter-spacing:.14em; color:var(--text)}
+.switch{
+  -webkit-appearance:none; appearance:none; cursor:pointer; flex:0 0 auto; margin:0;
+  width:40px; height:22px; border-radius:12px; position:relative;
+  background:var(--track-empty,#0c151b); border:1px solid var(--edge); transition:.18s;
+}
+.switch::after{
+  content:""; position:absolute; top:50%; left:2px; transform:translateY(-50%);
+  width:16px; height:16px; border-radius:50%; background:var(--text-dim); transition:.18s;
+}
+.switch:checked{background:var(--tx); border-color:var(--tx)}
+.switch:checked::after{left:20px; background:#fff}
+/* DECODE + AUTO switches follow the panel accent (digi = green, selcall = bronze) */
+.digi-zone .switch:checked, .selcall-zone .switch:checked{
+  background:var(--accent); border-color:var(--accent)}
+.switch:focus-visible{outline:none; box-shadow:0 0 0 2px var(--cyan)}
+body.theme-light .switch{--track-empty:#c8d2d9}
+/* settings ▸ Audio: USB mixer rows */
+.acd-hint{font-family:var(--font-mono); font-size:11px; color:var(--text-dim); letter-spacing:.04em}
+.mixer-field{margin-top:18px}
+.mixer-list{display:flex; flex-direction:column; gap:10px; margin-top:8px}
+.mixer-row{display:flex; align-items:center; gap:12px}
+.mixer-row .mx-name{flex:0 0 130px; font-family:var(--font-mono); font-size:12px;
+  color:var(--text); letter-spacing:.03em; text-transform:capitalize}
+/* gradient track like the gain/timing sliders so the unfilled part stays dark
+   (native accent-color tracks render a glaring light grey in the dark theme) */
+.mixer-row .mx-slider{flex:1 1 auto; --g-accent:var(--cyan);
+  -webkit-appearance:none; appearance:none; height:5px; border-radius:3px;
+  cursor:pointer; outline:none;
+  background:linear-gradient(90deg, var(--g-accent) var(--gpct,0%), var(--track-empty,#0c151b) var(--gpct,0%));
+}
+.mixer-row .mx-slider::-webkit-slider-thumb{
+  -webkit-appearance:none; appearance:none; width:14px; height:14px; border-radius:50%;
+  background:var(--g-accent); box-shadow:0 0 7px -1px var(--g-accent); cursor:pointer;
+}
+.mixer-row .mx-slider::-moz-range-thumb{
+  width:14px; height:14px; border:none; border-radius:50%; background:var(--g-accent); cursor:pointer;
+}
+body.theme-light .mixer-row .mx-slider{--track-empty:#c8d2d9}
+.mixer-row .mx-val{flex:0 0 42px; text-align:right; font-family:var(--font-mono);
+  font-size:12px; color:var(--cyan)}
+.mixer-row .mx-mute{flex:0 0 auto; display:flex; align-items:center; gap:5px;
+  font-family:var(--font-mono); font-size:11px; color:var(--text-dim); letter-spacing:.06em}
+.mixer-row .mx-mute input{width:15px; height:15px; accent-color:var(--cyan); color-scheme:dark}
+body.theme-light .mixer-row .mx-mute input{color-scheme:light}
+.modal-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:22px}
+.modal-actions button{
+  font-family:var(--font-ui); font-size:12px; letter-spacing:.16em; cursor:pointer;
+  padding:10px 20px; border-radius:8px; border:1px solid var(--edge); transition:.15s;
+}
+.btn-ghost{background:var(--ctrl-bg); color:var(--text-dim)}
+.btn-ghost:hover{border-color:var(--edge-hi); color:var(--text)}
+.btn-primary{background:var(--cyan); color:#06222a; border-color:var(--cyan); font-weight:600}
+.btn-primary:hover{box-shadow:0 0 16px -2px var(--cyan-glow)}
+#mem-new{color:var(--amber)!important}
+#mem-new:hover{border-color:var(--amber)!important; color:var(--amber)!important}
+@media (max-width:520px){.form-grid{grid-template-columns:1fr}}
+
+/* ---------------- settings: tabbed dialog ---------------- */
+/* anchor to the top so the dialog doesn't jump vertically when switching
+   tabs (panes differ in height); only the bottom edge grows/shrinks. */
+#settings{align-items:flex-start}
+.settings-card{width:min(860px,96vw); margin-top:5vh}
+.settings-head{display:flex; align-items:center; gap:14px; margin-bottom:14px}
+.settings-head h3{margin:0}
+.app-ver{font-family:var(--font-mono); font-size:11px; letter-spacing:.12em; color:var(--text-dim)}
+.set-x{
+  margin-left:auto; width:30px; height:30px; border-radius:7px; cursor:pointer;
+  background:transparent; border:1px solid var(--edge); color:var(--text-dim);
+  font-size:13px; transition:.15s;
+}
+.set-x:hover{border-color:var(--tx); color:var(--tx)}
+
+.tabs{display:flex; gap:4px; border-bottom:1px solid var(--edge); margin-bottom:18px; flex-wrap:wrap}
+.tab{
+  font-family:var(--font-ui); font-size:11px; letter-spacing:.16em; cursor:pointer;
+  color:var(--text-dim); background:transparent; border:none; padding:9px 16px;
+  border-bottom:2px solid transparent; margin-bottom:-1px; transition:.15s;
+}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--cyan); border-bottom-color:var(--cyan)}
+
+.tab-pane{display:none}
+.tab-pane.active{display:block}
+.pane-hint{font-size:10px; letter-spacing:.1em; color:var(--text-dim); margin-bottom:14px; line-height:1.7}
+.mixer-list + .pane-hint{margin-top:16px}
+
+/* logo management (Allgemein tab) */
+.logo-field{margin-top:16px}
+.update-field{margin-top:18px}
+.cert-field{margin-top:18px}
+.update-status{flex:1 1 auto; min-width:0; font-family:var(--font-mono); font-size:11px;
+  color:var(--text-dim); letter-spacing:.03em}
+.logo-label{
+  display:block; margin-bottom:8px;
+  font-family:var(--font-ui); font-size:10px; letter-spacing:.16em; color:var(--text-dim);
+}
+.logo-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+.logo-preview{
+  height:34px; min-width:64px; display:inline-flex; align-items:center; justify-content:center;
+  background:#b4b8bc; border-radius:7px; padding:4px 8px; box-shadow:inset 0 0 0 1px #0004;
+}
+.logo-preview:empty::before{
+  content:attr(data-empty); color:#8a9097; font-family:var(--font-mono); font-size:10px; letter-spacing:.08em;
+  background:none;
+}
+.logo-preview:empty{background:var(--field-bg); box-shadow:inset 0 0 0 1px var(--edge)}
+.logo-preview img{height:26px; width:auto; max-width:150px; display:block;
+  filter:brightness(.9) contrast(1.03)}   /* match the darkened title-bar logo */
+.mini-btn{
+  font-family:var(--font-ui); font-size:10px; letter-spacing:.14em; cursor:pointer;
+  color:var(--text); background:var(--ctrl-bg); border:1px solid var(--edge); border-radius:7px;
+  padding:8px 12px; transition:.15s;
+}
+.mini-btn:hover{border-color:var(--cyan); color:var(--cyan)}
+.mini-btn.danger:hover{border-color:var(--tx); color:var(--tx)}
+
+/* info readouts (ID / AE / FV / TY) */
+.info-grid{
+  display:grid; grid-template-columns:1fr 1fr; gap:1px;
+  background:var(--edge); border:1px solid var(--edge); border-radius:10px; overflow:hidden;
+}
+.info-grid dt{
+  background:#0c1217; padding:10px 12px; display:flex; align-items:center;
+  font-family:var(--font-ui); font-size:10px; letter-spacing:.12em; color:var(--text-dim);
+}
+.info-grid dd{
+  background:var(--field-bg); padding:10px 12px;
+  font-family:var(--font-mono); font-size:13px; color:var(--text); word-break:break-word;
+}
+/* light theme: the label column has a hardcoded dark bg — lighten it */
+body.theme-light .info-grid dt{background:#e4eaef; color:#46545f}
+@media (max-width:520px){.info-grid{grid-template-columns:1fr}}
+
+/* DTMF memory list */
+.dtmf-list{display:flex; flex-direction:column; gap:8px}
+.dtmf-row{display:flex; align-items:center; gap:10px}
+.dtmf-ch{
+  font-family:var(--font-disp); font-weight:700; font-size:15px; color:var(--cyan);
+  width:30px; text-align:center; flex:none;
+}
+.dtmf-row input{
+  flex:1; min-width:0; font-family:var(--font-mono); font-size:14px; letter-spacing:.2em;
+  color:var(--text); background:var(--field-bg); border:1px solid var(--edge); border-radius:8px; padding:9px 11px;
+}
+.dtmf-row input:focus{outline:none; border-color:var(--cyan); box-shadow:0 0 0 1px var(--cyan)}
+.dtmf-row .dtmf-save{
+  font-family:var(--font-ui); font-size:10px; letter-spacing:.14em; cursor:pointer; flex:none;
+  color:var(--text-dim); background:var(--ctrl-bg); border:1px solid var(--edge); border-radius:7px;
+  padding:9px 13px; transition:.15s;
+}
+.dtmf-row .dtmf-save:hover{border-color:var(--cyan); color:var(--cyan)}
+.dtmf-row .dtmf-save.dirty{border-color:var(--amber); color:var(--amber)}
+
+/* ---------------- toast ---------------- */
+.toast{
+  position:fixed; left:50%; bottom:26px; transform:translate(-50%,140%); z-index:30;
+  font-family:var(--font-mono); font-size:13px; letter-spacing:.04em;
+  padding:11px 18px; border-radius:9px; color:var(--text);
+  background:#0e161cdd; border:1px solid var(--edge-hi); backdrop-filter:blur(6px);
+  box-shadow:0 12px 30px -12px #000; transition:transform .35s cubic-bezier(.2,.9,.3,1.2);
+  max-width:80vw;
+}
+.toast.show{transform:translate(-50%,0)}
+.toast.err{border-color:var(--tx); color:#ffd9d5}
+.toast.ok{border-color:var(--ok)}
+/* light theme: a light toast plate with dark/red text instead of the dark box */
+body.theme-light .toast{
+  background:#ffffffee; color:#1b2731; border-color:#a4b4c1;
+  box-shadow:0 12px 30px -14px #00000055;
+}
+body.theme-light .toast.err{background:#fff0efee; border-color:#d23b30; color:#b3261e}
+body.theme-light .toast.ok{border-color:#1f9d57; color:#1f7a44}
+
+/* connection-lost dim */
+body.disconnected .console{opacity:.5; filter:grayscale(.4); transition:.4s}
+
+/* ===================== collapsible panels + HackRF ===================== */
+.panel-head{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px}
+.panel-head h2{font-family:var(--font-disp); font-weight:700; letter-spacing:.16em; font-size:16px; color:var(--text); margin:0}
+.panel-stat{font-family:var(--font-mono); font-size:10px; color:var(--text-dim); letter-spacing:.05em}
+.panel-toggle{
+  width:28px; height:22px; flex:none; cursor:pointer; order:99; padding:0;
+  color:var(--text-dim); background:var(--ctrl-bg);
+  border:1px solid var(--sw-edge); border-radius:6px; font-size:11px; line-height:1; transition:.15s;
+}
+.panel-head .panel-toggle{margin-left:auto}
+/* "HackRF ready" pill sits hard against the collapse arrow */
+.hrf-ready{
+  display:inline-flex; align-items:center; gap:7px; margin-left:auto;
+  font-family:var(--font-mono); font-size:10px; letter-spacing:.06em;
+  color:var(--text-dim); text-transform:uppercase;
+}
+.hrf-ready .dot{
+  width:8px; height:8px; border-radius:50%; flex:none;
+  background:#3a9ff0; box-shadow:0 0 7px 1px rgba(58,159,240,.75);
+}
+.hackrf-zone .panel-head .panel-toggle{margin-left:10px}
+.panel-toggle:hover{color:var(--accent); border-color:var(--accent)}
+.collapsed .panel-body{display:none}
+.hackrf-zone{padding:26px 30px 26px}
+.hackrf-zone.collapsed{padding-bottom:22px}
+/* switched off → dim the panel body (header with the ON button stays bright) */
+.hackrf-zone .panel-body{transition:opacity .25s, filter .25s}
+.hackrf-zone.hrf-off .panel-body{opacity:.4; filter:grayscale(.6) brightness(.82)}
+
+/* HackRF controls */
+.hrf-ctrls{display:flex; align-items:center; gap:11px 16px; flex-wrap:wrap; margin-bottom:12px}
+.hrf-power{
+  font-family:var(--font-mono); font-weight:700; font-size:12px; letter-spacing:.08em;
+  padding:6px 15px; border-radius:7px; cursor:pointer; transition:.15s;
+  color:var(--text-dim); background:var(--ctrl-bg); border:1px solid var(--sw-edge);
+}
+.hrf-power[aria-pressed="true"]{color:#06220f; background:var(--accent); border-color:var(--accent); box-shadow:0 0 12px -3px var(--accent-glow)}
+.hrf-modes{display:inline-flex; border:1px solid var(--sw-edge); border-radius:7px; overflow:hidden}
+.hrf-m{font-family:var(--font-mono); font-size:11px; padding:6px 11px; cursor:pointer; color:var(--text-dim);
+  background:var(--ctrl-bg); border:none; border-right:1px solid var(--sw-edge); transition:.15s}
+.hrf-m:last-child{border-right:none}
+.hrf-m:hover{color:var(--accent)}
+.hrf-m.active{color:#06220f; background:var(--accent); font-weight:600}
+.hrf-follow, .hrf-amp{display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono);
+  font-size:11px; color:var(--text-dim); cursor:pointer; user-select:none}
+.hrf-field{display:inline-flex; align-items:center; gap:7px; font-family:var(--font-mono); font-size:11px; color:var(--text-dim)}
+.hrf-field input[type=text]{width:96px; padding:4px 7px; font-family:var(--font-mono); font-size:12px;
+  color:var(--text); background:var(--field-bg); border:1px solid var(--sw-edge); border-radius:6px}
+.hrf-field input[type=text]:disabled{opacity:.45}
+.hrf-field input[type=range]{width:74px; --g-accent:var(--accent)}
+#hrf-level{--g-accent:#6fd89a}     /* level slider matches the green spectrum trace */
+#hrf-level-v{color:#6fd89a}        /* …and its value readout */
+.hrf-gains{display:inline-flex; align-items:center; gap:13px; flex-wrap:nowrap}
+.hrf-gv{min-width:18px; color:var(--accent); font-weight:600}
+.hrf-amp input, .hrf-follow input{accent-color:var(--accent)}
+
+/* HackRF graph: live spectrum stacked over the waterfall */
+.hrf-graph{position:relative; height:250px; border:1px solid #4a5a67; border-radius:10px; overflow:hidden; background:var(--panel)}
+body.theme-light .hrf-graph{border-color:var(--edge)}
+#hrf-spectrum, #hrf-wf{position:absolute; left:0; width:100%; display:block}
+#hrf-spectrum{top:0; height:38%}
+#hrf-wf{top:38%; height:62%}
+/* clear divider between the level spectrum (top) and the waterfall (bottom) */
+.hrf-split{position:absolute; left:0; right:0; top:38%; height:0; z-index:1; pointer-events:none;
+  border-top:2px solid var(--accent);
+  box-shadow:0 0 8px -1px var(--accent-glow), 0 1px 0 rgba(0,0,0,.45)}
+/* marker for the currently tuned frequency (centre in follow mode) */
+.hrf-centerline{position:absolute; top:0; bottom:0; width:0; z-index:2; pointer-events:none;
+  transform:translateX(-50%);
+  border-left:1px dashed rgba(255,255,255,0.7); box-shadow:0 0 7px rgba(255,255,255,0.35)}
+.hrf-centerline::before{content:""; position:absolute; top:0; left:-4px;
+  border-left:4px solid transparent; border-right:4px solid transparent;
+  border-top:5px solid rgba(255,255,255,0.85)}
