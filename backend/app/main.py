@@ -304,10 +304,23 @@ sel = SelcallService(radio_audio)
 # call required). Activity = any control command OR a connected WebSocket.
 _last_activity = time.monotonic()
 
+# Remote PTT safety: track a PTT engaged via the /api/ptt endpoint (held or
+# latched). If every client disappears while the radio is still keyed (e.g. a
+# Wi-Fi drop while PTT-locked), a watchdog drops it so the transmitter can't
+# stay latched on with no one in control.
+_remote_ptt = False
+_remote_ptt_clientless_since: float | None = None
+
 
 def touch_activity() -> None:
     global _last_activity
     _last_activity = time.monotonic()
+
+
+def _set_remote_ptt(on: bool) -> None:
+    global _remote_ptt, _remote_ptt_clientless_since
+    _remote_ptt = on
+    _remote_ptt_clientless_since = None
 
 
 async def _shut_down_peripherals() -> None:
@@ -348,6 +361,31 @@ async def _auto_power_off_loop() -> None:
             except Exception:  # noqa: BLE001
                 pass
             touch_activity()   # avoid immediate re-trigger
+
+
+async def _ptt_safety_loop() -> None:
+    """Release a remotely engaged PTT when every client vanishes while keyed: a
+    dropped link must never leave the transmitter latched on. Digi/selcall/DTMF
+    transmits don't go through /api/ptt, so they're unaffected (they un-key
+    themselves)."""
+    global _remote_ptt_clientless_since
+    grace = 4.0          # tolerate brief WebSocket reconnects
+    while True:
+        await asyncio.sleep(1.0)
+        if not _remote_ptt or not service.transmitting or manager.count > 0:
+            _remote_ptt_clientless_since = None
+            continue
+        now = time.monotonic()
+        if _remote_ptt_clientless_since is None:
+            _remote_ptt_clientless_since = now
+        elif now - _remote_ptt_clientless_since >= grace:
+            try:
+                await service.set_ptt(False)
+            except Exception:  # noqa: BLE001
+                pass
+            _set_remote_ptt(False)
+            logging.getLogger("tmv71").warning(
+                "remote PTT released: all clients gone while keyed")
 
 
 async def _audio_watchdog() -> None:
@@ -418,12 +456,14 @@ async def lifespan(app: FastAPI):
         await sel.start()
         audio_wd = asyncio.create_task(_audio_watchdog())
     apo_task = asyncio.create_task(_auto_power_off_loop())
+    ptt_wd = asyncio.create_task(_ptt_safety_loop())
     yield
     if audio_wd:
         audio_wd.cancel()
     await digi.stop()
     await sel.stop()
     apo_task.cancel()
+    ptt_wd.cancel()
     await sdr.stop()
     for pc in list(pcs):
         await pc.close()
@@ -580,6 +620,7 @@ async def scan_stop() -> dict:
 @app.post("/api/ptt", response_model=RadioStatus)
 async def set_ptt(req: PttRequest) -> RadioStatus:
     await service.set_ptt(req.transmit)
+    _set_remote_ptt(req.transmit)
     return service.status
 
 

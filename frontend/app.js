@@ -367,7 +367,14 @@ function pushLevel(rxDb, txDb) {
 function connectWS() {
   const ws = new WebSocket(wsUrl("/ws"));
   ws.onmessage = (e) => { try { render(JSON.parse(e.data)); } catch {} };
-  ws.onclose = () => { document.body.classList.add("disconnected"); setTimeout(connectWS, 1500); };
+  ws.onclose = () => {
+    document.body.classList.add("disconnected");
+    // Safety: a latched (continuous) PTT must not stay keyed when the link to
+    // the backend drops. Release it locally and best-effort tell the radio; the
+    // backend PTT watchdog covers the case where the radio is unreachable too.
+    if (pttLock && setPttLock) { setPttLock(false); toast("Link lost — PTT released", "err"); }
+    setTimeout(connectWS, 1500);
+  };
   ws.onerror = () => ws.close();
   // keepalive
   ws._ka = setInterval(() => ws.readyState === 1 && ws.send("ping"), 15000);
@@ -806,27 +813,59 @@ function bindEditor() {
 
 // ---- audio panel (direct WebRTC <-> Pi, Opus) -----------------------------
 let audioPc = null, audioMic = null;
+let audioWant = false;          // user wants audio on → auto-reconnect on drops
+let audioReconnectT = null;     // pending reconnect timer
 function audioConnected() {
   return !!audioPc && ["connected", "completed"].includes(audioPc.connectionState);
 }
 function updateAudioToggle() {
   const t = $("#audio-toggle"); if (!t) return;
-  t.textContent = audioPc ? "DISCONNECT" : "CONNECT";
-  t.classList.toggle("connected", !!audioPc);
+  const reconnecting = audioWant && !audioPc;
+  t.textContent = reconnecting ? "…" : audioPc ? "DISCONNECT" : "CONNECT";
+  t.classList.toggle("connected", !!audioPc || reconnecting);
+}
+function teardownAudio() {
+  if (audioPc) { try { audioPc.close(); } catch {} audioPc = null; }
+  if (audioMic) { audioMic.getTracks().forEach(tr => tr.stop()); audioMic = null; }
+  const a = $("#rx-audio"); if (a) a.srcObject = null;
+}
+function scheduleAudioReconnect() {
+  if (audioReconnectT || !audioWant) return;
+  audioReconnectT = setTimeout(() => {
+    audioReconnectT = null;
+    if (audioWant && !audioPc) audioConnect();
+  }, 2000);
+}
+// Unexpected drop (ICE failed/disconnected, negotiation error): tear the peer
+// down and retry while the user still wants audio.
+function audioDropped() {
+  const was = audioWant;
+  teardownAudio();
+  updateAudioToggle();
+  if (was) { toast("Audio lost — reconnecting…", "err"); scheduleAudioReconnect(); }
 }
 async function audioConnect() {
+  audioWant = true;
   const t = $("#audio-toggle");
-  t.disabled = true; t.textContent = "…";
+  if (t) { t.disabled = true; t.textContent = "…"; }
+  let mic;
   try {
-    audioMic = await navigator.mediaDevices.getUserMedia({
+    mic = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
     });
+  } catch (e) {
+    // mic permission / device error — needs the user, so don't loop on it
+    toast("Audio: " + e.message, "err"); audioDisconnect();
+    if (t) t.disabled = false; return;
+  }
+  try {
+    audioMic = mic;
     audioPc = new RTCPeerConnection();
     audioMic.getTracks().forEach(tr => audioPc.addTrack(tr, audioMic));
     audioPc.addEventListener("track", e => { $("#rx-audio").srcObject = e.streams[0]; });
     audioPc.addEventListener("connectionstatechange", () => {
       updateAudioToggle();
-      if (audioPc && ["failed", "closed", "disconnected"].includes(audioPc.connectionState)) audioDisconnect();
+      if (audioPc && ["failed", "closed", "disconnected"].includes(audioPc.connectionState)) audioDropped();
     });
     const offer = await audioPc.createOffer({ offerToReceiveAudio: true });
     await audioPc.setLocalDescription(offer);
@@ -840,14 +879,17 @@ async function audioConnect() {
       { sdp: audioPc.localDescription.sdp, type: audioPc.localDescription.type });
     await audioPc.setRemoteDescription(ans);
     toast("Audio connected", "ok");
-  } catch (e) { toast("Audio: " + e.message, "err"); audioDisconnect(); }
+  } catch (e) {
+    // backend/negotiation failure: retry (e.g. service still coming back up)
+    toast("Audio: " + e.message, "err"); audioDropped();
+  }
   if (t) t.disabled = false;
   updateAudioToggle();
 }
-function audioDisconnect() {
-  if (audioPc) { try { audioPc.close(); } catch {} audioPc = null; }
-  if (audioMic) { audioMic.getTracks().forEach(tr => tr.stop()); audioMic = null; }
-  const a = $("#rx-audio"); if (a) a.srcObject = null;
+function audioDisconnect() {       // user-initiated: stop and don't reconnect
+  audioWant = false;
+  if (audioReconnectT) { clearTimeout(audioReconnectT); audioReconnectT = null; }
+  teardownAudio();
   updateAudioToggle();
 }
 function setGainUi(key, val) {
@@ -975,7 +1017,7 @@ function bindAudio() {
       toast(e.target.checked ? "RX low-pass on" : "RX low-pass off", e.target.checked ? "ok" : "");
     } catch (err) { toast("RX low-pass: " + err.message, "err"); e.target.checked = !e.target.checked; }
   });
-  t.addEventListener("click", () => { audioPc ? audioDisconnect() : audioConnect(); });
+  t.addEventListener("click", () => { (audioWant || audioPc) ? audioDisconnect() : audioConnect(); });
 
   $("#audio-device").addEventListener("change", async e => {
     try { await api("POST", "/api/audio/device", { device: e.target.value }); toast("Audio device switched", "ok"); }
@@ -1129,7 +1171,7 @@ function refreshPowerUi() {
   // Radio off -> also drop audio and the HackRF (the backend stops them too;
   // this keeps the UI in sync). Idempotent: only acts when something is active.
   if (avail && on === false) {
-    if (audioPc) audioDisconnect();
+    if (audioWant || audioPc) audioDisconnect();
     if (hrf.on) { hrf.on = false; updateHrfPower(); hrfSync(); }
   }
   btn.title = !avail ? "GPIO-Pin in den Einstellungen festlegen"

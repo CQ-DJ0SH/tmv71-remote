@@ -262,6 +262,9 @@ EN = [
         "mute RX until your own ID is received.",
         "CW (Morse) and RTTY (Baudot/AFSK) decode + encode, over the FM audio path.",
         "Installable PWA with a mobile landscape swipe-deck layout.",
+        "Resilient operation: the phone screen is kept awake, browser audio "
+        "auto-reconnects after a network glitch, and a backend watchdog releases "
+        "a latched PTT if every client disappears.",
         "GPIO power switch, auto power-off, TX power, squelch, in-display S-meter.",
         "Two themes (dark/light); no build step for the UI.",
     ]),
@@ -326,7 +329,8 @@ EN = [
     ("h2", "Digimodes (CW / RTTY)"),
     ("p", "Switch between CW (Morse) and RTTY (Baudot/AFSK). DECODE shows received "
           "text; type into the field and SEND to transmit (keys PTT). Parameters: "
-          "CW WPM/pitch, RTTY baud/shift/mark. Over the FM radio this is MCW / "
+          "CW WPM/pitch — with an optional AUTO mode that tracks the received "
+          "speed — and RTTY baud/shift/mark. Over the FM radio this is MCW / "
           "AFSK — not native HF CW/RTTY."),
     ("h2", "Band scan"),
     ("p", "Sweep a VHF/UHF range or the memory bank and see an occupancy "
@@ -344,6 +348,12 @@ EN = [
           "slim vertical strip on the left and an icon tab rail on the right. The "
           "app is forced to landscape; portrait shows a rotate hint. Install via the "
           "browser menu (Install / Add to Home Screen); on iOS use Safari > Share."),
+    ("p", "While the app is open the phone screen is kept awake via the Screen Wake "
+          "Lock API, so it won't dim or lock mid-QSO. The browser audio link "
+          "reconnects automatically after a brief network interruption, and if the "
+          "connection to the backend is lost while transmit is latched, the PTT is "
+          "released (locally and by a backend watchdog) so the rig can never stay "
+          "keyed unattended."),
     ("img", "pwa-ptt-dark.png", 150),
     ("h1", "9  Trusted Certificate (Root CA)"),
     ("p", "A self-signed certificate is fine on the desktop, but mobile browsers "
@@ -419,6 +429,10 @@ DE = [
         "und RX stummschalten bis zum eigenen Ruf.",
         "CW (Morse) und RTTY (Baudot/AFSK) dekodieren + senden über den FM-Audioweg.",
         "Installierbare PWA mit mobilem Querformat-Swipe-Deck.",
+        "Robuster Betrieb: der Handy-Bildschirm bleibt an, das Browser-Audio "
+        "verbindet sich nach einer Netzstörung automatisch neu, und ein "
+        "Backend-Watchdog beendet ein eingerastetes PTT, wenn alle Clients "
+        "verschwinden.",
         "GPIO-Power-Schalter, Auto-Abschaltung, TX-Leistung, Squelch, S-Meter.",
         "Zwei Themes (dunkel/hell); kein Build-Schritt für die Oberfläche.",
     ]),
@@ -487,8 +501,9 @@ DE = [
     ("h2", "Digimodes (CW / RTTY)"),
     ("p", "Umschalten zwischen CW (Morse) und RTTY (Baudot/AFSK). DECODE zeigt den "
           "empfangenen Text; in das Feld tippen und mit SEND senden (tastet PTT). "
-          "Parameter: CW WpM/Tonhöhe, RTTY Baud/Shift/Mark. Über das FM-Gerät ist "
-          "das MCW / AFSK — kein echtes HF-CW/RTTY."),
+          "Parameter: CW WpM/Tonhöhe — mit optionalem AUTO-Modus, der die "
+          "empfangene Geschwindigkeit nachführt — sowie RTTY Baud/Shift/Mark. Über "
+          "das FM-Gerät ist das MCW / AFSK — kein echtes HF-CW/RTTY."),
     ("h2", "Bandscan"),
     ("p", "Einen VHF/UHF-Bereich oder die Speicherbank absuchen und ein "
           "Belegungs-Spektrum + Wasserfall sehen. Ein Doppelklick auf einen Kanal "
@@ -506,6 +521,13 @@ DE = [
           "rechts. Die App wird ins Querformat gezwungen; im Hochformat erscheint "
           "ein Dreh-Hinweis. Installation über das Browser-Menü (Installieren / Zum "
           "Startbildschirm); unter iOS über Safari > Teilen."),
+    ("p", "Solange die App geöffnet ist, bleibt der Handy-Bildschirm über die "
+          "Screen-Wake-Lock-API wach und schaltet sich nicht mitten im QSO ab. Die "
+          "Browser-Audioverbindung verbindet sich nach einer kurzen Netzstörung "
+          "automatisch neu, und geht die Verbindung zum Backend bei eingerastetem "
+          "Sendebetrieb verloren, wird das PTT beendet (lokal und durch einen "
+          "Backend-Watchdog) — das Gerät kann so nie unbeaufsichtigt getastet "
+          "bleiben."),
     ("img", "pwa-ptt-dark.png", 150),
     ("h1", "9  Vertrauenswürdiges Zertifikat (Root-CA)"),
     ("p", "Ein selbstsigniertes Zertifikat genügt am Desktop, aber mobile Browser "
