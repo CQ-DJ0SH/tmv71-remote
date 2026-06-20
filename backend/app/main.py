@@ -942,7 +942,8 @@ async def set_audio_tones(req: TonesRequest) -> dict:
     if req.test_tone is not None:
         radio_audio.test_tone = req.test_tone
     if req.mic_test is not None:
-        radio_audio.mic_test = req.mic_test
+        # records while on; on switch-off, replays the take over RX (no keying)
+        radio_audio.set_mic_test(req.mic_test)
         if not req.mic_test and not radio_audio._ptt_open:
             radio_audio.tx_db = None      # clear the meter when leaving mic test
     if req.tx_lowpass is not None:

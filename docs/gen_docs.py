@@ -313,9 +313,11 @@ EN = [
     ("h2", "Audio (WebRTC/Opus)"),
     ("p", "Open the AUDIO panel, pick the audio band, click CONNECT and allow the "
           "microphone. RX and mic levels are shown live. Controls: RX/TX gain, a "
-          "MIC TEST switch (meter the mic without keying), switchable TX and RX "
-          "voice low-pass filters (≤ 3.5 kHz), a two-tone test, and TX timing "
-          "(buffer / trail). The USB card mixer is in Settings > Audio."),
+          "MIC TEST switch (meter the mic without keying — it records while on and "
+          "replays your audio over RX when switched off, so you can hear how you "
+          "sound, with no RF), switchable TX and RX voice low-pass filters "
+          "(≤ 3.5 kHz), a two-tone test, and TX timing (buffer / trail). The USB "
+          "card mixer is in Settings > Audio."),
     ("h2", "HackRF waterfall"),
     ("p", "If a HackRF One is connected, this panel shows a live spectrum stacked "
           "over a waterfall: a panadapter centred on the tuned frequency "
@@ -484,9 +486,10 @@ DE = [
     ("p", "Das AUDIO-Panel öffnen, das Audio-Band wählen, CONNECT klicken und das "
           "Mikrofon erlauben. RX- und Mic-Pegel werden live angezeigt. "
           "Bedienelemente: RX/TX-Gain, ein MIC-TEST-Schalter (Mic messen ohne zu "
-          "tasten), zuschaltbare TX- und RX-Sprachtiefpässe (≤ 3,5 kHz), ein "
-          "Zweiton-Test sowie TX-Timing (Buffer/Trail). Der USB-Mixer liegt unter "
-          "Einstellungen > Audio."),
+          "tasten — nimmt im Betrieb auf und spielt die Aufnahme beim Ausschalten "
+          "über RX zurück, sodass man sich selbst hört, ganz ohne HF), zuschaltbare "
+          "TX- und RX-Sprachtiefpässe (≤ 3,5 kHz), ein Zweiton-Test sowie TX-Timing "
+          "(Buffer/Trail). Der USB-Mixer liegt unter Einstellungen > Audio."),
     ("h2", "HackRF-Wasserfall"),
     ("p", "Ist ein HackRF One angeschlossen, zeigt dieses Panel ein Live-Spektrum "
           "über einem Wasserfall: ein Panadapter zentriert auf der Frequenz "

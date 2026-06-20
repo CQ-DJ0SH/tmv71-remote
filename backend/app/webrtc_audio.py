@@ -111,6 +111,13 @@ class RadioAudio:
         self.tone_1750 = False        # 1750 Hz repeater tone-call while keyed
         self.roger_beep = False       # short beep on un-key (preference)
         self.mic_test = False         # meter the browser mic without keying the radio
+        # mic-test echo: record the mic while MIC TEST is on, then replay it over
+        # the RX path once it's switched off (no RF, no keying).
+        self._mic_rec_chunks: list = []
+        self._echo_lock = threading.Lock()
+        self._echo_buf: Optional[np.ndarray] = None   # samples being replayed
+        self._echo_pos = 0
+        self._mic_rec_cap = 30 * SAMPLE_RATE          # keep at most ~30 s
         # digimodes: tap RX for the decoder; inject CW/RTTY audio on TX
         self.digi_rx = False
         self._digi_rx_chunks: list = []
@@ -244,8 +251,22 @@ class RadioAudio:
                     self._sel_rx_chunks.append(samples.copy())
                     if len(self._sel_rx_chunks) > 250:
                         self._sel_rx_chunks.pop(0)
+        # mic-test echo replay: while a recording is being played back, override
+        # the published RX block with it (single pos writer = this callback).
+        pub = samples
+        if self._echo_buf is not None:
+            e = self._echo_buf
+            blk = np.zeros(frames, dtype=np.int16)
+            k = min(frames, len(e) - self._echo_pos)
+            if k > 0:
+                blk[:k] = e[self._echo_pos:self._echo_pos + k]
+                self._echo_pos += k
+            if self._echo_pos >= len(e):
+                self._echo_buf = None
+            pub = blk
+            self.rx_db = _level(blk, self.rx_db)
         # publish the latest block; the clock-paced RX track(s) pick it up.
-        self._latest = samples.tobytes()
+        self._latest = pub.tobytes()
         self._latest_ts = time.monotonic()
         # TX: radio mic source. The two-tone test is emitted continuously on the
         # mic line regardless of PTT (so deviation can be set without holding the
@@ -364,7 +385,15 @@ class RadioAudio:
             pcm = self._tx_lp.process(pcm)
         self.tx_db = _level(pcm, self.tx_db)
         if not self._ptt_open:
-            return                     # mic test only: level measured, nothing to the radio
+            # mic test only: level measured, nothing to the radio. Record the
+            # audio so it can be replayed when MIC TEST is switched off.
+            if self.mic_test:
+                with self._echo_lock:
+                    self._mic_rec_chunks.append(pcm.copy())
+                    total = sum(len(c) for c in self._mic_rec_chunks)
+                    while total > self._mic_rec_cap and len(self._mic_rec_chunks) > 1:
+                        total -= len(self._mic_rec_chunks.pop(0))
+            return
         with self._pb_lock:
             self._playback.extend(pcm.tolist())
             # keep the backlog tight so TX stays low-latency (bound jitter, not 1 s)
@@ -408,6 +437,38 @@ class RadioAudio:
             self._tx_lp.reset()      # clear filter state at the start of each over
         self._ptt_open = is_open
 
+    # -- mic-test echo -----------------------------------------------------
+    def set_mic_test(self, on: bool) -> bool:
+        """Toggle the mic-test meter. Turning it on starts a fresh recording;
+        turning it off replays what was captured over the RX path. Returns True
+        when a replay was started."""
+        was = self.mic_test
+        self.mic_test = on
+        if on and not was:
+            with self._echo_lock:
+                self._mic_rec_chunks = []     # fresh take
+            self._echo_buf = None             # stop any previous replay
+            return False
+        if was and not on:
+            return self._start_echo_playback()
+        return False
+
+    def _start_echo_playback(self) -> bool:
+        with self._echo_lock:
+            chunks = self._mic_rec_chunks
+            self._mic_rec_chunks = []
+        if not chunks:
+            return False
+        buf = np.concatenate(chunks)
+        if len(buf) < int(0.2 * SAMPLE_RATE):     # ignore a stray tap
+            return False
+        self._echo_pos = 0
+        self._echo_buf = buf                       # picked up by the callback
+        return True
+
+    def echo_busy(self) -> bool:
+        return self._echo_buf is not None
+
     # -- status ------------------------------------------------------------
     def status(self) -> dict:
         return {"enabled": True, "connected": self.connected, "error": self.error,
@@ -419,6 +480,7 @@ class RadioAudio:
                 "test_tone": self.test_tone, "tone_1750": self.tone_1750,
                 "roger_beep": self.roger_beep, "tx_lowpass": self.tx_lowpass,
                 "rx_lowpass": self.rx_lowpass, "mic_test": self.mic_test,
+                "echo_busy": self.echo_busy(),
                 "digi_rx": self.digi_rx, "digi_tx": self.digi_tx_busy(),
                 "transport": "webrtc", "web_client": self.peers > 0}
 

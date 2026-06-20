@@ -8,6 +8,7 @@ let last = null;          // last RadioStatus
 let memBase = 0;          // quick-key channel offset: 0 normally, 50 in the air band
 let airbandRx = false;    // Band A in the air band → receive-only, TX blocked
 let txActive = false;
+let linkDown = false;     // backend status WebSocket is down (shown to the user)
 let selcallMuted = false; // RX muted by the selcall "MUTE until call" button
 let pttLock = false;      // latched (continuous) transmit
 let lockConfirmed = false; // radio has actually reported TX since locking
@@ -366,9 +367,16 @@ function pushLevel(rxDb, txDb) {
 // ---- websocket ------------------------------------------------------------
 function connectWS() {
   const ws = new WebSocket(wsUrl("/ws"));
+  ws.onopen = () => {
+    document.body.classList.remove("disconnected");
+    if (linkDown) { linkDown = false; toast("Connection restored", "ok"); }
+  };
   ws.onmessage = (e) => { try { render(JSON.parse(e.data)); } catch {} };
   ws.onclose = () => {
     document.body.classList.add("disconnected");
+    // Surface the lost backend link to the user (once per outage), regardless of
+    // whether transmit is keyed.
+    if (!linkDown) { linkDown = true; toast("Connection lost — reconnecting…", "err"); }
     // Safety: a latched (continuous) PTT must not stay keyed when the link to
     // the backend drops. Release it locally and best-effort tell the radio; the
     // backend PTT watchdog covers the case where the radio is unreachable too.
@@ -1001,8 +1009,10 @@ function bindAudio() {
     if (on && !audioConnected())
       toast("Connect audio first to test the mic", "");
     try {
-      await api("POST", "/api/audio/tones", { mic_test: on });
-      toast(on ? "Mic test ON — speak, watch the MIC level" : "Mic test off", on ? "ok" : "");
+      const st = await api("POST", "/api/audio/tones", { mic_test: on });
+      toast(on ? "Mic test ON — speak; switch off to hear it back"
+               : (st && st.echo_busy ? "Replaying your mic test…" : "Mic test off"),
+            on || (st && st.echo_busy) ? "ok" : "");
     } catch (err) { toast("Mic test: " + err.message, "err"); e.target.checked = !on; }
   });
   $("#set-tx-lowpass")?.addEventListener("change", async e => {
