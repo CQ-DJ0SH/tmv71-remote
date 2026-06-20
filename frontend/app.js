@@ -2080,6 +2080,24 @@ function bindPanelDeck() {
   sync();
 }
 
+// Keep the phone screen awake while the app is open: the radio remote needs to
+// stay visible (PTT, meters, waterfall). The wake lock is released by the
+// browser whenever the page is hidden, so re-acquire it on visibility change.
+let wakeLock = null;
+async function requestWakeLock() {
+  if (!("wakeLock" in navigator) || document.visibilityState !== "visible") return;
+  try {
+    wakeLock = await navigator.wakeLock.request("screen");
+    wakeLock.addEventListener("release", () => { wakeLock = null; });
+  } catch { /* denied / unsupported / not focused — ignore */ }
+}
+function bindWakeLock() {
+  requestWakeLock();
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && !wakeLock) requestWakeLock();
+  });
+}
+
 // Best-effort lock to landscape. The manifest already forces it for the
 // installed PWA; this covers the fullscreen case. Throws in a normal browser
 // tab (no permission) — ignored; the CSS rotate hint handles portrait there.
@@ -2316,6 +2334,7 @@ bindRadioHint();
 bindDigi();
 bindSelcall();
 lockLandscape();
+bindWakeLock();
 bindQuickKeys();
 bindScan();
 bindPanels();

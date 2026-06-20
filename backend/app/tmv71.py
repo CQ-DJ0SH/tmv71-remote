@@ -397,7 +397,16 @@ class TMV71:
         if ensure_vfo and self.get_band_mode(band) != VFO_MODE:
             self.set_band_mode(band, VFO_MODE)
         ch = self.get_vfo(band)
+        # The radio refuses an FO write whose frequency isn't a multiple of the
+        # tuning step (e.g. a HackRF waterfall double-click lands on an arbitrary
+        # 100 Hz value). Keep the exact frequency when some step divides it,
+        # otherwise snap it to the current step grid so the write is accepted.
+        step_idx = align_step_index(freq_hz, ch.step)
+        step = STEP_HZ[step_idx] if 0 <= step_idx < len(STEP_HZ) else 0
+        if step and freq_hz % step:
+            freq_hz = round(freq_hz / step) * step
         ch.rx_freq = freq_hz
+        ch.step = step_idx
         self.set_vfo(ch)
         return self.get_vfo(band)
 

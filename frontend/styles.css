@@ -621,6 +621,7 @@ body.theme-light .digi-decode{background:#f3f7f4; border-color:#cfe0d6;
 .sel-call-field .sel-digits, .sel-own-field .sel-digits{gap:5px}
 .sel-call-field .sel-d, .sel-own-field .sel-d{width:26px; height:32px; font-size:17px; border-radius:6px}
 .sel-call-field .sel-call, .sel-own-field .sel-mute{padding:7px 12px; font-size:10px}
+.sel-own-field .sel-mute{margin-left:10px; min-width:72px; text-align:center; box-sizing:border-box}
 .sel-call-field .sel-call{padding:5px 10px; font-size:9px}
 .selcall-zone .panel-head .panel-toggle{margin-left:12px}
 .sel-controls{display:flex; flex-wrap:wrap; align-items:center; gap:14px 24px}
