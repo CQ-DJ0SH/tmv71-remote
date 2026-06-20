@@ -328,6 +328,9 @@ body.theme-light .callsign{color:#0c7b71; text-shadow:none}
 .console-foot .foot-sep{opacity:.6}
 .console-foot .foot-date{color:var(--text-dim)}
 .console-foot .foot-date::before{content:"·"; opacity:.6; margin-right:8px}
+/* the info heading + environment list are only used on the mobile deck page */
+.foot-title, .foot-env{display:none}
+.foot-links{display:contents}
 @media (max-width:860px) and (min-width:761px){
   .console{grid-template-columns:1fr; grid-template-rows:none;
            grid-template-areas:"bands" "ptt" "audio" "hackrf" "sel" "digi" "scan" "foot"}
@@ -414,23 +417,38 @@ body.theme-light .callsign{color:#0c7b71; text-shadow:none}
   .hdr-hide, .hdr-reveal{display:none}   /* not needed: the title bar is always docked */
 
   /* ---- center: the swipe deck, full height ---- */
+  /* Vertical deck: panels are swiped up/down (one per screen). This keeps the
+     deck's scroll axis off the horizontal sliders, so range inputs stay fully
+     usable with a sideways drag. */
   .console{order:1; flex:1 1 auto; min-width:0; height:100dvh;
-    display:flex; flex-flow:row nowrap; gap:0; max-width:none; margin:0; padding:0;
-    overflow-x:auto; overflow-y:hidden; scrollbar-width:none;
-    scroll-snap-type:x mandatory; scroll-behavior:smooth; -webkit-overflow-scrolling:touch}
+    display:flex; flex-flow:column nowrap; gap:0; max-width:none; margin:0; padding:0;
+    overflow-y:auto; overflow-x:hidden; scrollbar-width:none;
+    scroll-snap-type:y mandatory; scroll-behavior:smooth; -webkit-overflow-scrolling:touch}
   .console::-webkit-scrollbar{display:none}
   /* unwrap the two-band wrapper so VFO A and VFO B are their own deck pages */
   .bands{display:contents}
   #band-0, #band-1,
   .ptt-zone, .audio, .hackrf-zone, .selcall-zone, .digi-zone, .scan-zone{
-    flex:0 0 100%; width:100%; min-width:100%;
+    flex:0 0 auto; width:100%; height:100%; min-height:0;
     scroll-snap-align:start; scroll-snap-stop:always;
     overflow-y:auto; -webkit-overflow-scrolling:touch;
     margin:0; border-radius:0; box-sizing:border-box;
     /* top & bottom padding clear the decorative corner screws (at 8px, 18px tall)
        so panel graphs/canvases don't run over them */
     padding:30px 14px 30px}
-  .console-foot{display:none}
+  /* the footer becomes the final deck page: app version + browser info */
+  .console-foot{display:flex; flex-direction:column; align-items:stretch;
+    justify-content:flex-start; gap:12px;
+    flex:0 0 auto; width:100%; height:100%; min-height:0;
+    scroll-snap-align:start; scroll-snap-stop:always; overflow-y:auto;
+    padding:30px 18px; box-sizing:border-box;
+    font-family:var(--font-mono); font-size:11px; color:var(--text-dim)}
+  .foot-title{display:block; font-family:var(--font-disp); font-weight:700; letter-spacing:.16em;
+    font-size:16px; color:var(--text); margin:0}
+  .foot-links{display:flex; flex-wrap:wrap; align-items:center; gap:8px}
+  .foot-env{display:grid; grid-template-columns:auto 1fr; gap:4px 14px; margin:0; width:100%}
+  .foot-env dt{color:var(--text-dim); opacity:.65; white-space:nowrap}
+  .foot-env dd{margin:0; color:var(--text); word-break:break-word}
   /* deck pages always show their body (ignore the desktop collapse toggle).
      Higher specificity than the later base ".collapsed .panel-body{display:none}"
      so the bodies (graphs/decoders) actually render in the deck. */

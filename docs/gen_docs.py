@@ -315,7 +315,8 @@ EN = [
           "microphone. RX and mic levels are shown live. Controls: RX/TX gain, a "
           "MIC TEST switch (meter the mic without keying — it records while on and "
           "replays your audio over RX when switched off, so you can hear how you "
-          "sound, with no RF), switchable TX and RX voice low-pass filters "
+          "sound, with no RF; the radio's RX is muted during the test), "
+          "switchable TX and RX voice low-pass filters "
           "(≤ 3.5 kHz), a two-tone test, and TX timing (buffer / trail). The USB "
           "card mixer is in Settings > Audio."),
     ("h2", "HackRF waterfall"),
@@ -346,8 +347,11 @@ EN = [
     ("h1", "8  Mobile App (PWA)"),
     ("p", "The UI installs as a Progressive Web App: full-screen, with an "
           "app-shell service worker for instant launch. On phones the panels become "
-          "a horizontal swipe deck (one panel per screen), with the title bar as a "
-          "slim vertical strip on the left and an icon tab rail on the right. The "
+          "a vertical swipe deck — swipe up/down, one panel per screen (this keeps "
+          "the deck's scroll axis off the horizontal sliders, so they stay usable) "
+          "— with the title bar as a slim vertical strip on the left and an icon "
+          "tab rail on the right. Past the last panel is an info page listing the "
+          "app version and browser/environment details. The "
           "app is forced to landscape; portrait shows a rotate hint. Install via the "
           "browser menu (Install / Add to Home Screen); on iOS use Safari > Share."),
     ("p", "While the app is open the phone screen is kept awake via the Screen Wake "
@@ -487,7 +491,8 @@ DE = [
           "Mikrofon erlauben. RX- und Mic-Pegel werden live angezeigt. "
           "Bedienelemente: RX/TX-Gain, ein MIC-TEST-Schalter (Mic messen ohne zu "
           "tasten — nimmt im Betrieb auf und spielt die Aufnahme beim Ausschalten "
-          "über RX zurück, sodass man sich selbst hört, ganz ohne HF), zuschaltbare "
+          "über RX zurück, sodass man sich selbst hört, ganz ohne HF; das "
+          "RX-Rauschen des Funkgeräts ist während des Tests stumm), zuschaltbare "
           "TX- und RX-Sprachtiefpässe (≤ 3,5 kHz), ein Zweiton-Test sowie TX-Timing "
           "(Buffer/Trail). Der USB-Mixer liegt unter Einstellungen > Audio."),
     ("h2", "HackRF-Wasserfall"),
@@ -519,9 +524,13 @@ DE = [
     ("h1", "8  Mobile App (PWA)"),
     ("p", "Die Oberfläche installiert sich als Progressive Web App: Vollbild, mit "
           "App-Shell-Service-Worker für sofortigen Start. Auf dem Handy werden die "
-          "Panels zu einem horizontalen Swipe-Deck (ein Panel pro Bildschirm), die "
+          "Panels zu einem vertikalen Swipe-Deck — nach oben/unten wischen, ein "
+          "Panel pro Bildschirm (so liegt die Scroll-Achse des Decks nicht auf den "
+          "waagerechten Schiebereglern, die dadurch bedienbar bleiben) —, die "
           "Titelzeile zu einer schmalen vertikalen Leiste links und die Tab-Leiste "
-          "rechts. Die App wird ins Querformat gezwungen; im Hochformat erscheint "
+          "rechts. Hinter dem letzten Panel folgt eine Info-Seite mit App-Version "
+          "und Browser-/Umgebungsdaten. Die App wird ins Querformat gezwungen; im "
+          "Hochformat erscheint "
           "ein Dreh-Hinweis. Installation über das Browser-Menü (Installieren / Zum "
           "Startbildschirm); unter iOS über Safari > Teilen."),
     ("p", "Solange die App geöffnet ist, bleibt der Handy-Bildschirm über die "

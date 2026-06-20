@@ -10,6 +10,7 @@ let airbandRx = false;    // Band A in the air band → receive-only, TX blocked
 let txActive = false;
 let linkDown = false;     // backend status WebSocket is down (shown to the user)
 let selcallMuted = false; // RX muted by the selcall "MUTE until call" button
+let micTestActive = false; // RX muted while MIC TEST is on (silence radio noise)
 let pttLock = false;      // latched (continuous) transmit
 let lockConfirmed = false; // radio has actually reported TX since locking
 let setPttLock = null;    // assigned in bindControls()
@@ -176,7 +177,7 @@ function render(st) {
   $("#ptt").classList.toggle("tx", txActive);
   // mute browser RX output whenever transmitting (covers PTT-lock, spacebar,
   // and radio-side TX, not just the key() button handler)
-  const rxEl = $("#rx-audio"); if (rxEl) rxEl.muted = txActive || selcallMuted;
+  const rxEl = $("#rx-audio"); if (rxEl) rxEl.muted = txActive || selcallMuted || micTestActive;
   // keep the PTT-Lock honest: clear it only after TX was confirmed then dropped
   // on the radio side (e.g. time-out timer), never during the engage round-trip.
   if (pttLock && setPttLock) {
@@ -584,7 +585,7 @@ function bindControls() {
             `transmitting on band ${last.ptt_band ? "B" : "A"} — no modulation!`, "err");
     }
     // mute the browser RX output the instant we key so nothing trails on TX
-    const rx = $("#rx-audio"); if (rx) rx.muted = on || selcallMuted;
+    const rx = $("#rx-audio"); if (rx) rx.muted = on || selcallMuted || micTestActive;
     try { await api("POST", "/api/ptt", { transmit: on }); }
     catch (e) { toast("PTT: " + e.message, "err"); }
     // 1750 Hz tone call is a one-shot: auto-disable the hold after releasing PTT
@@ -1008,12 +1009,20 @@ function bindAudio() {
     const on = e.target.checked;
     if (on && !audioConnected())
       toast("Connect audio first to test the mic", "");
+    // mute the radio RX (noise) while testing; un-mute on switch-off so the
+    // echo replay is audible
+    micTestActive = on;
+    { const a = $("#rx-audio"); if (a) a.muted = on || txActive || selcallMuted; }
     try {
       const st = await api("POST", "/api/audio/tones", { mic_test: on });
       toast(on ? "Mic test ON — speak; switch off to hear it back"
                : (st && st.echo_busy ? "Replaying your mic test…" : "Mic test off"),
             on || (st && st.echo_busy) ? "ok" : "");
-    } catch (err) { toast("Mic test: " + err.message, "err"); e.target.checked = !on; }
+    } catch (err) {
+      toast("Mic test: " + err.message, "err");
+      e.target.checked = !on; micTestActive = !on;
+      const a = $("#rx-audio"); if (a) a.muted = (!on) || txActive || selcallMuted;
+    }
   });
   $("#set-tx-lowpass")?.addEventListener("change", async e => {
     try {
@@ -2095,7 +2104,7 @@ function bindPanelDeck() {
 
   tabs.forEach((t, i) => t.addEventListener("click", () => {
     const el = targets[i];
-    if (el) deck.scrollTo({ left: el.offsetLeft, behavior: "smooth" });
+    if (el) deck.scrollTo({ top: el.offsetTop, behavior: "smooth" });
   }));
 
   const setActive = i => tabs.forEach((t, k) => t.classList.toggle("active", k === i));
@@ -2340,7 +2349,7 @@ function bindSelcall() {
   const setMute = on => {
     muted = on;
     selcallMuted = on;
-    const a = $("#rx-audio"); if (a) a.muted = on || txActive;
+    const a = $("#rx-audio"); if (a) a.muted = on || txActive || micTestActive;
     muteBtn.classList.toggle("armed", on);
     muteBtn.textContent = on ? "MUTED" : "MUTE";
     if (on && $("#sel-rx") && !$("#sel-rx").checked) { $("#sel-rx").checked = true; post({ rx: true }); }
@@ -2418,7 +2427,39 @@ api("GET", "/api/version").then(v => {
   if (v?.version) $("#foot-version").textContent = v.version;
   if (v?.repo) $("#src-link").href = v.repo;
   if (v?.built) { const d = $("#foot-date"); d.textContent = "built " + v.built; d.hidden = false; }
+  fillEnv();
 }).catch(() => {});
+
+// Footer info page (last deck slide): app + browser/environment details.
+function fillEnv() {
+  const el = $("#foot-env"); if (!el) return;
+  const n = navigator;
+  const dm = matchMedia("(display-mode: standalone)").matches ||
+             matchMedia("(display-mode: fullscreen)").matches ? "installed (PWA)" : "browser tab";
+  const rows = [
+    ["App version", $("#foot-version")?.textContent || "—"],
+    ["Backend", apiBase() || location.origin],
+    ["Mode", dm],
+    ["Secure context", window.isSecureContext ? "yes" : "no"],
+    ["Online", n.onLine ? "yes" : "no"],
+    ["Browser", n.userAgent],
+    ["Platform", n.platform || "—"],
+    ["Language", n.language || "—"],
+    ["CPU cores", n.hardwareConcurrency || "—"],
+    ["Viewport", `${innerWidth}×${innerHeight} @ ${devicePixelRatio || 1}x`],
+    ["Screen", `${screen.width}×${screen.height}`],
+    ["Orientation", screen.orientation?.type || "—"],
+    ["Wake Lock", ("wakeLock" in n) ? (wakeLock ? "held" : "supported") : "unsupported"],
+  ];
+  el.innerHTML = rows.map(([k, v]) =>
+    `<dt>${k}</dt><dd>${String(v).replace(/[<>&]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]))}</dd>`
+  ).join("");
+}
+fillEnv();
+window.addEventListener("resize", fillEnv);
+window.addEventListener("online", fillEnv);
+window.addEventListener("offline", fillEnv);
+screen.orientation?.addEventListener?.("change", fillEnv);
 sizeLevelGraph();
 window.addEventListener("resize", sizeLevelGraph);
 refreshAudio();
