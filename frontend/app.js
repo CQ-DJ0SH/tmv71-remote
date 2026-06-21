@@ -177,7 +177,11 @@ function render(st) {
   $("#ptt").classList.toggle("tx", txActive);
   // mute browser RX output whenever transmitting (covers PTT-lock, spacebar,
   // and radio-side TX, not just the key() button handler)
-  const rxEl = $("#rx-audio"); if (rxEl) rxEl.muted = txActive || selcallMuted || micTestActive;
+  // RX is NOT muted during TX in the browser: a half-duplex rig isn't receiving
+  // while it transmits, and toggling the <audio> element upsets Bluetooth
+  // routing. The mic is gated in the backend instead (only sent to the radio
+  // while keyed). Selcall/mic-test muting stays.
+  const rxEl = $("#rx-audio"); if (rxEl) rxEl.muted = selcallMuted || micTestActive;
   // keep the PTT-Lock honest: clear it only after TX was confirmed then dropped
   // on the radio side (e.g. time-out timer), never during the engage round-trip.
   if (pttLock && setPttLock) {
@@ -584,10 +588,11 @@ function bindControls() {
       toast(`Audio band ≠ PTT band: mic is on band ${DATA_TX_BAND[last.data_band] ? "B" : "A"}, ` +
             `transmitting on band ${last.ptt_band ? "B" : "A"} — no modulation!`, "err");
     }
-    // mute the browser RX output the instant we key so nothing trails on TX
-    const rx = $("#rx-audio"); if (rx) rx.muted = on || selcallMuted || micTestActive;
+    // RX is not muted for TX (see render()); keep only selcall/mic-test muting
+    const rx = $("#rx-audio"); if (rx) rx.muted = selcallMuted || micTestActive;
     try { await api("POST", "/api/ptt", { transmit: on }); }
     catch (e) { toast("PTT: " + e.message, "err"); }
+
     // 1750 Hz tone call is a one-shot: auto-disable the hold after releasing PTT
     if (!on) {
       const t1750 = $("#btn-1750");
@@ -821,9 +826,47 @@ function bindEditor() {
 }
 
 // ---- audio panel (direct WebRTC <-> Pi, Opus) -----------------------------
+// Keep a Bluetooth headset permanently on A2DP (good-quality stereo playback) so
+// RX audio always reaches it. A2DP can't carry a microphone, and using the
+// headset's mic would force Android onto the mono HFP/SCO profile (which also
+// gets stuck until Bluetooth is toggled). So we capture TX audio from a
+// NON-Bluetooth input — the phone's built-in mic — which never triggers SCO. The
+// headset then stays on A2DP the whole time; the radio mic comes from the phone.
 let audioPc = null, audioMic = null;
 let audioWant = false;          // user wants audio on → auto-reconnect on drops
 let audioReconnectT = null;     // pending reconnect timer
+
+// Pick an audio input that is NOT the Bluetooth headset (so the headset stays on
+// A2DP). Returns a deviceId or null. Labels are only populated after mic
+// permission has been granted.
+async function pickNonBtMicId() {
+  try {
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    const ins = devs.filter(d => d.kind === "audioinput" && d.deviceId && d.deviceId !== "default");
+    const isBt = l => /bluetooth|headset|hands?-?free|hfp|sco|airpod|buds|wh-|wf-/i.test(l || "");
+    const builtin = ins.find(d => /built|internal|phone|handset|mic|mikrofon/i.test(d.label) && !isBt(d.label));
+    const nonBt = builtin || ins.find(d => d.label && !isBt(d.label));
+    return nonBt ? nonBt.deviceId : null;
+  } catch { return null; }
+}
+// Capture the mic, preferring a non-Bluetooth (built-in) input.
+async function captureBuiltinMic() {
+  const base = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+  let id = await pickNonBtMicId();                 // works if permission persisted
+  let stream = await navigator.mediaDevices.getUserMedia({
+    audio: id ? { ...base, deviceId: { exact: id } } : base });
+  if (!id) {
+    // first run: labels are available now — switch to a non-BT mic if needed
+    const id2 = await pickNonBtMicId();
+    const cur = stream.getAudioTracks()[0]?.getSettings?.().deviceId;
+    if (id2 && id2 !== cur) {
+      stream.getTracks().forEach(tr => tr.stop());
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { ...base, deviceId: { exact: id2 } } });
+    }
+  }
+  return stream;
+}
+
 function audioConnected() {
   return !!audioPc && ["connected", "completed"].includes(audioPc.connectionState);
 }
@@ -855,13 +898,12 @@ function audioDropped() {
 }
 async function audioConnect() {
   audioWant = true;
+  try { localStorage.setItem("tmv71.audioOn", "1"); } catch {}   // persist: auto-connect next launch
   const t = $("#audio-toggle");
   if (t) { t.disabled = true; t.textContent = "…"; }
   let mic;
   try {
-    mic = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
-    });
+    mic = await captureBuiltinMic();     // non-BT mic → headset stays on A2DP
   } catch (e) {
     // mic permission / device error — needs the user, so don't loop on it
     toast("Audio: " + e.message, "err"); audioDisconnect();
@@ -897,6 +939,7 @@ async function audioConnect() {
 }
 function audioDisconnect() {       // user-initiated: stop and don't reconnect
   audioWant = false;
+  try { localStorage.setItem("tmv71.audioOn", "0"); } catch {}
   if (audioReconnectT) { clearTimeout(audioReconnectT); audioReconnectT = null; }
   teardownAudio();
   updateAudioToggle();
@@ -1012,7 +1055,7 @@ function bindAudio() {
     // mute the radio RX (noise) while testing; un-mute on switch-off so the
     // echo replay is audible
     micTestActive = on;
-    { const a = $("#rx-audio"); if (a) a.muted = on || txActive || selcallMuted; }
+    { const a = $("#rx-audio"); if (a) a.muted = on || selcallMuted; }
     try {
       const st = await api("POST", "/api/audio/tones", { mic_test: on });
       toast(on ? "Mic test ON — speak; switch off to hear it back"
@@ -1021,7 +1064,7 @@ function bindAudio() {
     } catch (err) {
       toast("Mic test: " + err.message, "err");
       e.target.checked = !on; micTestActive = !on;
-      const a = $("#rx-audio"); if (a) a.muted = (!on) || txActive || selcallMuted;
+      const a = $("#rx-audio"); if (a) a.muted = (!on) || selcallMuted;
     }
   });
   $("#set-tx-lowpass")?.addEventListener("change", async e => {
@@ -2349,7 +2392,7 @@ function bindSelcall() {
   const setMute = on => {
     muted = on;
     selcallMuted = on;
-    const a = $("#rx-audio"); if (a) a.muted = on || txActive || micTestActive;
+    const a = $("#rx-audio"); if (a) a.muted = on || micTestActive;
     muteBtn.classList.toggle("armed", on);
     muteBtn.textContent = on ? "MUTED" : "MUTE";
     if (on && $("#sel-rx") && !$("#sel-rx").checked) { $("#sel-rx").checked = true; post({ rx: true }); }
@@ -2465,6 +2508,15 @@ window.addEventListener("resize", sizeLevelGraph);
 refreshAudio();
 setInterval(refreshAudio, 200);   // fast enough for a responsive VU meter
 tickClock(); setInterval(tickClock, 1000);
+
+// Persistent audio: auto-reconnect if it was on last session. RX playback may
+// need a user gesture (autoplay policy) — resume it on the first tap.
+if (localStorage.getItem("tmv71.audioOn") === "1") {
+  audioConnect();
+  // RX playback may need a user gesture (autoplay policy) — resume on first tap
+  const kick = () => { const a = $("#rx-audio"); if (a) a.play().catch(() => {}); window.removeEventListener("pointerdown", kick); };
+  window.addEventListener("pointerdown", kick, { once: true });
+}
 
 // decorative aircraft-panel corner screws (one set of four per panel)
 function addPanelScrews() {

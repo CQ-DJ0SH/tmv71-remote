@@ -76,9 +76,22 @@ class RadioService:
             await asyncio.to_thread(self.radio.open)
             self.model = await asyncio.to_thread(self.radio.get_model)
             log.info("Connected to radio: %s", self.model)
+            await self._restore_squelch()
         except Exception as exc:  # noqa: BLE001
             log.error("Could not open radio: %s", exc)
         self._poll_task = asyncio.create_task(self._poll_loop())
+
+    async def _restore_squelch(self) -> None:
+        """Re-apply the persisted squelch level to each band (the radio loses it
+        on a power cycle). No-op for bands with no saved value."""
+        from .config import settings
+        for band, level in ((0, settings.squelch_a), (1, settings.squelch_b)):
+            if level is None:
+                continue
+            try:
+                await asyncio.to_thread(self.radio.set_squelch_level, band, level)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("restore squelch band %d failed: %s", band, exc)
 
     async def stop(self) -> None:
         self._stop.set()
@@ -151,10 +164,15 @@ class RadioService:
         )
 
     async def refresh(self) -> RadioStatus:
+        prev = self._status.connected
         try:
             self._status = await asyncio.to_thread(self._read_status)
         except Exception as exc:  # noqa: BLE001
             self._status = RadioStatus(connected=False, error=str(exc))
+        # radio just came (back) online — re-apply the persisted squelch, which
+        # the rig loses on a power cycle (GPIO/manual power-on, serial recovery)
+        if self._status.connected and not prev:
+            await self._restore_squelch()
         return self._status
 
     async def _poll_loop(self) -> None:
@@ -747,6 +765,7 @@ class RadioService:
             return self.radio.get_model()
         self.model = await asyncio.to_thread(_do)
         config.save_runtime(serial_port=port, serial_baud=baud)
+        await self._restore_squelch()
         await self.refresh()
         await self.manager.broadcast(self._status.model_dump())
         return self.model

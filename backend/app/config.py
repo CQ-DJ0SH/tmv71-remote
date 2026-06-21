@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     audio_device: str = "NAD"        # substring matched against sound devices
     rx_gain: float = 1.0             # digital gain radio -> browser
     tx_gain: float = 1.0             # digital gain browser mic -> radio
+
+    # Squelch threshold (0..31) per band, persisted so it is restored on the
+    # radio after a power cycle. None = leave the radio's own setting alone.
+    squelch_a: int | None = None
+    squelch_b: int | None = None
     # TX path timing (ms). tx_buffer = mic backlog cap (latency vs jitter
     # tolerance); ptt_tail = how long TX stays keyed after release so the
     # buffered/in-flight tail plays out instead of being chopped.
@@ -84,6 +89,7 @@ class Settings(BaseSettings):
 _RUNTIME_FILE = os.path.join(os.path.dirname(__file__), "runtime.json")
 _RUNTIME_KEYS = ("serial_port", "serial_baud", "gpio_power_pin",
                  "rx_gain", "tx_gain", "audio_device",
+                 "squelch_a", "squelch_b",
                  "tx_buffer_ms", "ptt_tail_ms",
                  "auto_power_off_enabled", "auto_power_off_seconds",
                  "callsign", "roger_beep_enabled", "theme",

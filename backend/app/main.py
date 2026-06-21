@@ -576,6 +576,13 @@ async def set_power(req: PowerRequest) -> RadioStatus:
 @app.post("/api/squelch", response_model=RadioStatus)
 async def set_squelch(req: SquelchRequest) -> RadioStatus:
     await service.set_squelch(req.band, req.level)
+    # persist per band so it can be restored after a radio power cycle
+    if req.band == 0:
+        settings.squelch_a = req.level
+        save_runtime(squelch_a=req.level)
+    else:
+        settings.squelch_b = req.level
+        save_runtime(squelch_b=req.level)
     return service.status
 
 

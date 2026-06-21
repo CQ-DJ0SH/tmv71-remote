@@ -130,6 +130,8 @@ class RadioAudio:
         self._t1750_phase = 0         # 1750 Hz tone phase
         self._beep_phase = 0          # roger-beep phase
         self._beep_left = 0           # remaining roger-beep samples
+        self._beep_seg = 0            # samples per tone of the two-tone roger beep
+        self._beep_second = False     # second tone (1750 Hz) reached
 
     # -- device ------------------------------------------------------------
     def _find_device(self) -> int:
@@ -287,7 +289,16 @@ class RadioAudio:
                 mono = self._gen_tone(frames, (1750.0,), 0.5, "_t1750_phase")
             elif self._beep_left > 0:
                 k = min(frames, self._beep_left)
-                mono[:k] = self._gen_tone(k, (1000.0,), 0.5, "_beep_phase")
+                # two-tone: first segment 1000 Hz, second 1750 Hz (reset the
+                # phase at the change for a clean edge)
+                if self._beep_left > self._beep_seg:
+                    freq = 1000.0
+                else:
+                    if not self._beep_second:
+                        self._beep_phase = 0
+                        self._beep_second = True
+                    freq = 1750.0
+                mono[:k] = self._gen_tone(k, (freq,), 0.5, "_beep_phase")
                 self._beep_left -= k
             else:
                 with self._pb_lock:
@@ -315,7 +326,10 @@ class RadioAudio:
         with self._pb_lock:
             self._playback.clear()         # drop trailing mic; beep only
         self._beep_phase = 0
-        self._beep_left = int(SAMPLE_RATE * 0.25)   # 250 ms
+        self._beep_second = False
+        # two-tone roger beep: 1000 Hz then 1750 Hz, 125 ms each (250 ms total)
+        self._beep_seg = int(SAMPLE_RATE * 0.125)
+        self._beep_left = 2 * self._beep_seg
 
     # -- digimodes (CW/RTTY) ----------------------------------------------
     def pop_digi_rx(self) -> Optional[np.ndarray]:

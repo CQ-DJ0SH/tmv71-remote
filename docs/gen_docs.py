@@ -300,13 +300,15 @@ EN = [
     ("h2", "Band panels (VFO A / VFO B)"),
     ("p", "Each band shows the frequency on a 7-segment display with an S-meter "
           "(1 s peak-hold), plus controls for VFO/memory mode, CTRL/PTT band "
-          "selection, TX power, squelch, repeater shift/offset, tone and "
+          "selection, TX power, squelch (remembered per band across power "
+          "cycles), repeater shift/offset, tone and "
           "bandwidth. The digit tuner lets you click bars above/below each digit "
           "to step the frequency; AIR Band tunes band A to the 118–137 MHz air "
           "band (receive-only)."),
     ("h2", "PTT & memory quick keys"),
     ("p", "Hold the large PTT button (or the space bar) to transmit; PTT-LOCK "
-          "latches transmit. ROGER adds a beep on release; the 1750 Hz button "
+          "latches transmit. ROGER adds a two-tone (1000/1750 Hz) beep on "
+          "release; the 1750 Hz button "
           "arms a tone-call. The left column recalls memory channels 0–9 (the "
           "loaded channel's key glows); the right column sends DTMF memories. On "
           "mobile, mini RX/TX VU bars with peak-hold flank the button."),
@@ -318,7 +320,13 @@ EN = [
           "sound, with no RF; the radio's RX is muted during the test), "
           "switchable TX and RX voice low-pass filters "
           "(≤ 3.5 kHz), a two-tone test, and TX timing (buffer / trail). The USB "
-          "card mixer is in Settings > Audio."),
+          "card mixer is in Settings > Audio. The audio link auto-reconnects after "
+          "a network glitch and is restored automatically on the next launch."),
+    ("p", "Bluetooth headsets: transmit audio is captured from the phone's "
+          "built-in microphone (not the headset's), so the headset stays on the "
+          "A2DP profile and receive audio keeps coming through in good quality. "
+          "Using the headset mic would force Android onto the mono HFP/SCO profile "
+          "and, on many phones, leave RX stuck until Bluetooth is toggled."),
     ("h2", "HackRF waterfall"),
     ("p", "If a HackRF One is connected, this panel shows a live spectrum stacked "
           "over a waterfall: a panadapter centred on the tuned frequency "
@@ -475,14 +483,16 @@ DE = [
     ("h2", "Band-Panels (VFO A / VFO B)"),
     ("p", "Jedes Band zeigt die Frequenz auf einer 7-Segment-Anzeige mit S-Meter "
           "(1 s Peak-Hold) sowie Bedienelemente für VFO-/Speichermodus, CTRL-/"
-          "PTT-Bandwahl, TX-Leistung, Squelch, Relais-Shift/Offset, Ton und "
+          "PTT-Bandwahl, TX-Leistung, Squelch (pro Band über Aus-/Einschalten "
+          "hinweg gespeichert), Relais-Shift/Offset, Ton und "
           "Bandbreite. Über die Ziffern-Abstimmung lässt sich jede Stelle per "
           "Klick auf die Balken hoch/runter stellen; AIR Band stellt Band A auf "
           "das Flugfunkband 118–137 MHz (nur Empfang)."),
     ("h2", "PTT & Speicher-Schnelltasten"),
     ("p", "Den großen PTT-Knopf (oder die Leertaste) halten zum Senden; PTT-LOCK "
-          "rastet den Sendebetrieb ein. ROGER fügt beim Loslassen einen Piep "
-          "hinzu; die 1750-Hz-Taste schärft einen Tonruf. Die linke Spalte ruft "
+          "rastet den Sendebetrieb ein. ROGER fügt beim Loslassen einen "
+          "Zweiton-Piep (1000/1750 Hz) hinzu; die 1750-Hz-Taste schärft einen "
+          "Tonruf. Die linke Spalte ruft "
           "die Speicherkanäle 0–9 ab (die Taste des geladenen Kanals leuchtet); "
           "die rechte Spalte sendet DTMF-Speicher. Auf dem Handy flankieren "
           "Mini-RX/TX-VU-Bars mit Peak-Hold den Knopf."),
@@ -494,7 +504,15 @@ DE = [
           "über RX zurück, sodass man sich selbst hört, ganz ohne HF; das "
           "RX-Rauschen des Funkgeräts ist während des Tests stumm), zuschaltbare "
           "TX- und RX-Sprachtiefpässe (≤ 3,5 kHz), ein Zweiton-Test sowie TX-Timing "
-          "(Buffer/Trail). Der USB-Mixer liegt unter Einstellungen > Audio."),
+          "(Buffer/Trail). Der USB-Mixer liegt unter Einstellungen > Audio. Die "
+          "Audioverbindung verbindet sich nach einer Netzstörung automatisch neu "
+          "und wird beim nächsten Start wiederhergestellt."),
+    ("p", "Bluetooth-Headsets: Das Sende-Audio wird vom eingebauten Telefon-"
+          "Mikrofon aufgenommen (nicht vom Headset-Mikro), damit das Headset im "
+          "A2DP-Profil bleibt und der Empfang in guter Qualität durchkommt. Das "
+          "Headset-Mikrofon würde Android auf das Mono-Profil HFP/SCO zwingen und "
+          "RX auf vielen Handys hängen lassen, bis Bluetooth aus/an geschaltet "
+          "wird."),
     ("h2", "HackRF-Wasserfall"),
     ("p", "Ist ein HackRF One angeschlossen, zeigt dieses Panel ein Live-Spektrum "
           "über einem Wasserfall: ein Panadapter zentriert auf der Frequenz "
