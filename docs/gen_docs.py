@@ -308,7 +308,8 @@ EN = [
     ("h2", "PTT & memory quick keys"),
     ("p", "Hold the large PTT button (or the space bar) to transmit; PTT-LOCK "
           "latches transmit. ROGER adds a two-tone (1000/1750 Hz) beep on "
-          "release; the 1750 Hz button "
+          "release; while transmitting the button shows a count-up timer (MM:SS). "
+          "The 1750 Hz button "
           "arms a tone-call. The left column recalls memory channels 0–9 (the "
           "loaded channel's key glows); the right column sends DTMF memories. On "
           "mobile, mini RX/TX VU bars with peak-hold flank the button."),
@@ -491,7 +492,8 @@ DE = [
     ("h2", "PTT & Speicher-Schnelltasten"),
     ("p", "Den großen PTT-Knopf (oder die Leertaste) halten zum Senden; PTT-LOCK "
           "rastet den Sendebetrieb ein. ROGER fügt beim Loslassen einen "
-          "Zweiton-Piep (1000/1750 Hz) hinzu; die 1750-Hz-Taste schärft einen "
+          "Zweiton-Piep (1000/1750 Hz) hinzu; während des Sendens zeigt der Knopf "
+          "einen aufwärts laufenden Timer (MM:SS). Die 1750-Hz-Taste schärft einen "
           "Tonruf. Die linke Spalte ruft "
           "die Speicherkanäle 0–9 ab (die Taste des geladenen Kanals leuchtet); "
           "die rechte Spalte sendet DTMF-Speicher. Auf dem Handy flankieren "

@@ -9,6 +9,24 @@ let memBase = 0;          // quick-key channel offset: 0 normally, 50 in the air
 let airbandRx = false;    // Band A in the air band → receive-only, TX blocked
 let txActive = false;
 let linkDown = false;     // backend status WebSocket is down (shown to the user)
+let pttTimerStart = 0, pttTimerIv = null;   // PTT up-timer (counts up while TX)
+function fmtMMSS(s) {
+  const m = Math.floor(s / 60), ss = s % 60;
+  return String(m).padStart(2, "0") + ":" + String(ss).padStart(2, "0");
+}
+function startPttTimer() {
+  pttTimerStart = Date.now();
+  const el = document.getElementById("ptt-timer"); if (el) el.textContent = "00:00";
+  pttTimerIv = setInterval(() => {
+    const e = document.getElementById("ptt-timer");
+    if (e) e.textContent = fmtMMSS(Math.floor((Date.now() - pttTimerStart) / 1000));
+  }, 250);
+}
+function stopPttTimer() {
+  if (pttTimerIv) { clearInterval(pttTimerIv); pttTimerIv = null; }
+  pttTimerStart = 0;
+  const el = document.getElementById("ptt-timer"); if (el) el.textContent = "00:00";
+}
 let selcallMuted = false; // RX muted by the selcall "MUTE until call" button
 let micTestActive = false; // RX muted while MIC TEST is on (silence radio noise)
 let pttLock = false;      // latched (continuous) transmit
@@ -175,6 +193,9 @@ function render(st) {
   txActive = !!st.transmitting;
   document.body.classList.toggle("transmitting", txActive);
   $("#ptt").classList.toggle("tx", txActive);
+  // PTT up-timer: count up from 00:00 while transmitting (any source)
+  if (txActive && !pttTimerIv) startPttTimer();
+  else if (!txActive && pttTimerIv) stopPttTimer();
   // mute browser RX output whenever transmitting (covers PTT-lock, spacebar,
   // and radio-side TX, not just the key() button handler)
   // RX is NOT muted during TX in the browser: a half-duplex rig isn't receiving
