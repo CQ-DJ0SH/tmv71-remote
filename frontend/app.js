@@ -17,15 +17,22 @@ function fmtMMSS(s) {
 function startPttTimer() {
   pttTimerStart = Date.now();
   const el = document.getElementById("ptt-timer"); if (el) el.textContent = "00:00";
-  pttTimerIv = setInterval(() => {
+  const tick = () => {
+    const ms = Date.now() - pttTimerStart;
     const e = document.getElementById("ptt-timer");
-    if (e) e.textContent = fmtMMSS(Math.floor((Date.now() - pttTimerStart) / 1000));
-  }, 250);
+    if (e) e.textContent = fmtMMSS(Math.floor(ms / 1000));
+    // clock sweep: one revolution per minute (6° per second)
+    const ptt = document.getElementById("ptt");
+    if (ptt) ptt.style.setProperty("--sweep", (((ms / 1000) % 60) * 6).toFixed(1));
+  };
+  tick();
+  pttTimerIv = setInterval(tick, 120);
 }
 function stopPttTimer() {
   if (pttTimerIv) { clearInterval(pttTimerIv); pttTimerIv = null; }
   pttTimerStart = 0;
   const el = document.getElementById("ptt-timer"); if (el) el.textContent = "00:00";
+  const ptt = document.getElementById("ptt"); if (ptt) ptt.style.setProperty("--sweep", "0");
 }
 let selcallMuted = false; // RX muted by the selcall "MUTE until call" button
 let micTestActive = false; // RX muted while MIC TEST is on (silence radio noise)

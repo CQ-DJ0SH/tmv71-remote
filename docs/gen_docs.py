@@ -369,7 +369,7 @@ EN = [
           "connection to the backend is lost while transmit is latched, the PTT is "
           "released (locally and by a backend watchdog) so the rig can never stay "
           "keyed unattended."),
-    ("img", "pwa-ptt-dark.png", 150),
+    ("img", "pwa-ptt.png", 150),
     ("h1", "9  Trusted Certificate (Root CA)"),
     ("p", "A self-signed certificate is fine on the desktop, but mobile browsers "
           "will not install the PWA or run the service worker without a trusted "
@@ -560,7 +560,7 @@ DE = [
           "Sendebetrieb verloren, wird das PTT beendet (lokal und durch einen "
           "Backend-Watchdog) — das Gerät kann so nie unbeaufsichtigt getastet "
           "bleiben."),
-    ("img", "pwa-ptt-dark.png", 150),
+    ("img", "pwa-ptt.png", 150),
     ("h1", "9  Vertrauenswürdiges Zertifikat (Root-CA)"),
     ("p", "Ein selbstsigniertes Zertifikat genügt am Desktop, aber mobile Browser "
           "installieren die PWA nicht und starten den Service-Worker nicht ohne "

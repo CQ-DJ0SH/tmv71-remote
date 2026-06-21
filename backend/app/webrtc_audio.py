@@ -267,6 +267,10 @@ class RadioAudio:
                 self._echo_buf = None
             pub = blk
             self.rx_db = _level(blk, self.rx_db)
+        elif self.mic_test:
+            # mute the radio RX while a mic test is recording, so only the test
+            # (and its replay on switch-off) is heard — not live radio audio.
+            pub = np.zeros(frames, dtype=np.int16)
         # publish the latest block; the clock-paced RX track(s) pick it up.
         self._latest = pub.tobytes()
         self._latest_ts = time.monotonic()

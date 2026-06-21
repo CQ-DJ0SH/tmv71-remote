@@ -181,20 +181,30 @@ microphone. Listen there; hold the large **PTT** button to transmit.
 ## Mobile app (PWA)
 
 The UI is an installable **Progressive Web App**. Once installed it runs
-full-screen (no browser chrome), and on phones the panels turn into a horizontal
+full-screen (no browser chrome), and on phones the panels turn into a vertical
 **swipe deck** — one panel per screen (VFO A · VFO B · PTT · Audio · HackRF ·
-Selcall · Digi · Scan), swipe or tap the side **tab rail** to switch. The title
-bar becomes a slim vertical strip on the left, the tab rail sits on the right.
-The app is forced to **landscape**; in portrait it shows a "rotate" hint. The app
-shell is cached by a service worker, so it launches instantly and the layout
-works offline (live control/audio still need the backend reachable).
+Selcall · Digi · Scan · Info), swipe up/down or tap the side **tab rail** to
+switch. The title bar becomes a slim vertical strip on the left, the tab rail
+sits on the right. The app is forced to **landscape**; in portrait it shows a
+"rotate" hint. The app shell is cached by a service worker, so it launches
+instantly and the layout works offline (live control/audio still need the
+backend reachable). The screen is kept awake (Wake Lock) while the app is open.
 
-| | Dark | Light |
-|---|---|---|
-| **Band** | ![PWA band, dark](docs/pwa-band-dark.png) | ![PWA band, light](docs/pwa-band-light.png) |
-| **PTT** | ![PWA PTT, dark](docs/pwa-ptt-dark.png) | ![PWA PTT, light](docs/pwa-ptt-light.png) |
+| | |
+|---|---|
+| **VFO A** | **VFO B** |
+| ![PWA VFO A](docs/pwa-band-a.png) | ![PWA VFO B](docs/pwa-band-b.png) |
+| **PTT** (transmitting — count-up timer + ring sweep) | **Audio** (WebRTC/Opus, RX/MIC levels) |
+| ![PWA PTT](docs/pwa-ptt.png) | ![PWA audio](docs/pwa-audio.png) |
+| **HackRF** waterfall (panadapter) | **Selcall** (5-tone) |
+| ![PWA HackRF](docs/pwa-hackrf.png) | ![PWA selcall](docs/pwa-selcall.png) |
+| **Digimodes — CW** | **Digimodes — RTTY** |
+| ![PWA digimodes CW](docs/pwa-digi-cw.png) | ![PWA digimodes RTTY](docs/pwa-digi-rtty.png) |
+| **Band / memory scan** | **App & browser info** |
+| ![PWA scan](docs/pwa-scan.png) | ![PWA info](docs/pwa-info.png) |
 
-*The PTT panel has mini RX/TX VU bars (with 1 s peak-hold) flanking the key.*
+*The PTT panel has mini RX/TX VU bars (with 1 s peak-hold) flanking the key, and
+shows a count-up timer with a clock-style ring sweep while transmitting.*
 
 To install: open the site, then in the browser menu choose **Install** /
 **Add to Home Screen** (Chrome offers an install icon in the address bar; on iOS

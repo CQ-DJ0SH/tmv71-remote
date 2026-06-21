@@ -1020,8 +1020,17 @@ body.airband .ptt-hint{color:var(--amber); opacity:.85}
   /* red outline on RX (idle); turns bright red + glow on TX (.ptt.tx) */
   box-shadow:inset 0 0 0 2px #c1392f, inset 0 8px 22px #000, 0 14px 30px -10px #000;
 }
+/* clock-style sweep around the outer ring while transmitting: a conic sector
+   filling clockwise from 12 o'clock, one full revolution per minute. The core
+   (inset:18px) covers the centre, so only the outer ring band shows the sweep. */
+.ptt-sweep{
+  position:absolute; inset:0; border-radius:50%; pointer-events:none;
+  background:conic-gradient(var(--tx-glow) calc(var(--sweep,0) * 1deg), transparent 0);
+  opacity:0; transition:opacity .15s;
+}
+.ptt.tx .ptt-sweep{opacity:.9}
 .ptt-core{
-  position:absolute; inset:18px; border-radius:50%;
+  position:absolute; inset:18px; border-radius:50%; z-index:1;
   display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
   font-family:var(--font-disp); font-weight:700; font-size:34px; letter-spacing:.1em;
   color:var(--text);
