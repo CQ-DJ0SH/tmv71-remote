@@ -380,10 +380,20 @@ body.theme-light .callsign{color:#0c7b71; text-shadow:none}
     justify-content:center; gap:1px; padding:4px 1px; cursor:pointer;
     color:var(--text-dim); background:transparent; border:0;
     border-left:2px solid transparent; border-radius:7px; transition:.15s}
-  .ptab .ptab-ico{font-size:14px; line-height:1}
+  .ptab .ptab-ico{font-size:14px; line-height:1; color:var(--tab, var(--text-dim))}
   .ptab .ptab-lbl{font-family:var(--font-ui); font-size:7px; letter-spacing:.02em; line-height:1}
-  .ptab.active{color:#6fd89a; border-left-color:#6fd89a;
-    text-shadow:0 0 8px rgba(111,216,154,.55); background:#6fd89a14}
+  /* each tab carries its panel's accent colour */
+  .ptab[data-target="#band-0"]{--tab:var(--amber)}
+  .ptab[data-target="#band-1"]{--tab:var(--cyan)}
+  .ptab[data-target=".ptt-zone"]{--tab:#c1392f}
+  .ptab[data-target=".audio"]{--tab:#8b7ad6}
+  .ptab[data-target=".hackrf-zone"]{--tab:#3a9ff0}
+  .ptab[data-target=".selcall-zone"]{--tab:#c9a066}
+  .ptab[data-target=".digi-zone"]{--tab:#6fd89a}
+  .ptab[data-target=".scan-zone"]{--tab:#9fb0bd}
+  .ptab.active{color:var(--tab); border-left-color:var(--tab);
+    text-shadow:0 0 8px color-mix(in srgb, var(--tab) 55%, transparent);
+    background:color-mix(in srgb, var(--tab) 9%, transparent)}
 
   /* ---- left: title bar as a narrow vertical strip (rotated 180°) ----
      column-reverse + status-cluster reverse so that, read bottom→top (matching

@@ -1967,8 +1967,13 @@ function sizeHrfCanvases() {
   ["#hrf-spectrum", "#hrf-wf"].forEach(sel => {
     const cv = $(sel); if (!cv) return;
     const r = cv.getBoundingClientRect();
-    cv.width = Math.max(1, Math.round(r.width * dpr));
-    cv.height = Math.max(1, Math.round(r.height * dpr));
+    const w = Math.max(1, Math.round(r.width * dpr));
+    const h = Math.max(1, Math.round(r.height * dpr));
+    // Assigning width/height clears the canvas — only do it on a real size
+    // change, so navigating away and back (re-measuring the visible panel)
+    // keeps the accumulated waterfall instead of wiping it.
+    if (cv.width !== w) cv.width = w;
+    if (cv.height !== h) cv.height = h;
   });
 }
 
