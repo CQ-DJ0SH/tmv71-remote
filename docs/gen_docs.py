@@ -307,7 +307,10 @@ EN = [
           "band (receive-only)."),
     ("h2", "PTT & memory quick keys"),
     ("p", "Hold the large PTT button (or the space bar) to transmit; PTT-LOCK "
-          "latches transmit. ROGER adds a two-tone (1000/1750 Hz) beep on "
+          "latches transmit. PTT and PTT-LOCK require connected audio (there is no "
+          "mic otherwise) — they are disabled while audio is off and released "
+          "automatically if audio disconnects. ROGER adds a two-tone "
+          "(1000/1750 Hz) beep on "
           "release; while transmitting the button shows a count-up timer (MM:SS). "
           "The 1750 Hz button "
           "arms a tone-call. The left column recalls memory channels 0–9 (the "
@@ -491,7 +494,10 @@ DE = [
           "das Flugfunkband 118–137 MHz (nur Empfang)."),
     ("h2", "PTT & Speicher-Schnelltasten"),
     ("p", "Den großen PTT-Knopf (oder die Leertaste) halten zum Senden; PTT-LOCK "
-          "rastet den Sendebetrieb ein. ROGER fügt beim Loslassen einen "
+          "rastet den Sendebetrieb ein. PTT und PTT-LOCK setzen verbundenes Audio "
+          "voraus (sonst gibt es kein Mikrofon) — sie sind deaktiviert, solange "
+          "Audio aus ist, und werden bei einer Audio-Trennung automatisch beendet. "
+          "ROGER fügt beim Loslassen einen "
           "Zweiton-Piep (1000/1750 Hz) hinzu; während des Sendens zeigt der Knopf "
           "einen aufwärts laufenden Timer (MM:SS). Die 1750-Hz-Taste schärft einen "
           "Tonruf. Die linke Spalte ruft "

@@ -607,6 +607,7 @@ function bindControls() {
   const DATA_TX_BAND = { 0: 0, 1: 1, 2: 0, 3: 1 };
   const key = async (on) => {
     if (on && airbandRx) { toast("Air band is receive-only — TX disabled", "err"); return; }
+    if (on && !audioConnected()) { toast("Connect audio first to transmit", "err"); return; }
     if (keying === on) return; keying = on;
     // warn if the keyed band isn't where the USB-soundcard mic audio is routed:
     // the audio band (data band) TX side must match the PTT band, else nothing
@@ -634,6 +635,7 @@ function bindControls() {
   };
   // expose to updatePanels so a radio-side TX drop clears the latch
   setPttLock = (on) => {
+    if (on && !audioConnected()) { toast("Connect audio first to transmit", "err"); return; }
     pttLock = on;
     lockConfirmed = false;
     lockBtn.classList.toggle("locked", on);
@@ -899,10 +901,27 @@ function audioConnected() {
   return !!audioPc && ["connected", "completed"].includes(audioPc.connectionState);
 }
 function updateAudioToggle() {
-  const t = $("#audio-toggle"); if (!t) return;
-  const reconnecting = audioWant && !audioPc;
-  t.textContent = reconnecting ? "…" : audioPc ? "DISCONNECT" : "CONNECT";
-  t.classList.toggle("connected", !!audioPc || reconnecting);
+  const t = $("#audio-toggle");
+  if (t) {
+    const reconnecting = audioWant && !audioPc;
+    t.textContent = reconnecting ? "…" : audioPc ? "DISCONNECT" : "CONNECT";
+    t.classList.toggle("connected", !!audioPc || reconnecting);
+  }
+  updatePttEnabled();
+}
+// PTT / PTT-LOCK only make sense with audio (the mic) connected: disable them
+// when audio is off so transmit can't be keyed without modulation.
+function updatePttEnabled() {
+  const ok = audioConnected();
+  ["#ptt", "#ptt-lock"].forEach(sel => {
+    const el = document.querySelector(sel);
+    if (el) { el.disabled = !ok; el.classList.toggle("tx-disabled", !ok); }
+  });
+}
+// End any active transmit (held key or latched lock) when audio goes away.
+function endTxOnAudioLoss() {
+  if (pttLock && setPttLock) setPttLock(false);
+  else if (txActive) api("POST", "/api/ptt", { transmit: false }).catch(() => {});
 }
 function teardownAudio() {
   if (audioPc) { try { audioPc.close(); } catch {} audioPc = null; }
@@ -920,6 +939,7 @@ function scheduleAudioReconnect() {
 // down and retry while the user still wants audio.
 function audioDropped() {
   const was = audioWant;
+  endTxOnAudioLoss();          // never keep transmitting without audio
   teardownAudio();
   updateAudioToggle();
   if (was) { toast("Audio lost — reconnecting…", "err"); scheduleAudioReconnect(); }
@@ -967,6 +987,7 @@ async function audioConnect() {
 }
 function audioDisconnect() {       // user-initiated: stop and don't reconnect
   audioWant = false;
+  endTxOnAudioLoss();              // end PTT/PTT-LOCK when audio goes away
   try { localStorage.setItem("tmv71.audioOn", "0"); } catch {}
   if (audioReconnectT) { clearTimeout(audioReconnectT); audioReconnectT = null; }
   teardownAudio();
@@ -2480,6 +2501,7 @@ bindControls();
 bindMemory();
 bindEditor();
 bindAudio();
+updatePttEnabled();   // PTT/PTT-LOCK start disabled until audio is connected
 loadAudioDevices();
 bindVfoParams();
 bindSettings();
