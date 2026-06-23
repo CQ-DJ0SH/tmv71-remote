@@ -307,8 +307,8 @@ body.theme-light .callsign{color:#0c7b71; text-shadow:none}
   display:grid; gap:22px;
   --row-h:377px;                      /* band-panel height; keeps the grid square */
   grid-template-columns:1fr 1fr;
-  grid-template-rows:auto var(--row-h) auto auto auto auto auto;
-  grid-template-areas: "bands bands" "ptt audio" "hackrf hackrf" "sel sel" "digi digi" "scan scan" "foot foot";
+  grid-template-rows:auto var(--row-h) auto auto auto auto auto auto;
+  grid-template-areas: "bands bands" "ptt audio" "hackrf hackrf" "sel sel" "digi digi" "log log" "scan scan" "foot foot";
 }
 .bands{grid-area:bands; display:grid; grid-template-columns:1fr 1fr; gap:22px}
 .ptt-zone{grid-area:ptt}
@@ -316,6 +316,7 @@ body.theme-light .callsign{color:#0c7b71; text-shadow:none}
 .hackrf-zone{grid-area:hackrf}
 .selcall-zone{grid-area:sel}
 .digi-zone{grid-area:digi}
+.log-zone{grid-area:log}
 .scan-zone{grid-area:scan}
 /* source link + version, below the last panel, right-aligned */
 .console-foot{
@@ -333,7 +334,7 @@ body.theme-light .callsign{color:#0c7b71; text-shadow:none}
 .foot-links{display:contents}
 @media (max-width:860px) and (min-width:761px){
   .console{grid-template-columns:1fr; grid-template-rows:none;
-           grid-template-areas:"bands" "ptt" "audio" "hackrf" "sel" "digi" "scan" "foot"}
+           grid-template-areas:"bands" "ptt" "audio" "hackrf" "sel" "digi" "log" "scan" "foot"}
   .bands{grid-template-columns:1fr}
 }
 
@@ -390,6 +391,7 @@ body.theme-light .callsign{color:#0c7b71; text-shadow:none}
   .ptab[data-target=".hackrf-zone"]{--tab:#3a9ff0}
   .ptab[data-target=".selcall-zone"]{--tab:#c9a066}
   .ptab[data-target=".digi-zone"]{--tab:#6fd89a}
+  .ptab[data-target=".log-zone"]{--tab:#1fb6a6}
   .ptab[data-target=".scan-zone"]{--tab:#9fb0bd}
   .ptab.active{color:var(--tab); border-left-color:var(--tab);
     text-shadow:0 0 8px color-mix(in srgb, var(--tab) 55%, transparent);
@@ -438,7 +440,7 @@ body.theme-light .callsign{color:#0c7b71; text-shadow:none}
   /* unwrap the two-band wrapper so VFO A and VFO B are their own deck pages */
   .bands{display:contents}
   #band-0, #band-1,
-  .ptt-zone, .audio, .hackrf-zone, .selcall-zone, .digi-zone, .scan-zone{
+  .ptt-zone, .audio, .hackrf-zone, .selcall-zone, .digi-zone, .log-zone, .scan-zone{
     flex:0 0 auto; width:100%; height:100%; min-height:0;
     scroll-snap-align:start; scroll-snap-stop:always;
     overflow-y:auto; -webkit-overflow-scrolling:touch;
@@ -518,7 +520,7 @@ body.theme-light .callsign{color:#0c7b71; text-shadow:none}
 }
 
 /* panel base — beveled aircraft instrument plate */
-.band, .ptt-zone, .audio, .scan-zone, .hackrf-zone, .digi-zone, .selcall-zone{
+.band, .ptt-zone, .audio, .scan-zone, .hackrf-zone, .digi-zone, .selcall-zone, .log-zone{
   background:
     linear-gradient(180deg,var(--panel-2),var(--panel));
   border:1px solid var(--edge);
@@ -573,7 +575,7 @@ body.theme-light .screw::before{
   box-shadow:inset 0 1px 1px #00000045;
 }
 .band::before, .ptt-zone::before, .audio::before, .scan-zone::before,
-.hackrf-zone::before, .digi-zone::before, .selcall-zone::before{ /* color rail */
+.hackrf-zone::before, .digi-zone::before, .selcall-zone::before, .log-zone::before{ /* color rail */
   content:""; position:absolute; left:0; top:14px; bottom:14px; width:3px;
   border-radius:3px; background:var(--accent); box-shadow:0 0 12px var(--accent-glow);
 }
@@ -589,6 +591,8 @@ body.theme-light .screw::before{
 .digi-zone{--accent:#6fd89a; --accent-glow:#6fd89a}   /* digimodes = light green */
 .digi-zone::before{box-shadow:0 0 9px -2px var(--accent-glow)}
 .digi-zone{padding:22px 26px}
+.log-zone{--accent:#1fb6a6; --accent-glow:#1fb6a6}   /* logbook = wavelog teal */
+.log-zone::before{box-shadow:0 0 9px -2px var(--accent-glow)}
 .digi-modes{display:inline-flex; border:1px solid var(--accent); border-radius:7px; overflow:hidden}
 .digi-mode{font-family:var(--font-ui); font-size:11px; letter-spacing:.12em; padding:5px 12px;
   color:var(--text-dim); background:var(--ctrl-bg); border:none; cursor:pointer; transition:.15s}
@@ -694,13 +698,14 @@ body.theme-light .sel-decode{background:#f6f1e8; color:#8a6a2f; border-color:#dd
 /* ---------------- band panel ---------------- */
 .band{padding:26px 30px 26px}
 /* radio powered off (GPIO relay open) -> dim the band/PTT/audio/scan panels */
-.band, .ptt-zone, .audio, .scan-zone, .hackrf-zone, .digi-zone, .selcall-zone{transition:opacity .25s, filter .25s}
+.band, .ptt-zone, .audio, .scan-zone, .hackrf-zone, .digi-zone, .selcall-zone, .log-zone{transition:opacity .25s, filter .25s}
 body.radio-off .band,
 body.radio-off .ptt-zone,
 body.radio-off .audio,
 body.radio-off .scan-zone,
 body.radio-off .digi-zone,
 body.radio-off .selcall-zone,
+body.radio-off .log-zone,
 body.radio-off .hackrf-zone{opacity:.32; filter:grayscale(.6) brightness(.78)}
 .band-head{display:flex; align-items:center; gap:10px; margin-bottom:6px; flex-wrap:wrap}
 /* per-band power/solo button (DL single-band toggle) */
@@ -1026,9 +1031,12 @@ body.airband .ptt-hint{color:var(--amber); opacity:.85}
 }
 .ptt-ring{
   position:absolute; inset:0; border-radius:50%;
-  background:conic-gradient(from 0deg,#1c262e,#0d1419,#1c262e);
+  /* brushed-metal sheen: alternating light/dark sectors around the ring */
+  background:conic-gradient(from 150deg,
+    #46535f, #232e37, #525f6c, #1c252d, #3e4b56, #2a3540, #54616e, #1c252d, #46535f);
   /* red outline on RX (idle); turns bright red + glow on TX (.ptt.tx) */
-  box-shadow:inset 0 0 0 2px #c1392f, inset 0 8px 22px #000, 0 14px 30px -10px #000;
+  box-shadow:inset 0 0 0 2px #c1392f, inset 0 1px 0 #ffffff1f,
+    inset 0 8px 22px #000a, 0 14px 30px -10px #000;
 }
 /* clock-style sweep around the outer ring while transmitting: a conic sector
    filling clockwise from 12 o'clock, one full revolution per minute. The core
@@ -1036,6 +1044,10 @@ body.airband .ptt-hint{color:var(--amber); opacity:.85}
 .ptt-sweep{
   position:absolute; inset:0; border-radius:50%; pointer-events:none;
   background:conic-gradient(var(--tx-glow) calc(var(--sweep,0) * 1deg), transparent 0);
+  /* render the swept arc as a dashed line instead of a solid sector:
+     an angular mask of repeating on/off segments breaks the ring into ticks */
+  -webkit-mask:repeating-conic-gradient(from 0deg, #000 0 4.5deg, transparent 4.5deg 9deg);
+  mask:repeating-conic-gradient(from 0deg, #000 0 4.5deg, transparent 4.5deg 9deg);
   opacity:0; transition:opacity .15s;
 }
 .ptt.tx .ptt-sweep{opacity:.9}
@@ -1044,8 +1056,8 @@ body.airband .ptt-hint{color:var(--amber); opacity:.85}
   display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
   font-family:var(--font-disp); font-weight:700; font-size:34px; letter-spacing:.1em;
   color:var(--text);
-  background:radial-gradient(120% 120% at 50% 25%, #243039, #121a20 60%, #0c1217);
-  box-shadow:inset 0 2px 8px #ffffff0f, inset 0 -10px 18px #000, 0 0 0 1px #0008;
+  background:radial-gradient(120% 120% at 50% 22%, #3a4854, #1c2730 58%, #121a20);
+  box-shadow:inset 0 2px 10px #ffffff24, inset 0 -10px 18px #0009, 0 0 0 1px #0008;
   transition:.12s;
 }
 /* count-up timer: hidden while idle, shown only during transmit */
@@ -1568,3 +1580,103 @@ body.theme-light .hrf-graph{border-color:var(--edge)}
 .hrf-centerline::before{content:""; position:absolute; top:0; left:-4px;
   border-left:4px solid transparent; border-right:4px solid transparent;
   border-top:5px solid rgba(255,255,255,0.85)}
+
+/* ---- logbook panel (Wavelog) ------------------------------------------- */
+.log-zone{padding:20px 28px}
+.log-form{display:flex; flex-direction:column; gap:10px; margin-top:6px}
+.log-row{display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap}
+.log-f{display:flex; flex-direction:column; gap:3px; min-width:0;
+  font-family:var(--font-ui); font-size:9px; letter-spacing:.16em; color:var(--text-dim)}
+.log-f input{font-family:var(--font-mono); font-size:14px; color:var(--text);
+  background:var(--field-bg); border:1px solid var(--edge); border-radius:7px;
+  padding:8px 10px; min-width:0; width:100%; box-sizing:border-box}
+.log-f input:focus{outline:none; border-color:var(--accent);
+  box-shadow:0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent)}
+#log-call{text-transform:uppercase; letter-spacing:.08em; font-weight:600}
+/* fixed-ish widths so fields don't stretch across the full-width desktop panel */
+.log-f-call{flex:0 0 150px}
+.log-f-rst{flex:0 0 60px}
+.log-f-grid{flex:0 0 96px}
+.log-f-name{flex:1 1 160px; max-width:260px}
+.log-f-cmt{flex:1 1 200px}
+/* Wavelog connection indicator in the title bar */
+.log-online{display:inline-flex; align-items:center; gap:6px; flex:none;
+  font-family:var(--font-mono); font-size:9px; letter-spacing:.14em;
+  color:var(--text-dim); text-transform:uppercase}
+.log-online .dot{width:8px; height:8px; border-radius:50%; flex:none;
+  background:#6b7681; transition:.2s}
+.log-online.on .dot{background:#3ec98a; box-shadow:0 0 7px 1px rgba(62,201,138,.7)}
+.log-online.on{color:#3ec98a}
+/* most-recent QSO shown in the title bar (extra gap after the title) */
+.log-last{margin-left:22px; display:inline-flex; align-items:baseline; gap:8px; min-width:0;
+  font-family:var(--font-mono); font-size:11px; color:var(--text-dim);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.log-last .ll-call{font-family:var(--font-disp); font-weight:600; font-size:14px;
+  letter-spacing:.14em; color:var(--text)}
+.log-last .ll-meta{color:var(--text-dim)}
+.log-last .ll-stat.ok{color:#3ec98a}
+.log-last .ll-stat.err{color:#e0635a}
+/* action buttons live in the panel head, right-aligned as a block */
+.log-head-right{margin-left:auto; display:flex; align-items:center; gap:10px;
+  flex-wrap:wrap; justify-content:flex-end}
+.log-zone .panel-head .log-btn{padding:5px 10px; font-size:9px}
+/* the right block already carries margin-left:auto — drop the toggle's own auto
+   margin so the free space isn't split, leaving a gap before the arrow */
+.log-zone .panel-head .panel-toggle{margin-left:0}
+.log-btn{font-family:var(--font-ui); font-size:11px; letter-spacing:.14em; cursor:pointer;
+  border-radius:8px; padding:9px 16px; border:1px solid var(--edge); transition:.15s;
+  background:var(--ctrl-bg); color:var(--text-dim)}
+.log-btn.ghost:hover{color:var(--accent); border-color:var(--accent)}
+.log-btn.primary{background:var(--accent); border-color:var(--accent); color:#04201d; font-weight:700}
+.log-btn.primary:hover{filter:brightness(1.12)}
+.log-btn:disabled{opacity:.45; cursor:not-allowed; filter:saturate(.4)}
+.log-stats{display:flex; gap:12px; flex-wrap:wrap;
+  font-family:var(--font-mono); font-size:11px; color:var(--text-dim)}
+.log-stats b{color:var(--accent); font-weight:700}
+.log-recent{margin-top:14px}
+.log-recent-head{display:flex; align-items:baseline; gap:12px;
+  font-family:var(--font-ui); font-size:9px; letter-spacing:.22em;
+  color:var(--text-dim); margin-bottom:6px}
+.log-recent-head .log-stats{margin-left:auto; letter-spacing:.04em}
+.log-clear-btn{font-family:var(--font-ui); font-size:9px; letter-spacing:.14em;
+  color:var(--text-dim); background:transparent; border:1px solid var(--edge);
+  border-radius:5px; padding:3px 9px; cursor:pointer; transition:.15s}
+.log-clear-btn:hover{color:#fff; background:#c0392b; border-color:#c0392b}
+/* fixed height so the panel never grows as QSOs are added — it just scrolls */
+.log-recent-list{height:190px; overflow-y:auto; border:1px solid var(--edge);
+  border-radius:9px; background:var(--field-bg)}
+.log-empty{margin:0; padding:14px; text-align:center; color:var(--text-dim);
+  font-family:var(--font-ui); font-size:12px}
+/* one compact line per QSO: time+band left, lookup extras (grid/qth/country/
+   email) flexible in the middle, name right-aligned just before the callsign */
+.log-item{display:flex; align-items:baseline; gap:8px; white-space:nowrap;
+  padding:6px 11px; border-bottom:1px solid color-mix(in srgb, var(--edge) 60%, transparent)}
+.log-item:last-child{border-bottom:0}
+.log-item .li-when{flex:0 0 auto; font-family:var(--font-mono); font-size:10px; color:var(--text-dim)}
+.log-item .li-dt{color:var(--text); font-weight:600}   /* match the name's look */
+.log-item .li-extra{flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis;
+  font-family:var(--font-mono); font-size:10px; color:var(--text-dim)}
+.log-item .li-name{flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; text-align:right;
+  font-family:var(--font-disp); font-weight:600; font-size:14px; letter-spacing:.04em; color:var(--text)}
+.log-item .li-call{flex:0 0 auto; font-family:var(--font-disp); font-weight:600;
+  font-size:14px; letter-spacing:.14em; color:var(--text)}
+.log-item .li-stat{flex:0 0 auto; font-size:13px}
+.log-item .li-stat.ok{color:#3ec98a}
+.log-item .li-stat.err{color:#e0635a}
+.log-item .li-del{flex:0 0 auto; width:20px; height:20px; padding:0; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; font-size:11px; line-height:1;
+  color:var(--text-dim); background:transparent; border:1px solid transparent; border-radius:5px;
+  opacity:.45; transition:.15s}
+.log-item:hover .li-del{opacity:1}
+.log-item .li-del:hover{color:#fff; background:#c0392b; border-color:#c0392b}
+
+/* settings: logging tab sections */
+.logsec{margin:4px 0 16px}
+.logsec.is-soon{opacity:.6}
+.soon-tag{font-family:var(--font-ui); font-size:9px; letter-spacing:.1em; color:var(--accent);
+  border:1px solid var(--accent); border-radius:5px; padding:1px 5px; margin-left:6px;
+  vertical-align:middle}
+.log-test-row{margin:16px 0}
+#log-wl-status, #log-qrz-status{font-family:var(--font-mono); font-size:11px}
+#log-wl-status.ok, #log-qrz-status.ok{color:#3ec98a}
+#log-wl-status.err, #log-qrz-status.err{color:#e0635a}

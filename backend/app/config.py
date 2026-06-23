@@ -6,7 +6,7 @@ import os
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-APP_VERSION = "3.1"
+APP_VERSION = "3.2"
 
 
 class Settings(BaseSettings):
@@ -76,6 +76,15 @@ class Settings(BaseSettings):
     # survives across browsers/devices and storage clears.
     theme: str = "light"
 
+    # Logbook integration: Wavelog (locally installed) for QSO logging, QRZ.com
+    # for callsign lookup. Secrets live only in runtime.json (gitignored).
+    wavelog_url: str = ""            # e.g. https://wavelog.local
+    wavelog_key: str = ""            # read/write API key
+    wavelog_station_id: str = ""     # station profile id to log under
+    qrz_api_key: str = ""
+    qrz_username: str = ""
+    qrz_password: str = ""
+
     # Highest memory channel number to scan when listing (TM-V71 has 0..999)
     max_memory_channels: int = 1000
 
@@ -93,7 +102,9 @@ _RUNTIME_KEYS = ("serial_port", "serial_baud", "gpio_power_pin",
                  "tx_buffer_ms", "ptt_tail_ms",
                  "auto_power_off_enabled", "auto_power_off_seconds",
                  "callsign", "roger_beep_enabled", "theme",
-                 "tx_lowpass_enabled", "rx_lowpass_enabled")
+                 "tx_lowpass_enabled", "rx_lowpass_enabled",
+                 "wavelog_url", "wavelog_key", "wavelog_station_id",
+                 "qrz_api_key", "qrz_username", "qrz_password")
 
 
 def _load_runtime() -> dict:

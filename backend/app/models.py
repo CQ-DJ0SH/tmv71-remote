@@ -273,3 +273,42 @@ class HackRFConfig(BaseModel):
     lna: Optional[int] = Field(default=None, ge=0, le=40)
     vga: Optional[int] = Field(default=None, ge=0, le=62)
     amp: Optional[bool] = None
+
+
+class LogConfigRequest(BaseModel):
+    """Logbook provider credentials (all optional; only sent fields applied)."""
+    wavelog_url: Optional[str] = None
+    wavelog_key: Optional[str] = None
+    wavelog_station_id: Optional[str] = None
+    qrz_api_key: Optional[str] = None
+    qrz_username: Optional[str] = None
+    qrz_password: Optional[str] = None
+
+
+class LogDeleteRequest(BaseModel):
+    """Delete one recent-log entry by its timestamp."""
+    ts: str
+
+
+class LogLookupRequest(BaseModel):
+    """Callsign lookup for auto-filling QSO details."""
+    callsign: str
+    band: Optional[str] = None
+    mode: Optional[str] = None
+
+
+class LogQsoRequest(BaseModel):
+    """Log a QSO. Only callsign is required; freq/band/mode are auto-filled from
+    the live control-band state when not supplied."""
+    callsign: str
+    name: Optional[str] = ""
+    rst_sent: Optional[str] = "59"
+    rst_rcvd: Optional[str] = "59"
+    comment: Optional[str] = ""
+    gridsquare: Optional[str] = ""
+    email: Optional[str] = ""
+    qth: Optional[str] = ""
+    country: Optional[str] = ""
+    freq_hz: Optional[int] = Field(default=None, gt=0)
+    mode: Optional[str] = None
+    power_w: Optional[float] = None

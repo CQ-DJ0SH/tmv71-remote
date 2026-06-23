@@ -430,6 +430,49 @@
     </div>
   </section>
 
+  <section class="log-zone collapsed" id="log-zone">
+    <div class="panel-head">
+      <h2>LOGBOOK · WAVELOG</h2>
+      <span class="log-last" id="log-last" title="Most recent logged QSO" hidden></span>
+      <div class="log-head-right">
+        <button type="button" id="log-lookup" class="log-btn ghost" title="Look up name / grid for the callsign">LOOKUP</button>
+        <button type="button" id="log-save" class="log-btn primary" title="Log this QSO to Wavelog">LOG QSO</button>
+      </div>
+      <span class="log-online" id="log-online" title="Wavelog connection" hidden><span class="dot"></span><span class="lbl">offline</span></span>
+      <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="log-body" title="Show / hide the logbook">▲</button>
+    </div>
+    <div class="panel-body" id="log-body">
+      <div class="log-form">
+        <div class="log-row">
+          <label class="log-f log-f-call">CALL
+            <input type="text" id="log-call" placeholder="DL1ABC" autocomplete="off" autocapitalize="characters" spellcheck="false">
+          </label>
+          <label class="log-f log-f-rst">RST S
+            <input type="text" id="log-rst-s" value="59" inputmode="numeric" maxlength="4">
+          </label>
+          <label class="log-f log-f-rst">RST R
+            <input type="text" id="log-rst-r" value="59" inputmode="numeric" maxlength="4">
+          </label>
+          <label class="log-f log-f-grid">GRID
+            <input type="text" id="log-grid" placeholder="auto" autocomplete="off" autocapitalize="characters" spellcheck="false">
+          </label>
+          <label class="log-f log-f-name">NAME
+            <input type="text" id="log-name" placeholder="auto" autocomplete="off" spellcheck="false">
+          </label>
+          <label class="log-f log-f-cmt">COMMENT
+            <input type="text" id="log-comment" placeholder="optional" autocomplete="off">
+          </label>
+        </div>
+      </div>
+      <div class="log-recent">
+        <div class="log-recent-head"><span>RECENT</span><div class="log-stats" id="log-stats" hidden></div><button type="button" id="log-clear" class="log-clear-btn" title="Clear the recent list" hidden>CLEAR</button></div>
+        <div class="log-recent-list" id="log-recent" aria-live="polite">
+          <p class="log-empty">No logged QSOs yet.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="scan-zone collapsed" id="scan-zone">
     <div class="scan-head">
       <h2>BAND · MEMORY SCAN</h2>
@@ -478,7 +521,7 @@
   <button class="ptab" data-target=".hackrf-zone"><span class="ptab-ico">≈</span><span class="ptab-lbl">HACKRF</span></button>
   <button class="ptab" data-target=".selcall-zone"><span class="ptab-ico">☎</span><span class="ptab-lbl">SELCALL</span></button>
   <button class="ptab" data-target=".digi-zone"><span class="ptab-ico">⠿</span><span class="ptab-lbl">DIGI</span></button>
-  <button class="ptab" data-target=".scan-zone"><span class="ptab-ico">⌕</span><span class="ptab-lbl">SCAN</span></button>
+  <button class="ptab" data-target=".log-zone"><span class="ptab-ico">✎</span><span class="ptab-lbl">LOG</span></button>
 </nav>
 
 <!-- Memory channel editor -->
@@ -517,6 +560,7 @@
       <button class="tab" data-tab="info" role="tab">Rig-Info</button>
       <button class="tab" data-tab="memory" role="tab">Rig-Memory</button>
       <button class="tab" data-tab="dtmf" role="tab">Rig-DTMF</button>
+      <button class="tab" data-tab="logging" role="tab">Logging</button>
       <button class="tab" data-tab="hardware" role="tab">Pi-Hardware</button>
     </div>
 
@@ -676,6 +720,43 @@
     <section class="tab-pane" data-pane="dtmf">
       <p class="pane-hint">10 DTMF memories (0–9), up to 16 digits each · allowed 0–9, A–D, ∗, #.</p>
       <div class="dtmf-list" id="dtmf-list"></div>
+    </section>
+
+    <!-- LOGGING (Wavelog + QRZ.com) -->
+    <section class="tab-pane" data-pane="logging">
+      <div class="logsec">
+        <span class="logo-label">Wavelog (local)</span>
+        <div class="form-grid">
+          <label class="span-2">Wavelog URL<input type="text" id="log-wl-url" placeholder="https://wavelog.local" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
+          <label class="span-2">API token<input type="password" id="log-wl-key" placeholder="read/write API key" autocomplete="off" spellcheck="false"></label>
+          <label>Station profile<select id="log-wl-station"><option value="">—</option></select></label>
+          <label class="check-label"><button type="button" id="log-wl-reload" class="mini-btn">Load profiles</button></label>
+        </div>
+        <div class="logo-row log-test-row">
+          <span class="update-status" id="log-wl-status">not tested</span>
+          <button type="button" id="log-wl-test" class="mini-btn">Test connection</button>
+        </div>
+        <p class="pane-hint">The API token is generated in Wavelog under Account → API Keys (needs read/write). Stored only locally on the Pi (runtime.json), never committed.</p>
+      </div>
+
+      <div class="logsec">
+        <span class="logo-label">QRZ.com</span>
+        <div class="form-grid">
+          <label>Username<input type="text" id="log-qrz-user" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+          <label>Password<input type="password" id="log-qrz-pass" autocomplete="off"></label>
+          <label class="span-2">Logbook API key <span class="soon-tag">upload soon</span><input type="password" id="log-qrz-key" autocomplete="off"></label>
+        </div>
+        <div class="logo-row log-test-row">
+          <span class="update-status" id="log-qrz-status">not tested</span>
+          <button type="button" id="log-qrz-test" class="mini-btn">Test login</button>
+        </div>
+        <p class="pane-hint">Username + password enable callsign lookup (name, grid, e-mail, QTH) via the QRZ XML data service — requires a QRZ XML subscription. The logbook API key is for future automatic QSO upload.</p>
+      </div>
+
+      <div class="modal-actions">
+        <button id="set-cancel-logging" class="btn-ghost">CLOSE</button>
+        <button id="log-save-cfg" class="btn-primary">SAVE</button>
+      </div>
     </section>
   </div>
 </div>

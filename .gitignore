@@ -9,6 +9,7 @@ __pycache__/
 *.log
 *.wav
 backend/app/runtime.json
+backend/app/logbook.json
 
 # Title-bar logo (may be a trademarked brand logo — never commit it)
 backend/app/branding/

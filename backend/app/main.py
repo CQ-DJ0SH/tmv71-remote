@@ -35,7 +35,9 @@ from .models import (AudioDeviceRequest, AudioGainRequest, AutoPowerOffRequest,
                      Tone1750Request,
                      RecallRequest, ScanStartRequest, SerialConfig,
                      SquelchRequest, StepRequest, VfoUpdate, WebRTCOffer,
-                     HackRFConfig)
+                     HackRFConfig,
+                     LogConfigRequest, LogLookupRequest, LogQsoRequest,
+                     LogDeleteRequest)
 from . import mixer
 from . import system_info
 from . import updater
@@ -43,6 +45,7 @@ from .power_switch import PowerSwitch
 from .webrtc_audio import RadioAudio, RadioRxTrack, consume_mic, SAMPLE_RATE
 from . import digimodes
 from . import selcall
+from .logbook import logbook, band_for_hz, _FM_MODE, LogError
 from aiortc import RTCPeerConnection, RTCSessionDescription
 from .radio_service import RadioService
 from .tmv71 import TMV71Error
@@ -717,6 +720,97 @@ async def set_callsign(req: CallsignRequest) -> dict:
     settings.callsign = cs
     save_runtime(callsign=cs)
     return {"callsign": cs}
+
+
+# ---- logbook (Wavelog logging + QRZ.com lookup) --------------------------
+
+def _control_band_rf():
+    """Current control-band RX frequency (Hz) and ADIF mode for QSO auto-fill."""
+    try:
+        st = service.status
+        b = st.control_band or 0
+        if st.bands and b < len(st.bands):
+            band = st.bands[b]
+            return band.rx_freq, _FM_MODE.get(band.fm_mode, "FM")
+    except Exception:  # noqa: BLE001
+        pass
+    return None, "FM"
+
+
+@app.get("/api/log/config")
+async def get_log_config() -> dict:
+    return logbook.config()
+
+
+@app.post("/api/log/config")
+async def set_log_config(req: LogConfigRequest) -> dict:
+    return logbook.configure(**req.model_dump(exclude_none=True))
+
+
+@app.post("/api/log/test")
+async def test_log() -> dict:
+    return await asyncio.to_thread(logbook.wavelog.test)
+
+
+@app.post("/api/log/qrz/test")
+async def test_qrz() -> dict:
+    return await asyncio.to_thread(logbook.qrz.test)
+
+
+@app.get("/api/log/stations")
+async def log_stations() -> dict:
+    stations = await asyncio.to_thread(logbook.wavelog.stations)
+    return {"stations": stations}
+
+
+@app.post("/api/log/lookup")
+async def log_lookup(req: LogLookupRequest) -> dict:
+    call = req.callsign.strip().upper()
+    if not call:
+        raise HTTPException(400, "callsign required")
+    freq, mode = _control_band_rf()
+    band = req.band or band_for_hz(freq)
+    try:
+        return await asyncio.to_thread(
+            logbook.lookup, call, band, req.mode or mode)
+    except LogError as e:
+        raise HTTPException(502, str(e))
+
+
+@app.post("/api/log/qso")
+async def log_qso(req: LogQsoRequest) -> dict:
+    freq, mode = _control_band_rf()
+    freq_hz = req.freq_hz or freq
+    try:
+        return await asyncio.to_thread(
+            logbook.log,
+            callsign=req.callsign, freq_hz=freq_hz, mode=req.mode or mode,
+            name=req.name or "", rst_sent=req.rst_sent or "59",
+            rst_rcvd=req.rst_rcvd or "59", comment=req.comment or "",
+            gridsquare=req.gridsquare or "", email=req.email or "",
+            qth=req.qth or "", country=req.country or "", power_w=req.power_w,
+            station_callsign=settings.callsign or "")
+    except LogError as e:
+        raise HTTPException(502, str(e))
+
+
+@app.get("/api/log/recent")
+async def log_recent() -> dict:
+    configured = logbook.wavelog.configured()
+    online = await asyncio.to_thread(logbook.wavelog.online) if configured else False
+    stats = await asyncio.to_thread(logbook.stats) if online else {}
+    return {"recent": logbook.recent(), "stats": stats,
+            "enabled": configured, "online": online}
+
+
+@app.post("/api/log/recent/delete")
+async def log_recent_delete(req: LogDeleteRequest) -> dict:
+    return logbook.delete_recent(req.ts)
+
+
+@app.post("/api/log/recent/clear")
+async def log_recent_clear() -> dict:
+    return logbook.clear_recent()
 
 
 @app.get("/api/theme")

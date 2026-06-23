@@ -1334,6 +1334,7 @@ function switchTab(name) {
   if (name === "info") loadInfo();
   if (name === "dtmf") loadDtmf();
   if (name === "audio") { loadAudioDevices(); loadMixer(); loadTones(); }
+  if (name === "logging") loadLogConfig();
   if (name === "hardware") { loadSystem(); sysTimer = setInterval(loadSystem, 2000); }
 }
 
@@ -1865,6 +1866,7 @@ function bindPanels() {
       setState(collapsed);
       localStorage.setItem("tmv71.collapse." + section.id, collapsed ? "1" : "0");
       if (section.id === "hackrf-zone") { if (!collapsed) sizeHrfCanvases(); hrfSync(); }
+      else if (section.id === "log-zone") { if (!collapsed) loadLogRecent(); }
       else if (!collapsed) sizeScanCanvas();        // re-measure scan on expand
     });
   });
@@ -2212,6 +2214,7 @@ function bindPanelDeck() {
     try {
       if (el.matches(".audio")) sizeLevelGraph();
       else if (el.matches(".hackrf-zone")) { sizeHrfCanvases(); hrfSync(); }
+      else if (el.matches(".log-zone")) loadLogRecent();
       else if (el.matches(".scan-zone")) sizeScanCanvas();
     } catch {}
   };
@@ -2484,6 +2487,233 @@ function connectSelcallWS(decode, isMuted, setMute) {
   ws.onerror = () => { try { ws.close(); } catch {} };
 }
 
+// ---- logbook (Wavelog) ----------------------------------------------------
+const logEsc = s => String(s ?? "").replace(/[&<>"]/g,
+  c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let logStationWanted = "";   // station id to preselect once profiles load
+let lastLookup = null;       // cached lookup result {call, ...} for the log form
+
+function renderLogRecent(data) {
+  const stat = $("#log-stat");
+  if (stat) stat.textContent = data.enabled ? "Wavelog ready" : "not configured";
+  const onl = $("#log-online");
+  if (onl) {
+    onl.hidden = !data.enabled;            // only relevant once Wavelog is set up
+    onl.classList.toggle("on", !!data.online);
+    const lbl = onl.querySelector(".lbl");
+    if (lbl) lbl.textContent = data.online ? "online" : "offline";
+    onl.title = data.online ? "Wavelog connected" : "Wavelog not reachable";
+  }
+  const sEl = $("#log-stats");
+  if (sEl) {
+    const s = data.stats || {};
+    // Wavelog's statistics keys vary by version (e.g. Today / month_qsos /
+    // year_qsos / total_qsos) — map the known dashboard counters, else show raw
+    const pick = (...ks) => { for (const k of ks) if (s[k] != null) return s[k]; return null; };
+    let entries = [
+      ["Today", pick("Today", "today_qsos", "todays_qsos", "today")],
+      ["Month", pick("Month", "month_qsos", "months_qsos")],
+      ["Year", pick("Year", "year_qsos", "years_qsos")],
+      ["Total", pick("Total", "total_qsos", "total")],
+    ].filter(([, v]) => v != null);
+    if (!entries.length)
+      entries = Object.entries(s).filter(([, v]) => v != null && typeof v !== "object");
+    const parts = entries.map(([l, v]) => `${logEsc(l)} <b>${logEsc(v)}</b>`);
+    sEl.innerHTML = parts.join(" &nbsp;·&nbsp; ");
+    sEl.hidden = !parts.length;
+  }
+  const r = data.recent || [];
+  const clr = $("#log-clear"); if (clr) clr.hidden = !r.length;
+  // most recent QSO, shown in the panel title bar
+  const lastEl = $("#log-last");
+  if (lastEl) {
+    if (r.length) {
+      const e = r[0];
+      const ok = e.targets && Object.values(e.targets).some(Boolean);
+      const extra = [e.name, e.band].filter(Boolean).join(" · ");
+      lastEl.innerHTML = `<span class="ll-stat ${ok ? "ok" : "err"}">${ok ? "✓" : "✕"}</span>` +
+        `<span class="ll-call">${logEsc(e.call)}</span>` +
+        (extra ? `<span class="ll-meta">${logEsc(extra)}</span>` : "");
+      lastEl.hidden = false;
+    } else { lastEl.innerHTML = ""; lastEl.hidden = true; }
+  }
+  const list = $("#log-recent"); if (!list) return;
+  if (!r.length) { list.innerHTML = '<p class="log-empty">No logged QSOs yet.</p>'; return; }
+  list.innerHTML = r.map(e => {
+    const t = String(e.ts || "").replace("T", " ").slice(5, 16);   // MM-DD HH:MM
+    const ok = e.targets && Object.values(e.targets).some(Boolean);
+    const meta = [e.band, e.mode, e.freq_mhz ? `${e.freq_mhz} MHz` : ""]
+      .filter(Boolean).join(" · ");
+    const extra = [e.gridsquare, e.qth, e.country, e.email].filter(Boolean).join(" · ");
+    return `<div class="log-item">` +
+      `<span class="li-when"><span class="li-dt">${logEsc(t)}</span>${meta ? " · " + logEsc(meta) : ""}</span>` +
+      `<span class="li-extra" title="${logEsc(extra)}">${logEsc(extra)}</span>` +
+      `<span class="li-name">${logEsc(e.name || "")}</span>` +
+      `<span class="li-call">${logEsc(e.call)}</span>` +
+      `<span class="li-stat ${ok ? "ok" : "err"}" title="${ok ? "logged" : "failed"}">${ok ? "✓" : "✕"}</span>` +
+      `<button type="button" class="li-del" data-ts="${logEsc(e.ts || "")}" title="Delete this entry" aria-label="Delete">✕</button>` +
+      `</div>`;
+  }).join("");
+}
+
+async function loadLogRecent() {
+  try { renderLogRecent(await api("GET", "/api/log/recent")); } catch {}
+}
+
+async function deleteLogEntry(ts) {
+  if (!ts) return;
+  try { await api("POST", "/api/log/recent/delete", { ts }); loadLogRecent(); }
+  catch (e) { toast("Delete: " + e.message, "err"); }
+}
+
+async function clearLogRecent() {
+  if (!confirm("Clear the recent list? (does not delete the QSOs in Wavelog)")) return;
+  try { await api("POST", "/api/log/recent/clear"); loadLogRecent(); }
+  catch (e) { toast("Clear: " + e.message, "err"); }
+}
+
+async function logLookup() {
+  const inp = $("#log-call"); if (!inp) return;
+  const call = inp.value.trim().toUpperCase();
+  if (!call) { toast("Enter a callsign", "err"); return; }
+  inp.value = call;
+  try {
+    const r = await api("POST", "/api/log/lookup", { callsign: call });
+    lastLookup = { ...r, call };          // cache for the QSO we're about to log
+    if (r.name && !$("#log-name").value.trim()) $("#log-name").value = r.name;
+    if (r.gridsquare && !$("#log-grid").value.trim()) $("#log-grid").value = r.gridsquare;
+    const bits = [r.name, r.gridsquare, r.qth, r.country, r.email, r.dxcc]
+      .filter(Boolean).join(" · ");
+    toast(bits ? `${call}: ${bits}${r.worked_before ? " · worked before" : ""}`
+               : `${call}: no data`, bits ? "ok" : "");
+  } catch (e) { toast("Lookup: " + e.message, "err"); }
+}
+
+async function logQso() {
+  const call = $("#log-call").value.trim().toUpperCase();
+  if (!call) { toast("Enter a callsign", "err"); return; }
+  // carry over the extra lookup details (email/qth/country) for this callsign
+  const lk = (lastLookup && lastLookup.call === call) ? lastLookup : {};
+  const btn = $("#log-save"); btn.disabled = true;
+  try {
+    const r = await api("POST", "/api/log/qso", {
+      callsign: call, name: $("#log-name").value.trim(),
+      rst_sent: $("#log-rst-s").value.trim() || "59",
+      rst_rcvd: $("#log-rst-r").value.trim() || "59",
+      gridsquare: $("#log-grid").value.trim(),
+      comment: $("#log-comment").value.trim(),
+      email: lk.email || "", qth: lk.qth || "", country: lk.country || "",
+    });
+    if (r.ok) {
+      toast(`Logged ${call}`, "ok");
+      lastLookup = null;
+      ["#log-call", "#log-name", "#log-grid", "#log-comment"].forEach(s => ($(s).value = ""));
+      $("#log-rst-s").value = "59"; $("#log-rst-r").value = "59";
+    } else {
+      const msg = Object.values(r.targets || {}).map(t => t.message).filter(Boolean).join("; ");
+      toast("Log failed: " + (msg || "unknown"), "err");
+    }
+    loadLogRecent();
+  } catch (e) { toast("Log: " + e.message, "err"); }
+  finally { btn.disabled = false; }
+}
+
+function setLogStatus(msg, kind) {
+  const e = $("#log-wl-status"); if (!e) return;
+  e.textContent = msg; e.className = kind || "";
+}
+
+async function loadLogConfig() {
+  try {
+    const c = await api("GET", "/api/log/config");
+    $("#log-wl-url").value = c.wavelog_url || "";
+    $("#log-wl-key").value = c.wavelog_key || "";
+    logStationWanted = c.wavelog_station_id || "";
+    $("#log-qrz-user").value = c.qrz_username || "";
+    $("#log-qrz-pass").value = c.qrz_password || "";
+    $("#log-qrz-key").value = c.qrz_api_key || "";
+    setLogStatus(c.wavelog_enabled ? "configured" : "not configured",
+                 c.wavelog_enabled ? "ok" : "");
+    if (c.wavelog_url && c.wavelog_key) loadLogStations();
+  } catch (e) { toast("Logging config: " + e.message, "err"); }
+}
+
+async function loadLogStations() {
+  const sel = $("#log-wl-station"); if (!sel) return;
+  try {
+    const { stations } = await api("GET", "/api/log/stations");
+    sel.innerHTML = '<option value="">—</option>' + (stations || []).map(s =>
+      `<option value="${logEsc(s.id)}">${logEsc(s.id)} · ${logEsc(s.callsign || s.name || "")}</option>`).join("");
+    sel.value = logStationWanted || "";
+  } catch {}
+}
+
+async function saveLogConfig(silent) {
+  const body = {
+    wavelog_url: $("#log-wl-url").value.trim(),
+    wavelog_key: $("#log-wl-key").value.trim(),
+    wavelog_station_id: $("#log-wl-station").value,
+    qrz_username: $("#log-qrz-user").value.trim(),
+    qrz_password: $("#log-qrz-pass").value,
+    qrz_api_key: $("#log-qrz-key").value.trim(),
+  };
+  try {
+    const c = await api("POST", "/api/log/config", body);
+    if (!silent) toast("Logging settings saved", "ok");
+    setLogStatus(c.wavelog_enabled ? "configured" : "not configured",
+                 c.wavelog_enabled ? "ok" : "");
+    loadLogRecent();
+    return c;
+  } catch (e) { if (!silent) toast("Save: " + e.message, "err"); }
+}
+
+async function testLog() {
+  setLogStatus("testing…", "");
+  await saveLogConfig(true);   // test the values currently in the form
+  try {
+    const r = await api("POST", "/api/log/test");
+    setLogStatus(r.message || (r.ok ? "ok" : "failed"), r.ok ? "ok" : "err");
+    if (r.ok) loadLogStations();
+  } catch (e) { setLogStatus(e.message, "err"); }
+}
+
+function setQrzStatus(msg, kind) {
+  const e = $("#log-qrz-status"); if (!e) return;
+  e.textContent = msg; e.className = kind || "";
+}
+
+async function testQrz() {
+  setQrzStatus("testing…", "");
+  await saveLogConfig(true);   // test the values currently in the form
+  try {
+    const r = await api("POST", "/api/log/qrz/test");
+    setQrzStatus(r.message || (r.ok ? "ok" : "failed"), r.ok ? "ok" : "err");
+  } catch (e) { setQrzStatus(e.message, "err"); }
+}
+
+function bindLogbook() {
+  $("#log-lookup")?.addEventListener("click", logLookup);
+  $("#log-save")?.addEventListener("click", logQso);
+  const call = $("#log-call");
+  call?.addEventListener("change", () => { call.value = call.value.trim().toUpperCase(); });
+  call?.addEventListener("blur", () => {
+    if (call.value.trim() && !$("#log-name").value.trim()) logLookup();
+  });
+  call?.addEventListener("keydown", e => { if (e.key === "Enter") logQso(); });
+  $("#log-recent")?.addEventListener("click", e => {
+    const btn = e.target.closest(".li-del");
+    if (btn) deleteLogEntry(btn.dataset.ts);
+  });
+  $("#log-clear")?.addEventListener("click", clearLogRecent);
+  $("#log-wl-test")?.addEventListener("click", testLog);
+  $("#log-qrz-test")?.addEventListener("click", testQrz);
+  $("#log-wl-reload")?.addEventListener("click", () => { saveLogConfig(true).then(loadLogStations); });
+  $("#log-save-cfg")?.addEventListener("click", () => saveLogConfig(false));
+  $("#set-cancel-logging")?.addEventListener("click",
+    () => $("#settings").classList.remove("open"));
+  loadLogRecent();
+}
+
 // ---- boot -----------------------------------------------------------------
 bindTheme();
 bindPanelDeck();
@@ -2505,6 +2735,7 @@ updatePttEnabled();   // PTT/PTT-LOCK start disabled until audio is connected
 loadAudioDevices();
 bindVfoParams();
 bindSettings();
+bindLogbook();
 bindPower();
 renderCallsign();
 syncCallsign();
@@ -2575,7 +2806,7 @@ if (localStorage.getItem("tmv71.audioOn") === "1") {
 
 // decorative aircraft-panel corner screws (one set of four per panel)
 function addPanelScrews() {
-  document.querySelectorAll(".band, .ptt-zone, .audio, .scan-zone, .hackrf-zone, .selcall-zone, .digi-zone").forEach(p => {
+  document.querySelectorAll(".band, .ptt-zone, .audio, .scan-zone, .hackrf-zone, .selcall-zone, .digi-zone, .log-zone").forEach(p => {
     if (p.querySelector(".screw")) return;
     ["tl", "tr", "bl", "br"].forEach(pos => {
       const s = document.createElement("span");

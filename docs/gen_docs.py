@@ -16,7 +16,7 @@ ACCENT = (16, 110, 78)        # muted green
 DARK = (28, 39, 49)
 GREY = (110, 122, 132)
 CODEBG = (244, 246, 248)
-VERSION = "3.1"
+VERSION = "3.2"
 
 
 class Doc(FPDF):
@@ -132,6 +132,7 @@ ARCH = (
     "  FastAPI backend -- REST + WebSocket (live status)\n"
     "    - control (freq/mode/band/PTT)  - memory CRUD + CSV\n"
     "    - CW/RTTY + 5-tone selcall      - HackRF spectrum\n"
+    "    - Wavelog logbook (QSO log)     - callsign lookup\n"
     "                                                       \n"
     "  USB sound -- aiortc WebRTC <-> browser (Opus, PTT)\n"
     "  FastAPI serves the SPA / PWA at \"/\" (HTTPS/TLS)\n"
@@ -185,6 +186,17 @@ API_SDR = (
     "POST /api/hackrf/start|stop|config\n"
     "WS   /ws/hackrf             spectrum/waterfall frames\n"
     "GET  /api/scan  POST /api/scan/start|stop  band scan\n"
+)
+API_LOG = (
+    "GET/POST /api/log/config     logbook credentials (Wavelog + QRZ)\n"
+    "POST /api/log/test           test the Wavelog connection\n"
+    "POST /api/log/qrz/test       test the QRZ.com login\n"
+    "GET  /api/log/stations       Wavelog station profiles\n"
+    "POST /api/log/lookup         callsign lookup (QRZ + Wavelog)\n"
+    "POST /api/log/qso            log a QSO\n"
+    "GET  /api/log/recent         recent QSOs + online + Wavelog stats\n"
+    "POST /api/log/recent/delete  delete one recent entry\n"
+    "POST /api/log/recent/clear   clear the recent list\n"
 )
 API_SYS = (
     "GET/POST /api/power-switch   GPIO power\n"
@@ -351,11 +363,25 @@ EN = [
     ("p", "Sweep a VHF/UHF range or the memory bank and see an occupancy "
           "spectrum + waterfall. Double-click a channel to tune the control VFO "
           "to it."),
+    ("h2", "Logbook (Wavelog + QRZ.com)"),
+    ("p", "Logs QSOs to a locally installed Wavelog instance. Enter just the "
+          "callsign (and optionally a name) — frequency, band, mode, date/time and "
+          "your own callsign are filled in automatically from the live control "
+          "band and station profile. LOOKUP fetches the operator's name, grid, "
+          "QTH, country and e-mail from QRZ.com (XML data API) and 'worked before' "
+          "/ DXCC from Wavelog. LOG QSO sends the contact as ADIF. A green dot "
+          "shows when Wavelog is reachable; the panel lists the most recent QSOs "
+          "(with the looked-up details, deletable individually or via CLEAR) and "
+          "Wavelog's QSO counts (today/month/year/total). Configure the Wavelog "
+          "URL, API token and station profile, and the QRZ.com username/password, "
+          "in Settings > Logging. Credentials are stored only on the Pi "
+          "(runtime.json), never committed."),
     ("h2", "Settings"),
     ("p", "Tabs: General (callsign, API backend URL, serial port/baud, GPIO power, "
           "auto power-off, logo, GitHub self-update, Root-CA download), Audio "
           "(device, USB mixer, voice filters, test tone, TX timing), Rig-Info, "
-          "Rig-Memory, Rig-DTMF, and Pi-Hardware (host metrics)."),
+          "Rig-Memory, Rig-DTMF, Logging (Wavelog + QRZ.com), and Pi-Hardware "
+          "(host metrics)."),
     ("h1", "8  Mobile App (PWA)"),
     ("p", "The UI installs as a Progressive Web App: full-screen, with an "
           "app-shell service worker for instant launch. On phones the panels become "
@@ -394,6 +420,7 @@ EN = [
     ("h2", "Audio"), ("code", API_AUDIO),
     ("h2", "Digimodes & selcall"), ("code", API_DIGI),
     ("h2", "SDR & scan"), ("code", API_SDR),
+    ("h2", "Logbook"), ("code", API_LOG),
     ("h2", "System & power"), ("code", API_SYS),
     ("h1", "12  Troubleshooting"),
     ("ul", [
@@ -542,11 +569,26 @@ DE = [
     ("p", "Einen VHF/UHF-Bereich oder die Speicherbank absuchen und ein "
           "Belegungs-Spektrum + Wasserfall sehen. Ein Doppelklick auf einen Kanal "
           "stimmt den Steuer-VFO darauf ab."),
+    ("h2", "Logbuch (Wavelog + QRZ.com)"),
+    ("p", "Protokolliert QSOs in eine lokal installierte Wavelog-Instanz. Es "
+          "genügt, das Rufzeichen (und optional einen Namen) einzugeben — Frequenz, "
+          "Band, Modus, Datum/Uhrzeit und das eigene Rufzeichen werden automatisch "
+          "aus dem aktuellen Steuerband und dem Stationsprofil ergänzt. LOOKUP holt "
+          "Name, Locator, QTH, Land und E-Mail von QRZ.com (XML-Daten-API) sowie "
+          "'schon gearbeitet' / DXCC von Wavelog. LOG QSO überträgt den Kontakt als "
+          "ADIF. Ein grüner Punkt zeigt, ob Wavelog erreichbar ist; das Panel "
+          "listet die letzten QSOs (mit den ermittelten Details, einzeln oder per "
+          "CLEAR löschbar) sowie die QSO-Zähler von Wavelog (heute/Monat/Jahr/"
+          "gesamt). Wavelog-URL, API-Token und Stationsprofil sowie QRZ.com-"
+          "Benutzer/Passwort werden unter Einstellungen > Logging hinterlegt. "
+          "Zugangsdaten liegen nur auf dem Pi (runtime.json) und werden nie "
+          "committet."),
     ("h2", "Einstellungen"),
     ("p", "Reiter: Allgemein (Rufzeichen, API-Backend-URL, serieller Port/Baud, "
           "GPIO-Power, Auto-Abschaltung, Logo, GitHub-Update, Root-CA-Download), "
           "Audio (Gerät, USB-Mixer, Sprachfilter, Testton, TX-Timing), Rig-Info, "
-          "Rig-Speicher, Rig-DTMF und Pi-Hardware (Host-Metriken)."),
+          "Rig-Speicher, Rig-DTMF, Logging (Wavelog + QRZ.com) und Pi-Hardware "
+          "(Host-Metriken)."),
     ("h1", "8  Mobile App (PWA)"),
     ("p", "Die Oberfläche installiert sich als Progressive Web App: Vollbild, mit "
           "App-Shell-Service-Worker für sofortigen Start. Auf dem Handy werden die "
@@ -590,6 +632,7 @@ DE = [
     ("h2", "Audio"), ("code", API_AUDIO),
     ("h2", "Digimodes & Selektivruf"), ("code", API_DIGI),
     ("h2", "SDR & Scan"), ("code", API_SDR),
+    ("h2", "Logbuch"), ("code", API_LOG),
     ("h2", "System & Power"), ("code", API_SYS),
     ("h1", "12  Fehlerbehebung"),
     ("ul", [
