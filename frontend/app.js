@@ -2494,8 +2494,6 @@ let logStationWanted = "";   // station id to preselect once profiles load
 let lastLookup = null;       // cached lookup result {call, ...} for the log form
 
 function renderLogRecent(data) {
-  const stat = $("#log-stat");
-  if (stat) stat.textContent = data.enabled ? "Wavelog ready" : "not configured";
   const onl = $("#log-online");
   if (onl) {
     onl.hidden = !data.enabled;            // only relevant once Wavelog is set up
@@ -2622,8 +2620,8 @@ async function logQso() {
   finally { btn.disabled = false; }
 }
 
-function setLogStatus(msg, kind) {
-  const e = $("#log-wl-status"); if (!e) return;
+function logStatus(sel, msg, kind) {
+  const e = $(sel); if (!e) return;
   e.textContent = msg; e.className = kind || "";
 }
 
@@ -2636,8 +2634,8 @@ async function loadLogConfig() {
     $("#log-qrz-user").value = c.qrz_username || "";
     $("#log-qrz-pass").value = c.qrz_password || "";
     $("#log-qrz-key").value = c.qrz_api_key || "";
-    setLogStatus(c.wavelog_enabled ? "configured" : "not configured",
-                 c.wavelog_enabled ? "ok" : "");
+    logStatus("#log-wl-status", c.wavelog_enabled ? "configured" : "not configured",
+              c.wavelog_enabled ? "ok" : "");
     if (c.wavelog_url && c.wavelog_key) loadLogStations();
   } catch (e) { toast("Logging config: " + e.message, "err"); }
 }
@@ -2664,36 +2662,26 @@ async function saveLogConfig(silent) {
   try {
     const c = await api("POST", "/api/log/config", body);
     if (!silent) toast("Logging settings saved", "ok");
-    setLogStatus(c.wavelog_enabled ? "configured" : "not configured",
-                 c.wavelog_enabled ? "ok" : "");
+    logStatus("#log-wl-status", c.wavelog_enabled ? "configured" : "not configured",
+              c.wavelog_enabled ? "ok" : "");
     loadLogRecent();
     return c;
   } catch (e) { if (!silent) toast("Save: " + e.message, "err"); }
 }
 
-async function testLog() {
-  setLogStatus("testing…", "");
-  await saveLogConfig(true);   // test the values currently in the form
+// test a provider connection with the values currently in the form
+async function testProvider(endpoint, statusSel, onOk) {
+  logStatus(statusSel, "testing…", "");
+  await saveLogConfig(true);
   try {
-    const r = await api("POST", "/api/log/test");
-    setLogStatus(r.message || (r.ok ? "ok" : "failed"), r.ok ? "ok" : "err");
-    if (r.ok) loadLogStations();
-  } catch (e) { setLogStatus(e.message, "err"); }
+    const r = await api("POST", endpoint);
+    logStatus(statusSel, r.message || (r.ok ? "ok" : "failed"), r.ok ? "ok" : "err");
+    if (r.ok && onOk) onOk();
+  } catch (e) { logStatus(statusSel, e.message, "err"); }
 }
 
-function setQrzStatus(msg, kind) {
-  const e = $("#log-qrz-status"); if (!e) return;
-  e.textContent = msg; e.className = kind || "";
-}
-
-async function testQrz() {
-  setQrzStatus("testing…", "");
-  await saveLogConfig(true);   // test the values currently in the form
-  try {
-    const r = await api("POST", "/api/log/qrz/test");
-    setQrzStatus(r.message || (r.ok ? "ok" : "failed"), r.ok ? "ok" : "err");
-  } catch (e) { setQrzStatus(e.message, "err"); }
-}
+const testLog = () => testProvider("/api/log/test", "#log-wl-status", loadLogStations);
+const testQrz = () => testProvider("/api/log/qrz/test", "#log-qrz-status");
 
 function bindLogbook() {
   $("#log-lookup")?.addEventListener("click", logLookup);
@@ -2784,9 +2772,7 @@ function fillEnv() {
     ["Orientation", screen.orientation?.type || "—"],
     ["Wake Lock", ("wakeLock" in n) ? (wakeLock ? "held" : "supported") : "unsupported"],
   ];
-  el.innerHTML = rows.map(([k, v]) =>
-    `<dt>${k}</dt><dd>${String(v).replace(/[<>&]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]))}</dd>`
-  ).join("");
+  el.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${logEsc(v)}</dd>`).join("");
 }
 fillEnv();
 window.addEventListener("resize", fillEnv);
