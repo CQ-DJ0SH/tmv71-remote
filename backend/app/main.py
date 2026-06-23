@@ -796,11 +796,10 @@ async def log_qso(req: LogQsoRequest) -> dict:
 
 @app.get("/api/log/recent")
 async def log_recent() -> dict:
-    configured = logbook.wavelog.configured()
-    online = await asyncio.to_thread(logbook.wavelog.online) if configured else False
-    stats = await asyncio.to_thread(logbook.stats) if online else {}
-    return {"recent": logbook.recent(), "stats": stats,
-            "enabled": configured, "online": online}
+    # single statistics round-trip yields both reachability and the counts
+    st = await asyncio.to_thread(logbook.stats_status)
+    return {"recent": logbook.recent(), "stats": st["stats"],
+            "enabled": logbook.wavelog.configured(), "online": st["online"]}
 
 
 @app.post("/api/log/recent/delete")

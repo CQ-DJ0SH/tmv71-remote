@@ -72,7 +72,8 @@ def _adif_field(name: str, value) -> str:
     s = str(value).strip()
     if s == "":
         return ""
-    return f"<{name.upper()}:{len(s)}>{s}"
+    # ADIF data length is the byte count — matters for non-ASCII (umlauts etc.)
+    return f"<{name.upper()}:{len(s.encode('utf-8'))}>{s}"
 
 
 def build_adif(qso: dict, station_callsign: str = "", my_grid: str = "") -> str:
@@ -203,10 +204,6 @@ class WavelogProvider(LogProvider):
             return {"ok": True, "message": f"{len(st)} station profile(s)"}
         return {"ok": False, "message": f"unexpected response ({code})"}
 
-    def online(self) -> bool:
-        """True if the Wavelog instance is configured AND reachable."""
-        return self.configured() and bool(self.test().get("ok"))
-
     def stations(self) -> list[dict]:
         if not self.configured():
             return []
@@ -226,16 +223,17 @@ class WavelogProvider(LogProvider):
                 })
         return out
 
-    def stats(self) -> dict:
+    def stats_status(self) -> dict:
+        """One statistics round-trip → reachability + the dashboard counts.
+        A successful response means the instance is reachable (online); the raw
+        body is returned so the UI can render whatever keys Wavelog sends."""
         if not self.configured():
-            return {}
+            return {"online": False, "stats": {}}
         try:
             body, _ = self._request("statistics", key_in_url=True)
         except LogError:
-            return {}
-        # return whatever Wavelog sends (key names vary by version) so the UI
-        # can render it generically
-        return body if isinstance(body, dict) else {}
+            return {"online": False, "stats": {}}
+        return {"online": True, "stats": body if isinstance(body, dict) else {}}
 
     def lookup(self, callsign: str, band: str = "", mode: str = "") -> dict:
         if not self.configured():
@@ -453,8 +451,8 @@ class LogBook:
         self._save_recent()
         return {"recent": []}
 
-    def stats(self) -> dict:
-        return self.wavelog.stats()
+    def stats_status(self) -> dict:
+        return self.wavelog.stats_status()
 
     def lookup(self, callsign: str, band: str = "", mode: str = "") -> dict:
         """Merge a callsign lookup from QRZ.com (rich personal data: name, grid,

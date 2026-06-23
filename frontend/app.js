@@ -2542,7 +2542,7 @@ function renderLogRecent(data) {
     const ok = e.targets && Object.values(e.targets).some(Boolean);
     const meta = [e.band, e.mode, e.freq_mhz ? `${e.freq_mhz} MHz` : ""]
       .filter(Boolean).join(" · ");
-    const extra = [e.gridsquare, e.qth, e.country, e.email].filter(Boolean).join(" · ");
+    const extra = [e.gridsquare, e.qth, e.email, e.comment].filter(Boolean).join(" · ");
     return `<div class="log-item">` +
       `<span class="li-when"><span class="li-dt">${logEsc(t)}</span>${meta ? " · " + logEsc(meta) : ""}</span>` +
       `<span class="li-extra" title="${logEsc(extra)}">${logEsc(extra)}</span>` +
@@ -2590,15 +2590,21 @@ async function logLookup() {
 async function logQso() {
   const call = $("#log-call").value.trim().toUpperCase();
   if (!call) { toast("Enter a callsign", "err"); return; }
-  // carry over the extra lookup details (email/qth/country) for this callsign
-  const lk = (lastLookup && lastLookup.call === call) ? lastLookup : {};
   const btn = $("#log-save"); btn.disabled = true;
   try {
+    // make sure the lookup for this callsign has finished (a click on LOG QSO
+    // can fire before the blur-triggered lookup resolved) so name/grid/extras
+    // are actually captured in the logged entry
+    if (!lastLookup || lastLookup.call !== call) {
+      try { await logLookup(); } catch {}
+    }
+    const lk = (lastLookup && lastLookup.call === call) ? lastLookup : {};
     const r = await api("POST", "/api/log/qso", {
-      callsign: call, name: $("#log-name").value.trim(),
+      callsign: call,
+      name: $("#log-name").value.trim() || lk.name || "",
       rst_sent: $("#log-rst-s").value.trim() || "59",
       rst_rcvd: $("#log-rst-r").value.trim() || "59",
-      gridsquare: $("#log-grid").value.trim(),
+      gridsquare: $("#log-grid").value.trim() || lk.gridsquare || "",
       comment: $("#log-comment").value.trim(),
       email: lk.email || "", qth: lk.qth || "", country: lk.country || "",
     });

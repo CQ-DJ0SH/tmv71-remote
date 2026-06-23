@@ -1658,11 +1658,12 @@ body.theme-light .hrf-graph{border-color:var(--edge)}
 .log-item{display:flex; align-items:baseline; gap:8px; white-space:nowrap;
   padding:6px 11px; border-bottom:1px solid color-mix(in srgb, var(--edge) 60%, transparent)}
 .log-item:last-child{border-bottom:0}
-.log-item .li-when{flex:0 0 auto; font-family:var(--font-mono); font-size:10px; color:var(--text-dim)}
+.log-item .li-when{flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis;
+  font-family:var(--font-mono); font-size:10px; color:var(--text-dim)}
 .log-item .li-dt{color:var(--text); font-weight:600}   /* match the name's look */
 .log-item .li-extra{flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis;
   font-family:var(--font-mono); font-size:10px; color:var(--text-dim)}
-.log-item .li-name{flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; text-align:right;
+.log-item .li-name{flex:0 0 auto; text-align:right;
   font-family:var(--font-disp); font-weight:600; font-size:14px; letter-spacing:.04em; color:var(--text)}
 .log-item .li-call{flex:0 0 auto; font-family:var(--font-disp); font-weight:600;
   font-size:14px; letter-spacing:.14em; color:var(--text)}
