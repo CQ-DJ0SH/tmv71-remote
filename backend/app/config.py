@@ -85,6 +85,11 @@ class Settings(BaseSettings):
     qrz_username: str = ""
     qrz_password: str = ""
 
+    # Own 5-tone selcall ID and last-used call (destination) code. Persisted
+    # server-side so they survive restarts and are shared across browsers/devices.
+    selcall_own: str = ""
+    selcall_code: str = ""
+
     # Highest memory channel number to scan when listing (TM-V71 has 0..999)
     max_memory_channels: int = 1000
 
@@ -104,7 +109,8 @@ _RUNTIME_KEYS = ("serial_port", "serial_baud", "gpio_power_pin",
                  "callsign", "roger_beep_enabled", "theme",
                  "tx_lowpass_enabled", "rx_lowpass_enabled",
                  "wavelog_url", "wavelog_key", "wavelog_station_id",
-                 "qrz_api_key", "qrz_username", "qrz_password")
+                 "qrz_api_key", "qrz_username", "qrz_password",
+                 "selcall_own", "selcall_code")
 
 
 def _load_runtime() -> dict:

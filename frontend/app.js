@@ -2424,7 +2424,7 @@ function bindSelcall() {
       });
     });
   };
-  wire("#sel-code");
+  wire("#sel-code", () => post({ code: digitsOf("#sel-code") }));
   wire("#sel-own", () => post({ own: digitsOf("#sel-own") }));
   $("#sel-standard")?.addEventListener("change", e => post({ standard: e.target.value }));
   $("#sel-tone")?.addEventListener("change", e => post({ tone_ms: Number(e.target.value) }));
@@ -2462,6 +2462,7 @@ function bindSelcall() {
     if ($("#sel-tone")) $("#sel-tone").value = String(Math.round(s.tone_ms || 70));
     if ($("#sel-rx")) $("#sel-rx").checked = !!s.rx;
     if (s.own) setDigits("#sel-own", s.own);
+    if (s.code) setDigits("#sel-code", s.code);
   }).catch(() => {});
   connectSelcallWS(decode, () => muted, setMute);
 }

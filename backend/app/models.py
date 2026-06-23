@@ -201,6 +201,7 @@ class SelcallConfig(BaseModel):
     tone_ms: Optional[float] = Field(default=None, ge=20, le=200)
     rx: Optional[bool] = None           # run the decoder
     own: Optional[str] = None           # own 5-tone code (mute releases on match)
+    code: Optional[str] = None          # last-used call (destination) code
 
 
 class SelcallTxRequest(BaseModel):

@@ -209,7 +209,8 @@ class SelcallService:
         self.audio = audio
         self.standard = "zvei1"
         self.tone_ms = 70.0
-        self.own = ""
+        self.own = "".join(c for c in (settings.selcall_own or "") if c.isdigit())[:5]
+        self.code = "".join(c for c in (settings.selcall_code or "") if c.isdigit())[:5]
         self.rx = False
         self._dec = None
         self._subs: set = set()
@@ -218,7 +219,8 @@ class SelcallService:
 
     def status(self) -> dict:
         return {"standard": self.standard, "tone_ms": self.tone_ms,
-                "own": self.own, "rx": self.rx, "tx": self.audio.digi_tx_busy(),
+                "own": self.own, "code": self.code,
+                "rx": self.rx, "tx": self.audio.digi_tx_busy(),
                 "standards": list(selcall.STANDARDS.keys())}
 
     def _new_decoder(self):
@@ -232,7 +234,15 @@ class SelcallService:
                 setattr(self, f, v)
                 changed = True
         if cfg.own is not None:
-            self.own = "".join(c for c in cfg.own if c.isdigit())[:5]
+            own = "".join(c for c in cfg.own if c.isdigit())[:5]
+            if own != self.own:
+                self.own = own
+                save_runtime(selcall_own=own)
+        if cfg.code is not None:
+            code = "".join(c for c in cfg.code if c.isdigit())[:5]
+            if code != self.code:
+                self.code = code
+                save_runtime(selcall_code=code)
         if cfg.rx is not None:
             self.set_rx(cfg.rx)
         elif changed and self.rx:
