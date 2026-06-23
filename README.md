@@ -37,6 +37,12 @@ the theme toggle in the header (light is the default).*
   panel shows a live spectrum + waterfall: a real-time **panadapter** centred on
   the tuned frequency (auto-following the radio) or a **wideband sweep** across a
   range. Receive-only and entirely optional — see [below](#sdr-waterfall-optional-hackrf).
+- **Logbook (Wavelog + QRZ.com)** — a dedicated panel logs QSOs straight to a
+  (typically self-hosted) [Wavelog](https://www.wavelog.org/) instance over its
+  API. Enter just the callsign and name — frequency, band and mode are taken from
+  the radio, and a [QRZ.com](https://www.qrz.com/) lookup auto-fills name, grid,
+  QTH, e-mail and country. A "worked before" check and the latest contacts/totals
+  are shown inline; recent entries are kept locally so they survive restarts.
 - **No build step for the control UI** — the SPA is plain HTML/CSS/JS served
   directly by the backend. No Node toolchain required on the Pi.
 - **Installable PWA / mobile-ready** — runs as an installable Progressive Web App
@@ -183,7 +189,7 @@ microphone. Listen there; hold the large **PTT** button to transmit.
 The UI is an installable **Progressive Web App**. Once installed it runs
 full-screen (no browser chrome), and on phones the panels turn into a vertical
 **swipe deck** — one panel per screen (VFO A · VFO B · PTT · Audio · HackRF ·
-Selcall · Digi · Scan · Info), swipe up/down or tap the side **tab rail** to
+Selcall · Digi · Log · Info), swipe up/down or tap the side **tab rail** to
 switch. The title bar becomes a slim vertical strip on the left, the tab rail
 sits on the right. The app is forced to **landscape**; in portrait it shows a
 "rotate" hint. The app shell is cached by a service worker, so it launches
@@ -308,6 +314,11 @@ All settings are overridable via `TMV71_*` environment variables (see
 | `TMV71_AUDIO_ENABLED` | `true` | open the audio device / WebRTC bridge |
 | `TMV71_GPIO_POWER_PIN` | _(unset)_ | BCM pin for the GPIO power relay |
 
+**Logbook credentials** (Wavelog URL/API key/station id, QRZ.com
+username/password/key) are entered in the web UI under *Settings → Logging* and
+stored server-side in `runtime.json`, which is gitignored — secrets never enter
+the repository.
+
 ## API
 
 | Method | Path | Purpose |
@@ -329,6 +340,13 @@ All settings are overridable via `TMV71_*` environment variables (see
 | `POST` | `/api/webrtc/offer` | WebRTC SDP offer → answer (browser audio) |
 | `GET` | `/api/hackrf` | SDR waterfall status (optional HackRF) |
 | `POST` | `/api/hackrf/start` · `/stop` · `/config` | control the SDR waterfall |
+| `GET`/`POST` | `/api/log/config` | get / set logbook (Wavelog + QRZ) settings |
+| `POST` | `/api/log/test` · `/api/log/qrz/test` | test Wavelog / QRZ connection |
+| `GET` | `/api/log/stations` | list Wavelog station profiles |
+| `POST` | `/api/log/lookup` | callsign lookup (QRZ + worked-before) |
+| `POST` | `/api/log/qso` | log a QSO to the configured providers |
+| `GET` | `/api/log/recent` | recent local QSOs + Wavelog totals/online |
+| `POST` | `/api/log/recent/delete` · `/recent/clear` | remove / clear local recents |
 | `WS` | `/ws` | live status stream |
 | `WS` | `/ws/hackrf` | live spectrum / waterfall frames (optional HackRF) |
 
@@ -346,6 +364,7 @@ proxy with TLS + auth.
 - ✅ systemd packaging (see [`deploy/`](deploy/))
 - ✅ Optional HackRF SDR waterfall (panadapter + wideband sweep)
 - ✅ Installable PWA with a mobile swipe-deck layout (Add to Home Screen)
+- ✅ Logbook panel — Wavelog QSO logging + QRZ.com lookup
 
 ## Credits
 
