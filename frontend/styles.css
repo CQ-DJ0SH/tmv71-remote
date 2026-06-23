@@ -466,6 +466,12 @@ body.theme-light .callsign{color:#0c7b71; text-shadow:none}
      so the bodies (graphs/decoders) actually render in the deck. */
   .console .collapsed .panel-body{display:block}
   .panel-head .panel-toggle{display:none}
+  /* log panel: the recent list fills the remaining height and scrolls inside,
+     so the panel never runs past the bottom corner screws on the short deck */
+  .console .log-zone{display:flex; flex-direction:column}
+  .console .log-zone .panel-body{display:flex; flex-direction:column; flex:1 1 auto; min-height:0}
+  .log-zone .log-recent{display:flex; flex-direction:column; flex:1 1 auto; min-height:0}
+  .log-zone .log-recent-list{height:auto; flex:1 1 auto; min-height:0}
   /* shrink the fixed 250px graphs so HackRF/Scan fit the short landscape height
      (head + controls + graph) without scrolling */
   .hrf-graph, .scan-graph{height:32vh; min-height:84px; max-height:150px}

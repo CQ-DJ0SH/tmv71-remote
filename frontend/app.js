@@ -2500,8 +2500,6 @@ function renderLogRecent(data) {
   if (onl) {
     onl.hidden = !data.enabled;            // only relevant once Wavelog is set up
     onl.classList.toggle("on", !!data.online);
-    const lbl = onl.querySelector(".lbl");
-    if (lbl) lbl.textContent = data.online ? "online" : "offline";
     onl.title = data.online ? "Wavelog connected" : "Wavelog not reachable";
   }
   const sEl = $("#log-stats");
