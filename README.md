@@ -112,22 +112,12 @@ On the TM-V71(A/E), set the menu items:
 
 - **519 (PC port baud rate) → 57600** — the CAT/serial rate this app uses
   (matches `TMV71_SERIAL_BAUD`).
-- **518 (data speed) → 1200**.
 
-Menu 518 does **not** just change input sensitivity — it switches the whole audio
-path to/from the rear data connector. **1200** routes through the normal,
-band-limited audio chain (RX after de-emphasis, TX with pre-emphasis and the
-limiter), i.e. the same character as the speaker/mic. **9600** uses the flat,
-wideband direct-FM path (straight off the FM discriminator on RX, flat modulation
-on TX) and is only for true 9600-baud G3RUH FSK packet. For a USB sound interface
-carrying voice and ordinary soundcard modes (FT8, SSTV, APRS-1200, Echolink) use
-**1200** — 9600 sounds harsh/dull for voice and needs different levels. The
-differing input sensitivity (≈0.4 Vpp vs ≈2 Vpp) is a consequence of this path
-switch, not its purpose.
-
-Accordingly, take the **RX audio** into the USB sound interface from the
-**1200-baud** audio pin (`PR1`) on the rear data connector (mini-DIN), **not** the
-9600-baud pin — it is filtered, line-level audio.
+The USB sound interface is wired to the radio's front **Mic/Speaker** jacks, not
+the rear data connector. PTT is keyed over CAT (serial), and the TM-V71 only
+routes audio to/from the rear data connector when it is keyed by a **hardware**
+PTT — a serial PTT never switches that path. Using the front mic/speaker keeps
+RX/TX audio on the normal, band-limited voice chain regardless of how PTT is keyed.
 
 ## Install
 
