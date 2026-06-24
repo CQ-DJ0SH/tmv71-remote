@@ -451,7 +451,7 @@ function buildSpinner(band) {
 
     const up = document.createElement("span");
     up.className = "dbar dbar-up"; up.dataset.idx = idx;
-    up.title = "+1"; up.setAttribute("aria-label", "increment digit");
+    up.setAttribute("aria-label", "increment digit");   // no title → no hover tooltip
     up.addEventListener("click", () => bump(band, idx, +1));
     cell.appendChild(up);
 
@@ -482,7 +482,7 @@ function buildSpinner(band) {
 
     const dn = document.createElement("span");
     dn.className = "dbar dbar-dn"; dn.dataset.idx = idx;
-    dn.title = "-1"; dn.setAttribute("aria-label", "decrement digit");
+    dn.setAttribute("aria-label", "decrement digit");   // no title → no hover tooltip
     dn.addEventListener("click", () => bump(band, idx, -1));
     cell.appendChild(dn);
 

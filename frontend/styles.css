@@ -64,9 +64,9 @@ body.theme-light .display .freq{text-shadow:0 0 6px var(--accent-glow)}
 /* light theme: flat frequency entry (the neon glow washes out on a light bg) */
 body.theme-light .dig{text-shadow:none}
 body.theme-light .dig:focus{background:#e6edf2}
-/* lighter tuning bars on the light background */
-body.theme-light .dbar{background:#c4cfd6}
-body.theme-light .dcell:focus-within .dbar{background:#aab8c0}
+/* tuning bars stay outlined (not filled) on the light background too */
+body.theme-light .dbar{background:transparent}
+body.theme-light .dcell:focus-within .dbar{background:transparent; border-color:var(--text-dim)}
 body.theme-light .darr:hover{text-shadow:none}
 body.theme-light .freq-spin.pending{box-shadow:0 0 0 1px var(--accent)}
 body.theme-light .sm-bar{background:#dde5ea; border-color:#c4cfd6}
@@ -107,12 +107,14 @@ body.theme-light #band-1 .band-tag{color:#0c7b71; text-shadow:none}
 body.theme-light .chip{background:#e4eaef; color:#46545f}
 body.theme-light .audio-ctl .gv{color:#0c7b71}
 body.theme-light .sql-val{color:#46545f}
-/* memory table dark headers → light in the (now light) settings dialog */
-body.theme-light .mem-table-wrap th{background:#e4eaef; color:#46545f}
+/* memory table in the (now light) settings dialog: faintly tinted in the panel
+   (cyan) colour, the way the logbook recent list is tinted in its teal accent */
+body.theme-light .mem-table-wrap{background:#e8f7f5; border-color:#b9e3dd}
+body.theme-light .mem-table-wrap th{background:#d4efeb; color:#2f6b64}
 /* row hover: the dark-theme near-black wash turns rows almost black on the
-   light dialog — use a light highlight instead */
-body.theme-light .mem-table tbody tr:hover{background:#dce6ec}
-body.theme-light .mem-table td{border-bottom-color:#dde4e9}
+   light dialog — use a light cyan highlight instead */
+body.theme-light .mem-table tbody tr:hover{background:#d2ece8}
+body.theme-light .mem-table td{border-bottom-color:#cae7e2}
 
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -280,7 +282,7 @@ body.theme-light .callsign{color:#0c7b71; text-shadow:none}
 
 /* VFO live parameter controls: shift / bandwidth / CTCSS */
 .vfo-params{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:14px}
-.seg{display:inline-flex; border:1px solid var(--sw-edge); border-radius:7px; overflow:hidden}
+.seg{display:inline-flex; height:30px; border:1px solid var(--sw-edge); border-radius:7px; overflow:hidden}
 .seg .sg{
   padding:5px 11px; min-width:30px; font-family:var(--font-mono); font-size:11px;
   color:var(--text-dim); background:var(--field-bg); border:none; cursor:pointer; transition:.15s;
@@ -290,7 +292,8 @@ body.theme-light .callsign{color:#0c7b71; text-shadow:none}
 .seg .sg.active{color:#06222a; background:var(--accent); font-weight:600; box-shadow:0 0 10px -3px var(--accent-glow)}
 .tone-sel, .tone-tx-sel{
   font-family:var(--font-mono); font-size:11px; color:var(--text);
-  background:var(--field-bg); border:1px solid var(--edge); border-radius:7px; padding:6px 8px; cursor:pointer;
+  background:var(--field-bg); border:1px solid var(--edge); border-radius:7px;
+  height:30px; padding:0 8px; cursor:pointer;   /* match the FM/NFM segment height */
 }
 /* a bit of breathing room between the kHz offset field and the FM/NFM segment */
 .vfo-params .bw-seg{margin-left:10px}
@@ -480,6 +483,9 @@ body.theme-light .callsign{color:#0c7b71; text-shadow:none}
   .console .log-zone .panel-body{display:flex; flex-direction:column; flex:1 1 auto; min-height:0}
   .log-zone .log-recent{display:flex; flex-direction:column; flex:1 1 auto; min-height:0}
   .log-zone .log-recent-list{height:auto; flex:1 1 auto; min-height:0}
+  /* tight recent rows — vertical space is scarce on the log deck */
+  .log-zone .log-item{padding:3px 10px}
+  .log-zone .log-item .li-call, .log-zone .log-item .li-name{font-size:12px}
   /* shrink the fixed 250px graphs so HackRF/Scan fit the short landscape height
      (head + controls + graph) without scrolling */
   .hrf-graph, .scan-graph{height:32vh; min-height:84px; max-height:150px}
@@ -498,6 +504,11 @@ body.theme-light .callsign{color:#0c7b71; text-shadow:none}
   .band .vfo-params{margin-bottom:7px}
   .band .band-controls{gap:8px}
   .band .freq-spin{padding:5px 10px}
+  /* centre the freq-spin row so it clears the corner screws (8px..26px) on both
+     sides instead of sitting left-aligned over the left ones */
+  .band .spin-wrap{justify-content:center}
+  /* extra gap between the up/down step keys and the VFO/MEMORY toggle */
+  .band .spin-wrap .mode-toggle{margin-left:32px}
 
   /* mini VU bars flanking the PTT button (absolute → button stays put):
      vertical, RX just left, TX just right of the button, with RX/TX labels. */
@@ -926,23 +937,37 @@ body.theme-light .sm-seg.peak-tx{background:#8b99a2; box-shadow:none}
 .darr:active{transform:scale(.85)}
 .dcell{display:flex; flex-direction:column; align-items:center; gap:4px}
 /* clickable tuning bars above (+1) and below (-1) each digit */
+/* outlined, not filled — a thin VFO-coloured frame with a centre dot, like the
+   apply/enter button. --accent follows the band: A amber, B cyan. */
 .dbar{
-  width:26px; height:4px; border-radius:2px; background:#26333d; cursor:pointer;
-  transition:.12s;
+  position:relative; width:26px; height:10px; border-radius:4px; cursor:pointer;
+  transition:.12s; background:transparent; border:none;   /* no frame — just the grey dash */
 }
-.dbar:hover{background:var(--accent); box-shadow:0 0 8px var(--accent-glow)}
+.dbar::before{
+  content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:12px; height:2px; border-radius:1px; background:var(--text-dim);   /* grey dash, not dot */
+}
+/* hover only with a real pointer — on touch :hover sticks after a tap and would
+   leave the bar highlighted until you tap elsewhere. Keep it outlined: brighten
+   the frame + dot rather than filling it. */
+/* fill the button on hover (real pointer only) */
+@media (hover: hover){
+  .dbar:hover{background:var(--accent); border-color:var(--accent)}
+  .dbar:hover::before{background:var(--field-bg)}   /* dash stays visible on the fill */
+}
 .dbar:active{transform:scaleY(.6)}
-.dcell:focus-within .dbar{background:#33454f}
+.dcell:focus-within .dbar{border-color:var(--text-dim)}
 .dig{
-  width:26px; font-family:var(--font-seg), var(--font-mono); font-size:26px; font-weight:500;
+  width:26px; font-family:var(--font-seg), var(--font-mono); font-size:22px; font-weight:500;
   color:var(--accent); text-shadow:0 0 8px var(--accent-glow);
-  background:transparent; border:none;
-  text-align:center; padding:1px 0; -moz-appearance:textfield;
+  background:transparent; text-align:center; padding:1px 0; line-height:1; -moz-appearance:textfield;
+  /* each digit framed in grey; the digit itself stays VFO-coloured */
+  border:1px solid var(--edge-hi); border-radius:5px;
 }
-.dig:focus{outline:none; background:#0e1820}
+.dig:focus{outline:none; border-color:var(--text-dim); background:color-mix(in srgb, var(--edge-hi) 30%, transparent)}
 .dig::-webkit-outer-spin-button,.dig::-webkit-inner-spin-button{-webkit-appearance:none}
 .fdot{
-  font-family:var(--font-seg), var(--font-mono); font-size:26px; color:var(--accent);
+  font-family:var(--font-seg), var(--font-mono); font-size:22px; color:var(--accent);
   align-self:center; padding:0 2px;
 }
 .spin-unit{font-family:var(--font-mono); font-size:10px; letter-spacing:.2em; color:var(--text-dim); align-self:center; margin-left:4px}
@@ -1089,7 +1114,9 @@ body.airband .ptt-hint{color:var(--amber); opacity:.85}
 .ptt-timer{font-family:var(--font-mono); font-weight:700; font-size:16px;
   letter-spacing:.08em; line-height:1; opacity:0; height:0; transition:opacity .12s}
 .ptt.tx .ptt-timer{opacity:1; height:auto}
-.ptt:hover .ptt-core{color:var(--tx-glow)}
+/* hover-red only where a real pointer hovers — on touch, :hover sticks after a
+   tap and would leave the mic/text red until you touch elsewhere */
+@media (hover: hover){ .ptt:hover .ptt-core{color:var(--tx-glow)} }
 .ptt:active .ptt-core, .ptt.tx .ptt-core{
   color:#fff; transform:scale(.97);
   background:radial-gradient(120% 120% at 50% 25%, #ff6a5e, #d8281d 60%, #a01910);
@@ -1670,6 +1697,12 @@ body.theme-light .hrf-graph{border-color:var(--edge)}
 /* fixed height so the panel never grows as QSOs are added — it just scrolls */
 .log-recent-list{height:190px; overflow-y:auto; border:1px solid var(--edge);
   border-radius:9px; background:var(--field-bg)}
+/* light theme: tint the recent list faintly in the panel (teal) colour, the way
+   selcall tints its fields in its bronze accent. Derived from --accent via
+   color-mix so the hue matches the panel exactly (no manual-hex drift). */
+body.theme-light .log-recent-list{
+  background:color-mix(in srgb, var(--accent) 9%, #fff);
+  border-color:color-mix(in srgb, var(--accent) 30%, #fff)}
 .log-empty{margin:0; padding:14px; text-align:center; color:var(--text-dim);
   font-family:var(--font-ui); font-size:12px}
 /* one compact line per QSO: time+band left, lookup extras (grid/qth/country/
