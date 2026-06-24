@@ -1218,7 +1218,11 @@ async def webrtc_offer(req: WebRTCOffer) -> dict:
 
     @pc.on("connectionstatechange")
     async def _on_state() -> None:
-        if pc.connectionState in ("failed", "closed", "disconnected"):
+        # "disconnected" is usually a transient ICE blip that recovers on its own;
+        # only tear down on the terminal states so a brief glitch doesn't kill the
+        # stream and force a full renegotiation. aiortc escalates to "failed" if it
+        # genuinely can't recover.
+        if pc.connectionState in ("failed", "closed"):
             await pc.close()
             if pc in pcs:
                 pcs.discard(pc)

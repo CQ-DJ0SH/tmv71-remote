@@ -865,6 +865,8 @@ function bindEditor() {
 let audioPc = null, audioMic = null;
 let audioWant = false;          // user wants audio on → auto-reconnect on drops
 let audioReconnectT = null;     // pending reconnect timer
+let audioReconnectDelay = 400;  // reconnect backoff (ms), reset on a good connect
+let audioGraceT = null;         // grace timer: ride out a transient "disconnected"
 
 // Pick an audio input that is NOT the Bluetooth headset (so the headset stays on
 // A2DP). Returns a deviceId or null. Labels are only populated after mic
@@ -924,16 +926,19 @@ function endTxOnAudioLoss() {
   else if (txActive) api("POST", "/api/ptt", { transmit: false }).catch(() => {});
 }
 function teardownAudio() {
+  if (audioGraceT) { clearTimeout(audioGraceT); audioGraceT = null; }
   if (audioPc) { try { audioPc.close(); } catch {} audioPc = null; }
   if (audioMic) { audioMic.getTracks().forEach(tr => tr.stop()); audioMic = null; }
   const a = $("#rx-audio"); if (a) a.srcObject = null;
 }
 function scheduleAudioReconnect() {
   if (audioReconnectT || !audioWant) return;
+  const d = audioReconnectDelay;
+  audioReconnectDelay = Math.min(audioReconnectDelay * 2, 4000);  // back off on repeated failures
   audioReconnectT = setTimeout(() => {
     audioReconnectT = null;
     if (audioWant && !audioPc) audioConnect();
-  }, 2000);
+  }, d);
 }
 // Unexpected drop (ICE failed/disconnected, negotiation error): tear the peer
 // down and retry while the user still wants audio.
@@ -964,7 +969,21 @@ async function audioConnect() {
     audioPc.addEventListener("track", e => { $("#rx-audio").srcObject = e.streams[0]; });
     audioPc.addEventListener("connectionstatechange", () => {
       updateAudioToggle();
-      if (audioPc && ["failed", "closed", "disconnected"].includes(audioPc.connectionState)) audioDropped();
+      if (!audioPc) return;
+      const st = audioPc.connectionState;
+      if (st === "connected") {
+        audioReconnectDelay = 400;                       // healthy → reset backoff
+        if (audioGraceT) { clearTimeout(audioGraceT); audioGraceT = null; }
+      } else if (st === "failed" || st === "closed") {
+        audioDropped();                                  // terminal → reconnect now
+      } else if (st === "disconnected" && !audioGraceT) {
+        // transient blip: give ICE a short moment to self-heal before tearing
+        // down. If it recovers to "connected" the grace timer is cancelled above.
+        audioGraceT = setTimeout(() => {
+          audioGraceT = null;
+          if (audioPc && audioPc.connectionState === "disconnected") audioDropped();
+        }, 1200);
+      }
     });
     const offer = await audioPc.createOffer({ offerToReceiveAudio: true });
     await audioPc.setLocalDescription(offer);
@@ -972,7 +991,7 @@ async function audioConnect() {
       if (audioPc.iceGatheringState === "complete") return res();
       const h = () => { if (audioPc.iceGatheringState === "complete") { audioPc.removeEventListener("icegatheringstatechange", h); res(); } };
       audioPc.addEventListener("icegatheringstatechange", h);
-      setTimeout(res, 3000);
+      setTimeout(res, 1500);   // LAN host candidates gather fast; cap the wait short
     });
     const ans = await api("POST", "/api/webrtc/offer",
       { sdp: audioPc.localDescription.sdp, type: audioPc.localDescription.type });
@@ -989,6 +1008,7 @@ function audioDisconnect() {       // user-initiated: stop and don't reconnect
   audioWant = false;
   endTxOnAudioLoss();              // end PTT/PTT-LOCK when audio goes away
   try { localStorage.setItem("tmv71.audioOn", "0"); } catch {}
+  audioReconnectDelay = 400;
   if (audioReconnectT) { clearTimeout(audioReconnectT); audioReconnectT = null; }
   teardownAudio();
   updateAudioToggle();
