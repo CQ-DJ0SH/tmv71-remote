@@ -4,7 +4,7 @@
  * to a different origin (so a configured remote API backend keeps working). */
 "use strict";
 
-const CACHE = "tmv71-shell-v4";
+const CACHE = "tmv71-shell-v10";
 const SHELL = [
   "./",
   "index.html",

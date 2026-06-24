@@ -85,8 +85,16 @@ body.theme-light .ptt-ring{
   box-shadow:inset 0 0 0 2px #c1392f, inset 0 8px 18px #00000022, 0 12px 26px -12px #00000055;
 }
 body.theme-light .ptt-core{
-  background:radial-gradient(120% 120% at 50% 25%, #ffffff, #e2e9ee 60%, #d2dbe2);
-  box-shadow:inset 0 2px 8px #ffffffcc, inset 0 -10px 18px #0000001a, 0 0 0 1px #ffffff;
+  color:#9aa6b2;   /* lighter silver/grey on the bright core — never black */
+  /* brushed-steel disc, light variant */
+  background:
+    radial-gradient(110% 90% at 50% 16%, #ffffffcc, transparent 46%),
+    conic-gradient(from 218deg at 50% 50%,
+      #cbd5dd, #f5f9fc, #bdc8d1, #e9eff4, #c6d0d9, #f2f6f9, #cbd5dd) 0 0/100% 100%,
+    radial-gradient(120% 120% at 50% 25%, #ffffff, #e2e9ee 60%, #d2dbe2);
+  box-shadow:
+    inset 0 2px 5px #ffffff, inset 0 -9px 16px #00000022,
+    inset 0 0 0 1px #ffffffcc, 0 0 0 1px #c4ccd3;
 }
 /* TX lamp idle state lightened (active stays red) */
 body.theme-light .tx-lamp{background:#e4eaef; color:#5a6976}
@@ -1039,9 +1047,8 @@ body.airband .ptt-hint{color:var(--amber); opacity:.85}
 }
 .ptt-ring{
   position:absolute; inset:0; border-radius:50%;
-  /* brushed-metal sheen: alternating light/dark sectors around the ring */
-  background:conic-gradient(from 150deg,
-    #46535f, #232e37, #525f6c, #1c252d, #3e4b56, #2a3540, #54616e, #1c252d, #46535f);
+  /* solid steel ring band (single colour, like the light theme) */
+  background:#3a4753;
   /* red outline on RX (idle); turns bright red + glow on TX (.ptt.tx) */
   box-shadow:inset 0 0 0 2px #c1392f, inset 0 1px 0 #ffffff1f,
     inset 0 8px 22px #000a, 0 14px 30px -10px #000;
@@ -1063,9 +1070,16 @@ body.airband .ptt-hint{color:var(--amber); opacity:.85}
   position:absolute; inset:18px; border-radius:50%; z-index:1;
   display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
   font-family:var(--font-disp); font-weight:700; font-size:34px; letter-spacing:.1em;
-  color:var(--text);
-  background:radial-gradient(120% 120% at 50% 22%, #3a4854, #1c2730 58%, #121a20);
-  box-shadow:inset 0 2px 10px #ffffff24, inset 0 -10px 18px #0009, 0 0 0 1px #0008;
+  color:#c3ccd6;   /* silver/grey label + mic icon (currentColor) */
+  /* brushed-metal disc: angular conic sheen + top highlight over a domed base */
+  background:
+    radial-gradient(110% 90% at 50% 16%, #ffffff30, transparent 42%),
+    conic-gradient(from 218deg at 50% 50%,
+      #283541, #50616f, #1c2630, #3e4e5b, #222d36, #647889, #283541) 0 0/100% 100%,
+    radial-gradient(120% 120% at 50% 22%, #3a4854, #1c2730 58%, #121a20);
+  box-shadow:
+    inset 0 2px 3px #ffffff55, inset 0 -9px 16px #000a,
+    inset 0 0 0 1px #ffffff14, 0 0 0 1px #0008;
   transition:.12s;
 }
 .ptt-core-lbl{display:flex; align-items:center; justify-content:center; line-height:0}
@@ -1688,7 +1702,11 @@ body.theme-light .hrf-graph{border-color:var(--edge)}
 .soon-tag{font-family:var(--font-ui); font-size:9px; letter-spacing:.1em; color:var(--accent);
   border:1px solid var(--accent); border-radius:5px; padding:1px 5px; margin-left:6px;
   vertical-align:middle}
-.log-test-row{margin:16px 0}
+.log-test-row{margin:16px 0; flex-wrap:nowrap}
+/* keep the test button pinned right; long status messages truncate instead of
+   wrapping the button onto a new (left-aligned) line */
+.log-test-row .update-status{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.log-test-row .mini-btn{flex:0 0 auto}
 #log-wl-status, #log-qrz-status{font-family:var(--font-mono); font-size:11px}
 #log-wl-status.ok, #log-qrz-status.ok{color:#3ec98a}
 #log-wl-status.err, #log-qrz-status.err{color:#e0635a}
