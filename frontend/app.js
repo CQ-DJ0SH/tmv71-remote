@@ -2637,6 +2637,8 @@ async function loadLogConfig() {
     $("#log-qrz-key").value = c.qrz_api_key || "";
     logStatus("#log-wl-status", c.wavelog_enabled ? "configured" : "not configured",
               c.wavelog_enabled ? "ok" : "");
+    logStatus("#log-qrz-status", c.qrz_enabled ? "configured" : "not configured",
+              c.qrz_enabled ? "ok" : "");
     if (c.wavelog_url && c.wavelog_key) loadLogStations();
   } catch (e) { toast("Logging config: " + e.message, "err"); }
 }

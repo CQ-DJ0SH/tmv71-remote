@@ -371,7 +371,7 @@ class QrzProvider(LogProvider):
         try:
             self._session = ""
             self._ensure_session()
-            return {"ok": True, "message": "QRZ login ok"}
+            return {"ok": True, "message": "configured"}
         except LogError as e:
             return {"ok": False, "message": str(e)}
 
