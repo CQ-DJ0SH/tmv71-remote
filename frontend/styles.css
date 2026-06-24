@@ -81,7 +81,7 @@ body.theme-light .sm-seg.on-tx{background:#d23b30; box-shadow:none}
 body.theme-light .display .mem-badge{background:#ffffffcc}
 /* PTT button — brushed light instead of dark */
 body.theme-light .ptt-ring{
-  background:conic-gradient(from 0deg,#eef2f6,#cdd7df,#eef2f6);
+  background:#a4afba;
   box-shadow:inset 0 0 0 2px #c1392f, inset 0 8px 18px #00000022, 0 12px 26px -12px #00000055;
 }
 body.theme-light .ptt-core{
@@ -1048,7 +1048,7 @@ body.airband .ptt-hint{color:var(--amber); opacity:.85}
 .ptt-ring{
   position:absolute; inset:0; border-radius:50%;
   /* solid steel ring band (single colour, like the light theme) */
-  background:#3a4753;
+  background:#28323b;
   /* red outline on RX (idle); turns bright red + glow on TX (.ptt.tx) */
   box-shadow:inset 0 0 0 2px #c1392f, inset 0 1px 0 #ffffff1f,
     inset 0 8px 22px #000a, 0 14px 30px -10px #000;
