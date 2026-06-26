@@ -82,6 +82,43 @@ function toast(msg, kind = "") {
   toastTimer = setTimeout(() => (t.className = "toast"), 2600);
 }
 
+// Themed confirmation dialog — drop-in async replacement for window.confirm().
+// Returns a Promise<boolean>. Falls back to the native confirm if the markup
+// isn't present. opts: {title, okText, cancelText, danger}.
+function confirmDialog(message, opts = {}) {
+  const m = $("#confirm-dialog");
+  if (!m) return Promise.resolve(window.confirm(message));
+  $("#confirm-title").textContent = opts.title || "Confirm";
+  $("#confirm-msg").textContent = message;
+  const okBtn = $("#confirm-ok"), cancelBtn = $("#confirm-cancel");
+  okBtn.textContent = opts.okText || "OK";
+  cancelBtn.textContent = opts.cancelText || "CANCEL";
+  okBtn.className = opts.danger ? "btn-danger" : "btn-primary";
+  return new Promise(resolve => {
+    const close = val => {
+      m.classList.remove("open");
+      okBtn.removeEventListener("click", onOk);
+      cancelBtn.removeEventListener("click", onCancel);
+      m.removeEventListener("mousedown", onBackdrop);
+      document.removeEventListener("keydown", onKey);
+      resolve(val);
+    };
+    const onOk = () => close(true);
+    const onCancel = () => close(false);
+    const onBackdrop = e => { if (e.target === m) close(false); };
+    const onKey = e => {
+      if (e.key === "Escape") { e.preventDefault(); close(false); }
+      else if (e.key === "Enter") { e.preventDefault(); close(true); }
+    };
+    okBtn.addEventListener("click", onOk);
+    cancelBtn.addEventListener("click", onCancel);
+    m.addEventListener("mousedown", onBackdrop);
+    document.addEventListener("keydown", onKey);
+    m.classList.add("open");
+    okBtn.focus();
+  });
+}
+
 const fmtMHz = (hz) => (hz / 1e6).toFixed(4);
 const SHIFT = { 0: "SIMPLEX", 1: "SHIFT +", 2: "SHIFT −" };
 const FMMODE = { 0: "FM", 1: "NFM", 2: "AM" };
@@ -719,7 +756,8 @@ async function recall(band, ch) {
   catch (e) { toast("Recall: " + e.message, "err"); }
 }
 async function delMem(ch) {
-  if (!confirm(`Delete memory channel ${ch}?`)) return;
+  if (!await confirmDialog(`Delete memory channel ${ch}?`,
+        { title: "Delete channel", okText: "DELETE", danger: true })) return;
   try { await api("DELETE", `/api/memories/${ch}`); toast(`Channel ${ch} deleted`, "ok"); loadMemories(); loadQuickMemNames(); }
   catch (e) { toast("Delete: " + e.message, "err"); }
 }
@@ -1335,7 +1373,8 @@ function bindPower() {
       return;
     }
     const turnOff = powerState.on === true;
-    if (turnOff && !confirm("Really turn off the radio?")) return;
+    if (turnOff && !await confirmDialog("Really turn off the radio?",
+          { title: "Turn off radio", okText: "TURN OFF", danger: true })) return;
     try {
       powerState = await api("POST", "/api/power-switch", { on: !turnOff });
       refreshPowerUi();
@@ -1434,7 +1473,8 @@ async function loadUpdate() {
 }
 async function applyUpdate() {
   const st = $("#update-status");
-  if (!confirm("Pull the latest code from GitHub and restart the service?")) return;
+  if (!await confirmDialog("Pull the latest code from GitHub and restart the service?",
+        { title: "Update & restart", okText: "UPDATE" })) return;
   st.textContent = "updating…";
   try {
     const r = await api("POST", "/api/update");
@@ -1898,7 +1938,10 @@ const hrf = {
   center: null, sweepStart: 144e6, sweepStop: 146e6, sweepCenter: 0,
   ws: null, meta: null, floorEMA: null,   // auto-tracked noise floor (dB)
   level: Number(localStorage.getItem("tmv71.hrf.level") || 50),  // display peak height
+  peakHold: localStorage.getItem("tmv71.hrf.peak") !== "0",      // draw a max-hold line (default on)
+  smooth: null, peak: null,               // per-bin EMA trace and decaying peak buffers
 };
+const HRF_PEAK = "#ffcf6a";    // peak-hold line — soft amber, distinct from the live green
 const HRF_BLUE = "#3a9ff0";
 const HRF_GREEN = "#6fd89a";   // HackRF spectrum trace above the separator (soft green)
 // waterfall ramp low→high: blue "water" at the bottom, hot yellow→red for
@@ -2054,13 +2097,35 @@ function drawHrfSpectrum(db) {
   ctx.strokeStyle = "rgba(127,140,150,0.12)"; ctx.lineWidth = 1;
   for (let g = 1; g < 3; g++) { const y = Math.round(H * g / 3) + 0.5; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
   const norm = hrfNorm(), n = db.length;
+  const yOf = v => H - norm(v) * (H - 2);
+
+  // Temporal smoothing calms the fast, jittery panadapter trace (EMA per bin).
+  // Sweep frames are slow and already discrete, so leave those raw.
+  const pan = hrf.meta && hrf.meta.t === "pan";
+  let trace = db;
+  if (pan) {
+    if (!hrf.smooth || hrf.smooth.length !== n) hrf.smooth = Float32Array.from(db);
+    else { const S = 0.62; for (let i = 0; i < n; i++) hrf.smooth[i] = hrf.smooth[i] * S + db[i] * (1 - S); }
+    trace = hrf.smooth;
+  } else hrf.smooth = null;
+
+  // filled area + live line (from the smoothed trace)
   ctx.beginPath(); ctx.moveTo(0, H);
-  for (let i = 0; i < n; i++) ctx.lineTo(i / (n - 1) * W, H - norm(db[i]) * (H - 2));
+  for (let i = 0; i < n; i++) ctx.lineTo(i / (n - 1) * W, yOf(trace[i]));
   ctx.lineTo(W, H); ctx.closePath();
   ctx.fillStyle = "rgba(111,216,154,0.18)"; ctx.fill();
-  ctx.beginPath(); ctx.moveTo(0, H - norm(db[0]) * (H - 2));
-  for (let i = 1; i < n; i++) ctx.lineTo(i / (n - 1) * W, H - norm(db[i]) * (H - 2));
+  ctx.beginPath(); ctx.moveTo(0, yOf(trace[0]));
+  for (let i = 1; i < n; i++) ctx.lineTo(i / (n - 1) * W, yOf(trace[i]));
   ctx.strokeStyle = HRF_GREEN; ctx.lineWidth = 1.2 * dprOf(); ctx.stroke();
+
+  // optional peak hold: max of the raw level per bin, decaying slowly each frame
+  if (hrf.peakHold) {
+    if (!hrf.peak || hrf.peak.length !== n) hrf.peak = Float32Array.from(db);
+    else { const DEC = 0.5; for (let i = 0; i < n; i++) hrf.peak[i] = db[i] > hrf.peak[i] ? db[i] : hrf.peak[i] - DEC; }
+    ctx.beginPath(); ctx.moveTo(0, yOf(hrf.peak[0]));
+    for (let i = 1; i < n; i++) ctx.lineTo(i / (n - 1) * W, yOf(hrf.peak[i]));
+    ctx.strokeStyle = HRF_PEAK; ctx.lineWidth = 1 * dprOf(); ctx.stroke();
+  } else hrf.peak = null;
 }
 function dprOf() { return window.devicePixelRatio || 1; }
 
@@ -2127,6 +2192,16 @@ function bindHackRF() {
   $("#hrf-follow")?.addEventListener("change", e => {
     hrf.follow = e.target.checked; updateHrfModeUi(); hrfReconfig(); });
   $("#hrf-amp")?.addEventListener("change", e => { hrf.amp = e.target.checked; hrfReconfig(); });
+  const peakCb = $("#hrf-peak");
+  if (peakCb) {
+    peakCb.checked = hrf.peakHold;
+    peakCb.addEventListener("change", e => {
+      hrf.peakHold = e.target.checked;
+      hrf.peak = null;                                  // restart the hold from the next frame
+      localStorage.setItem("tmv71.hrf.peak", hrf.peakHold ? "1" : "0");
+      if (hrf.meta) drawHrfSpectrum(hrf.meta.db);       // reflect immediately
+    });
+  }
   // colored track fill (--gpct) like the audio-panel sliders
   const fillRange = el => { if (!el) return; const lo = +el.min || 0, hi = +el.max || 100;
     el.style.setProperty("--gpct", ((el.value - lo) / (hi - lo) * 100) + "%"); };
@@ -2547,10 +2622,10 @@ function renderLogRecent(data) {
     if (r.length) {
       const e = r[0];
       const ok = e.targets && Object.values(e.targets).some(Boolean);
-      const extra = [e.name, e.band].filter(Boolean).join(" · ");
+      // no band here — it makes the title row wrap; only stat · call · name
       lastEl.innerHTML = `<span class="ll-stat ${ok ? "ok" : "err"}">${ok ? "✓" : "✕"}</span>` +
         `<span class="ll-call">${logEsc(e.call)}</span>` +
-        (extra ? `<span class="ll-meta">${logEsc(extra)}</span>` : "");
+        (e.name ? `<span class="ll-meta">${logEsc(e.name)}</span>` : "");
       lastEl.hidden = false;
     } else { lastEl.innerHTML = ""; lastEl.hidden = true; }
   }
@@ -2584,7 +2659,8 @@ async function deleteLogEntry(ts) {
 }
 
 async function clearLogRecent() {
-  if (!confirm("Clear the recent list? (does not delete the QSOs in Wavelog)")) return;
+  if (!await confirmDialog("Clear the recent list? (does not delete the QSOs in Wavelog)",
+        { title: "Clear recent", okText: "CLEAR", danger: true })) return;
   try { await api("POST", "/api/log/recent/clear"); loadLogRecent(); }
   catch (e) { toast("Clear: " + e.message, "err"); }
 }
@@ -2720,6 +2796,12 @@ function bindLogbook() {
     if (btn) deleteLogEntry(btn.dataset.ts);
   });
   $("#log-clear")?.addEventListener("click", clearLogRecent);
+  // up/down buttons scroll the recent list (touch decks where direct scroll is
+  // awkward); step ~80% of the visible height so rows aren't skipped
+  const recList = $("#log-recent");
+  const recStep = dir => recList?.scrollBy({ top: dir * recList.clientHeight * 0.8, behavior: "smooth" });
+  $("#log-recent-up")?.addEventListener("click", () => recStep(-1));
+  $("#log-recent-dn")?.addEventListener("click", () => recStep(1));
   $("#log-wl-test")?.addEventListener("click", testLog);
   $("#log-qrz-test")?.addEventListener("click", testQrz);
   $("#log-wl-reload")?.addEventListener("click", () => { saveLogConfig(true).then(loadLogStations); });

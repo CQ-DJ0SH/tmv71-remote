@@ -63,7 +63,7 @@
     <button class="gear hdr-hide" id="hdr-hide" title="Hide title bar" aria-label="Hide title bar">▴</button>
     <button class="gear" id="open-settings" title="Settings" aria-label="Settings">⚙</button>
     <button class="power-switch unavailable" id="power-switch" title="Radio on/off (GPIO)" aria-label="Radio on/off">
-      <span class="ps-icon">⏻</span>
+      <span class="ps-icon"><svg class="pwr-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="3" x2="12" y2="12"></line><path d="M7.1 6.4a8 8 0 1 0 9.8 0"></path></svg></span>
     </button>
   </div>
 </header>
@@ -72,7 +72,7 @@
 
 <!-- shown while the radio is powered off (GPIO) — tap to switch it on -->
 <div class="radio-hint" id="radio-hint" hidden>
-  <span class="rh-ico">⏻</span>
+  <span class="rh-ico"><svg class="pwr-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="3" x2="12" y2="12"></line><path d="M7.1 6.4a8 8 0 1 0 9.8 0"></path></svg></span>
   <span class="rh-txt">Radio is off — tap here (or the power button) to switch it on</span>
   <button class="rh-x" id="radio-hint-x" title="Dismiss" aria-label="Dismiss">✕</button>
 </div>
@@ -82,7 +82,7 @@
   <section class="bands">
     <article class="band" id="band-0" data-band="0">
       <div class="band-head">
-        <button class="band-power" data-band="0" title="Band active · toggle single-band" aria-label="Band on/off">⏻</button>
+        <button class="band-power" data-band="0" title="Band active · toggle single-band" aria-label="Band on/off"><svg class="pwr-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="3" x2="12" y2="12"></line><path d="M7.1 6.4a8 8 0 1 0 9.8 0"></path></svg></button>
         <span class="band-tag">BAND A</span>
         <button class="air-btn" id="air-0" type="button" title="Tune Band A to the air band (memory 997); off → back to 2 m">AIR Band</button>
         <button class="ctrl-band-btn" data-band="0">CTRL</button>
@@ -153,7 +153,7 @@
 
     <article class="band" id="band-1" data-band="1">
       <div class="band-head">
-        <button class="band-power" data-band="1" title="Band active · toggle single-band" aria-label="Band on/off">⏻</button>
+        <button class="band-power" data-band="1" title="Band active · toggle single-band" aria-label="Band on/off"><svg class="pwr-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="3" x2="12" y2="12"></line><path d="M7.1 6.4a8 8 0 1 0 9.8 0"></path></svg></button>
         <span class="band-tag">BAND B</span>
         <button class="ctrl-band-btn" data-band="1">CTRL</button>
         <button class="ptt-band-btn" data-band="1" title="Select transmit band (PTT)">PTT</button>
@@ -324,6 +324,7 @@
           <button class="hrf-m" data-mode="sweep" title="Wideband sweep across a range">Sweep</button>
         </div>
         <label class="hrf-follow"><input type="checkbox" id="hrf-follow" checked> follow</label>
+        <label class="hrf-follow" title="Peak hold — a slowly-decaying max line over the live trace"><input type="checkbox" id="hrf-peak" checked> PH</label>
         <label class="hrf-field hrf-pan-only">Center<input type="text" id="hrf-center-in" inputmode="decimal" placeholder="MHz" disabled></label>
         <label class="hrf-field hrf-sweep-only" hidden>Range<input type="text" id="hrf-range-in" inputmode="decimal" placeholder="144–146"></label>
         <div class="hrf-gains">
@@ -467,15 +468,21 @@
           <label class="log-f log-f-name">NAME
             <input type="text" id="log-name" placeholder="auto" autocomplete="off" spellcheck="false">
           </label>
-          <label class="log-f log-f-cmt">COMMENT
-            <input type="text" id="log-comment" placeholder="optional" autocomplete="off">
+          <label class="log-f log-f-cmt"><span class="log-f-lbl">COMMENT</span>
+            <input type="text" id="log-comment" placeholder="comment (optional)" autocomplete="off">
           </label>
         </div>
       </div>
       <div class="log-recent">
         <div class="log-recent-head"><span>RECENT</span><div class="log-stats" id="log-stats" hidden></div><button type="button" id="log-clear" class="log-clear-btn" title="Clear the recent list" hidden>CLEAR</button></div>
-        <div class="log-recent-list" id="log-recent" aria-live="polite">
-          <p class="log-empty">No logged QSOs yet.</p>
+        <div class="log-recent-body">
+          <div class="log-recent-list" id="log-recent" aria-live="polite">
+            <p class="log-empty">No logged QSOs yet.</p>
+          </div>
+          <div class="log-recent-nav" aria-hidden="true">
+            <button type="button" id="log-recent-up" class="log-rnav" title="Scroll recent up" aria-label="Scroll recent up">▲</button>
+            <button type="button" id="log-recent-dn" class="log-rnav" title="Scroll recent down" aria-label="Scroll recent down">▼</button>
+          </div>
         </div>
       </div>
     </div>
@@ -550,6 +557,18 @@
     <div class="modal-actions">
       <button id="ed-cancel" class="btn-ghost">CANCEL</button>
       <button id="ed-save" class="btn-primary">SAVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- generic themed confirm dialog (replaces the browser's confirm()) -->
+<div class="modal" id="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-msg">
+  <div class="modal-card confirm-card">
+    <h3 id="confirm-title">Confirm</h3>
+    <p class="confirm-msg" id="confirm-msg"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn-ghost" id="confirm-cancel">CANCEL</button>
+      <button type="button" class="btn-primary" id="confirm-ok">OK</button>
     </div>
   </div>
 </div>

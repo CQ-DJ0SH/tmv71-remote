@@ -260,16 +260,19 @@ body.theme-light .launch{background:radial-gradient(120% 90% at 50% 34%, #ffffff
   margin-left:-10px;   /* tighten the gap to the settings gear (cluster gap is 22px) */
 }
 .power-switch .ps-icon{font-size:18px; line-height:1}
+/* inline power glyph as SVG (the ⏻ codepoint isn't in the UI font) — sized via
+   1em so the existing font-size rules keep controlling it, colour via currentColor */
+.pwr-svg{width:1em; height:1em; display:block}
 .power-switch:hover{border-color:var(--edge-hi); color:var(--text)}
 .power-switch.on{
   color:#04220f; background:#48b074; border-color:#48b074;   /* dampened green */
   box-shadow:0 0 13px -5px #48b074;
 }
 .power-switch.off{color:var(--tx); background:#160d0e; border-color:#5a2a2d}
-.power-switch.off .ps-icon{text-shadow:0 0 9px var(--tx-glow)}
+.power-switch.off .ps-icon{filter:drop-shadow(0 0 5px var(--tx-glow))}   /* glow on the SVG stroke */
 /* light theme: the dark "off" fill reads as a black box on the bright bar */
 body.theme-light .power-switch.off{color:#c62f26; background:#fbe3e1; border-color:#e3a7a2}
-body.theme-light .power-switch.off .ps-icon{text-shadow:none}
+body.theme-light .power-switch.off .ps-icon{filter:none}
 .power-switch.unavailable{opacity:.45}
 
 /* station callsign — secondary line under the centered title */
@@ -477,12 +480,21 @@ body.theme-light .callsign{color:#0c7b71; text-shadow:none}
      so the bodies (graphs/decoders) actually render in the deck. */
   .console .collapsed .panel-body{display:block}
   .panel-head .panel-toggle{display:none}
+  /* keep the logbook title on one line: don't wrap; let the last-QSO info shrink
+     and clip instead of pushing the buttons onto a second row */
+  .log-zone .panel-head{flex-wrap:nowrap}
+  .log-zone .log-last{flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis}
   /* log panel: the recent list fills the remaining height and scrolls inside,
      so the panel never runs past the bottom corner screws on the short deck */
   .console .log-zone{display:flex; flex-direction:column}
   .console .log-zone .panel-body{display:flex; flex-direction:column; flex:1 1 auto; min-height:0}
   .log-zone .log-recent{display:flex; flex-direction:column; flex:1 1 auto; min-height:0}
+  .log-zone .log-recent-body{flex:1 1 auto; min-height:0}
   .log-zone .log-recent-list{height:auto; flex:1 1 auto; min-height:0}
+  .log-zone .log-recent-nav{display:flex}   /* touch deck: show the scroll buttons */
+  /* drop the COMMENT label (the placeholder says "comment (optional)") so the
+     recent list — which flexes to fill — gets that vertical space */
+  .log-zone .log-f-cmt .log-f-lbl{display:none}
   /* tight recent rows — vertical space is scarce on the log deck */
   .log-zone .log-item{padding:3px 10px}
   .log-zone .log-item .li-call, .log-zone .log-item .li-name{font-size:12px}
@@ -497,11 +509,21 @@ body.theme-light .callsign{color:#0c7b71; text-shadow:none}
     justify-content:center; border-bottom:1px solid var(--tx); padding:6px 10px; font-size:11px}
 
   /* compact the band panel's vertical rhythm so it fits without scrolling */
-  .band-head{margin-bottom:4px}
+  /* symmetric top/bottom: flex column with equal 12px top/bottom padding; the
+     head sits beside the top screws (its left/right inset clears them) and the
+     freq-spin row is pushed to the bottom beside the bottom screws (margin-auto),
+     so the outer gaps match and the slack lands in the middle */
+  /* centred; the top/bottom padding difference biases the block vertically (the
+     shift is half the difference). 18/28 → ~5px above centre, and +6px top
+     padding pushes every row down ~3px with 3px more space up top. */
+  #band-0, #band-1{display:flex; flex-direction:column; justify-content:safe center; padding-top:18px; padding-bottom:28px}
+  .band .band-head{margin-bottom:4px; padding:0 22px}
   .band .display{margin:5px 0 7px; padding:10px 14px 9px}
   .band .smeter{margin-top:6px}
   .band .sql-row{margin:0 0 7px}
-  .band .vfo-params{margin-bottom:7px}
+  /* more room above (to the SQL slider), tight below (to the frequency entry);
+     the whole stack is vertically centred via the column's justify-content */
+  .band .vfo-params{margin-top:14px; margin-bottom:12px}
   .band .band-controls{gap:8px}
   .band .freq-spin{padding:5px 10px}
   /* centre the freq-spin row so it clears the corner screws (8px..26px) on both
@@ -1436,6 +1458,14 @@ body.theme-light .mixer-row .mx-mute input{color-scheme:light}
 .btn-ghost:hover{border-color:var(--edge-hi); color:var(--text)}
 .btn-primary{background:var(--cyan); color:#06222a; border-color:var(--cyan); font-weight:600}
 .btn-primary:hover{box-shadow:0 0 16px -2px var(--cyan-glow)}
+/* destructive confirm action (delete / power off) */
+.btn-danger{background:var(--tx); color:#fff; border-color:var(--tx); font-weight:600}
+.btn-danger:hover{box-shadow:0 0 16px -2px var(--tx-glow)}
+/* confirm dialog: above the settings (40) and editor (50) modals so it shows
+   when triggered from inside them (memory delete, update) */
+#confirm-dialog{z-index:60}
+.confirm-card{width:min(420px,94vw)}
+.confirm-msg{font-family:var(--font-ui); font-size:13px; line-height:1.5; color:var(--text)}
 #mem-new{color:var(--amber)!important}
 #mem-new:hover{border-color:var(--amber)!important; color:var(--amber)!important}
 @media (max-width:520px){.form-grid{grid-template-columns:1fr}}
@@ -1694,9 +1724,19 @@ body.theme-light .hrf-graph{border-color:var(--edge)}
   color:var(--text-dim); background:transparent; border:1px solid var(--edge);
   border-radius:5px; padding:3px 9px; cursor:pointer; transition:.15s}
 .log-clear-btn:hover{color:#fff; background:#c0392b; border-color:#c0392b}
-/* fixed height so the panel never grows as QSOs are added — it just scrolls */
-.log-recent-list{height:190px; overflow-y:auto; border:1px solid var(--edge);
-  border-radius:9px; background:var(--field-bg)}
+/* list + scroll-nav side by side */
+.log-recent-body{display:flex; gap:8px; align-items:stretch}
+/* fixed height so the panel never grows as QSOs are added — it just scrolls.
+   overscroll-behavior:contain stops a touch scroll from chaining to the deck. */
+.log-recent-list{flex:1 1 auto; min-width:0; height:190px; overflow-y:auto;
+  overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+  border:1px solid var(--edge); border-radius:9px; background:var(--field-bg)}
+/* up/down scroll buttons — only needed on the touch deck (shown in the PWA block) */
+.log-recent-nav{display:none; flex-direction:column; gap:8px; flex:0 0 auto}
+.log-rnav{flex:1 1 0; min-height:0; width:34px; display:flex; align-items:center; justify-content:center;
+  font-size:13px; color:var(--text-dim); background:var(--ctrl-bg);
+  border:1px solid var(--edge); border-radius:8px; cursor:pointer; transition:.12s}
+.log-rnav:active{background:var(--accent); color:#04201d; border-color:var(--accent)}
 /* light theme: tint the recent list faintly in the panel (teal) colour, the way
    selcall tints its fields in its bronze accent. Derived from --accent via
    color-mix so the hue matches the panel exactly (no manual-hex drift). */
