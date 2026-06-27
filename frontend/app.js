@@ -1062,9 +1062,10 @@ function audioDisconnect() {       // user-initiated: stop and don't reconnect
   updateAudioToggle();
 }
 function setGainUi(key, val) {
-  const el = document.getElementById(key + "-gain-val");
-  if (el) el.textContent = Number(val).toFixed(1) + "×";
   const sl = document.getElementById(key + "-gain");
+  const dec = sl && Number(sl.step) >= 1 ? 0 : 1;   // whole-step sliders show no decimal
+  const el = document.getElementById(key + "-gain-val");
+  if (el) el.textContent = Number(val).toFixed(dec) + "×";
   if (sl) {
     const pct = (sl.value - sl.min) / (sl.max - sl.min) * 100;
     sl.style.setProperty("--gpct", pct + "%");

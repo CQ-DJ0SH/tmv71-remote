@@ -457,11 +457,18 @@ body.theme-light .callsign{color:#0c7b71; text-shadow:none}
   .ptt-zone, .audio, .hackrf-zone, .selcall-zone, .digi-zone, .log-zone, .scan-zone{
     flex:0 0 auto; width:100%; height:100%; min-height:0;
     scroll-snap-align:start; scroll-snap-stop:always;
-    overflow-y:auto; -webkit-overflow-scrolling:touch;
+    overflow-y:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;
     margin:0; border-radius:0; box-sizing:border-box;
     /* top & bottom padding clear the decorative corner screws (at 8px, 18px tall)
        so panel graphs/canvases don't run over them */
     padding:30px 14px 30px}
+  /* hide the deck panels' own scrollbars too (like .console) — a hair of overflow
+     from the mobile URL-bar viewport change would otherwise flash a scrollbar on
+     PTT/Selcall when switching tabs */
+  #band-0::-webkit-scrollbar, #band-1::-webkit-scrollbar,
+  .ptt-zone::-webkit-scrollbar, .audio::-webkit-scrollbar, .hackrf-zone::-webkit-scrollbar,
+  .selcall-zone::-webkit-scrollbar, .digi-zone::-webkit-scrollbar, .log-zone::-webkit-scrollbar,
+  .scan-zone::-webkit-scrollbar{display:none}
   /* the footer becomes the final deck page: app version + browser info */
   .console-foot{display:flex; flex-direction:column; align-items:stretch;
     justify-content:flex-start; gap:12px;
@@ -513,10 +520,9 @@ body.theme-light .callsign{color:#0c7b71; text-shadow:none}
      head sits beside the top screws (its left/right inset clears them) and the
      freq-spin row is pushed to the bottom beside the bottom screws (margin-auto),
      so the outer gaps match and the slack lands in the middle */
-  /* centred; the top/bottom padding difference biases the block vertically (the
-     shift is half the difference). 18/28 → ~5px above centre, and +6px top
-     padding pushes every row down ~3px with 3px more space up top. */
-  #band-0, #band-1{display:flex; flex-direction:column; justify-content:safe center; padding-top:18px; padding-bottom:28px}
+  /* centred with a larger, symmetric top/bottom padding so the whole stack sits
+     a touch lower and is vertically balanced */
+  #band-0, #band-1{display:flex; flex-direction:column; justify-content:safe center; padding-top:28px; padding-bottom:28px}
   .band .band-head{margin-bottom:4px; padding:0 22px}
   .band .display{margin:5px 0 7px; padding:10px 14px 9px}
   .band .smeter{margin-top:6px}
