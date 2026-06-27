@@ -78,10 +78,14 @@ class RadioAudio:
     def __init__(self, device: str = "NAD", rx_gain: float = 1.0,
                  tx_gain: float = 1.0, tx_buffer_ms: int = DEF_TX_BUFFER_MS,
                  ptt_tail_ms: int = DEF_PTT_TAIL_MS, tx_lowpass: bool = False,
-                 rx_lowpass: bool = False):
+                 rx_lowpass: bool = False, tx_auto_gain: bool = False):
         self.device = device
         self.rx_gain = rx_gain
         self.tx_gain = tx_gain
+        # TX auto-gain (AGC on the mic path): drives the level toward a target,
+        # overriding the manual tx_gain while on. _agc_gain is the live factor.
+        self.tx_auto_gain = tx_auto_gain
+        self._agc_gain = 1.0
         # Optional voice low-pass on the TX (mic) and RX paths.
         self.tx_lowpass = tx_lowpass
         self.rx_lowpass = rx_lowpass
@@ -396,7 +400,20 @@ class RadioAudio:
         # it matches what TX would send) without routing anything to the radio.
         if not self._ptt_open and not self.mic_test:
             return
-        if self.tx_gain != 1.0:
+        if self.tx_auto_gain:
+            # Simple AGC: aim for a target RMS. Lower the gain fast (avoid clipping
+            # on loud bursts), raise it slowly, and hold it through pauses (a noise
+            # gate keeps quiet gaps from being pumped up). Capped so noise can't
+            # run away. Overrides the manual tx_gain while enabled.
+            x = pcm.astype(np.float32)
+            rms = float(np.sqrt(np.mean(x * x))) if x.size else 0.0
+            TARGET, NOISE, MAXG, MING = 5000.0, 180.0, 12.0, 0.3
+            if rms > NOISE:
+                desired = min(MAXG, max(MING, TARGET / rms))
+                a = 0.5 if desired < self._agc_gain else 0.04   # fast down, slow up
+                self._agc_gain += (desired - self._agc_gain) * a
+            pcm = np.clip(x * self._agc_gain, -32768, 32767).astype(np.int16)
+        elif self.tx_gain != 1.0:
             pcm = np.clip(pcm.astype(np.float32) * self.tx_gain,
                           -32768, 32767).astype(np.int16)
         if self.tx_lowpass:
@@ -493,6 +510,8 @@ class RadioAudio:
                 "rx_frames": self.rx_frames, "ptt_open": self._ptt_open,
                 "rx_db": self.rx_db, "tx_db": self.tx_db,
                 "rx_gain": self.rx_gain, "tx_gain": self.tx_gain,
+                "tx_auto_gain": self.tx_auto_gain,
+                "agc_gain": round(self._agc_gain, 2),   # live AGC factor (display)
                 "tx_buffer_ms": self.tx_buffer_ms, "ptt_tail_ms": self.ptt_tail_ms,
                 "device": self.device, "peers": self.peers,
                 "test_tone": self.test_tone, "tone_1750": self.tone_1750,

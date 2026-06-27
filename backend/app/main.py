@@ -48,7 +48,7 @@ from . import selcall
 from .logbook import logbook, band_for_hz, _FM_MODE, LogError
 from aiortc import RTCPeerConnection, RTCSessionDescription
 from .radio_service import RadioService
-from .tmv71 import TMV71Error
+from .tmv71 import TMV71Error, MR_MODE
 from .hackrf_sdr import HackRFSpectrum
 from .state import ConnectionManager
 
@@ -77,7 +77,8 @@ radio_audio = RadioAudio(device=settings.audio_device,
                          tx_buffer_ms=settings.tx_buffer_ms,
                          ptt_tail_ms=settings.ptt_tail_ms,
                          tx_lowpass=settings.tx_lowpass_enabled,
-                         rx_lowpass=settings.rx_lowpass_enabled)
+                         rx_lowpass=settings.rx_lowpass_enabled,
+                         tx_auto_gain=settings.tx_auto_gain)
 pcs: set = set()      # active WebRTC peer connections
 
 
@@ -353,6 +354,38 @@ async def _shut_down_peripherals() -> None:
     radio_audio.peers = 0
 
 
+def _remember_mem_for_boot() -> None:
+    """Before power-off, capture the control band's memory channel so it can be
+    restored on the next boot — but only if that band is in memory mode; in VFO
+    mode clear it so the boot doesn't force memory. Covers manual and auto off."""
+    st = service.status
+    cb = next((b for b in (st.bands or []) if b.band == (st.control_band or 0)), None)
+    if cb is not None and cb.mode == MR_MODE and cb.memory_channel is not None:
+        settings.boot_mem_band = cb.band
+        settings.boot_mem_channel = cb.memory_channel
+        save_runtime(boot_mem_band=cb.band, boot_mem_channel=cb.memory_channel)
+    elif settings.boot_mem_channel != -1:
+        settings.boot_mem_channel = -1
+        save_runtime(boot_mem_channel=-1)
+
+
+async def _restore_mem_after_boot() -> None:
+    """After the radio is powered back on, wait for CAT then recall the channel
+    captured at the last power-off (it otherwise comes up on M001)."""
+    if settings.boot_mem_channel < 0:
+        return
+    band, channel = settings.boot_mem_band, settings.boot_mem_channel
+    await asyncio.sleep(1.0)
+    for _ in range(20):                      # ~40 s for the radio to boot + CAT
+        if service.status.connected:
+            try:
+                await service.recall_memory(band, channel)
+            except Exception:  # noqa: BLE001
+                pass
+            return
+        await asyncio.sleep(2.0)
+
+
 async def _auto_power_off_loop() -> None:
     while True:
         await asyncio.sleep(2.0)
@@ -366,6 +399,7 @@ async def _auto_power_off_loop() -> None:
             continue
         if time.monotonic() - _last_activity >= settings.auto_power_off_seconds:
             try:
+                _remember_mem_for_boot()       # capture channel before cutting power
                 power_switch.set(False)
                 await _shut_down_peripherals()
                 logging.getLogger("tmv71").info(
@@ -699,12 +733,16 @@ async def get_power_switch() -> dict:
 
 @app.post("/api/power-switch")
 async def set_power_switch(req: PowerSwitchRequest) -> dict:
+    if not req.on:
+        _remember_mem_for_boot()         # capture channel while the radio still answers
     try:
         power_switch.set(req.on)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, str(exc))
     if not req.on:
         await _shut_down_peripherals()   # radio off -> stop HackRF + audio peers
+    else:
+        asyncio.create_task(_restore_mem_after_boot())   # bring back the saved channel
     touch_activity()
     return _power_switch_status()
 
@@ -1011,9 +1049,15 @@ async def set_audio_gain(req: AudioGainRequest) -> dict:
         radio_audio.rx_gain = req.rx_gain
     if req.tx_gain is not None:
         radio_audio.tx_gain = req.tx_gain
-    save_runtime(rx_gain=radio_audio.rx_gain, tx_gain=radio_audio.tx_gain)
+    if req.tx_auto_gain is not None:
+        radio_audio.tx_auto_gain = req.tx_auto_gain
+        if req.tx_auto_gain:
+            radio_audio._agc_gain = 1.0    # start from unity each time it's armed
+    save_runtime(rx_gain=radio_audio.rx_gain, tx_gain=radio_audio.tx_gain,
+                 tx_auto_gain=radio_audio.tx_auto_gain)
     settings.rx_gain = radio_audio.rx_gain
     settings.tx_gain = radio_audio.tx_gain
+    settings.tx_auto_gain = radio_audio.tx_auto_gain
     return radio_audio.status()
 
 

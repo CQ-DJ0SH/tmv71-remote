@@ -1222,16 +1222,17 @@ body.theme-light .rng input{color-scheme:light}
 .audio-status .led.on{background:var(--ok);box-shadow:0 0 10px var(--ok)}
 .audio-status .led.off{background:var(--tx);box-shadow:0 0 10px var(--tx)}
 /* connect row: device selector (left, grows wide) + connect button (right) */
-.audio-conn{display:flex; align-items:center; gap:8px; margin-bottom:12px}
-.audio-conn .acd{display:flex; align-items:center; gap:8px; flex:0 0 auto; min-width:150px;
+.audio-conn{display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap}
+.audio-conn .acd{display:flex; align-items:center; gap:8px; flex:0 0 auto;
   white-space:nowrap;
   font-family:var(--font-ui); font-size:10px; letter-spacing:.16em; color:var(--text-dim)}
 .audio-conn .acd select{flex:0 0 auto; width:auto;
   font-family:var(--font-mono); font-size:12px; color:var(--text);
   background:var(--field-bg); border:1px solid var(--accent); border-radius:7px; padding:6px 8px}
 .audio-conn .acd select:focus{outline:none; border-color:var(--accent)}
-/* "AUDIO" caption just before the CONNECT button */
+/* "AUDIO" caption just before the CONNECT button (pushed to the right edge) */
 .audio-cap{font-family:var(--font-ui); font-size:10px; letter-spacing:.16em; color:var(--text-dim)}
+.audio-conn .audio-cap{margin-left:auto}
 #audio-toggle{
   margin-left:0; font-family:var(--font-ui); font-size:10px; letter-spacing:.12em; cursor:pointer;
   color:var(--text); background:var(--ctrl-bg); border:1px solid var(--accent); border-radius:6px; padding:5px 10px; transition:.15s;
@@ -1257,10 +1258,15 @@ body.theme-light #audio-toggle.connected:hover{
 
 /* audio controls: device select + RX/MIC gain */
 .audio-ctl{display:flex; flex-wrap:wrap; align-items:center; gap:16px; margin:4px 0 12px}
-.audio-conn .mictest-toggle{flex:1 1 auto; justify-content:center; gap:8px;
+/* MIC TEST / MIC DSP: text snug to the switch, never wrapping */
+.audio-conn .mictest-toggle, .audio-conn .audio-agc{flex:0 0 auto; gap:6px; white-space:nowrap;
   font-family:var(--font-ui); font-size:10px; letter-spacing:.16em; color:var(--text-dim)}
+/* centre the MIC TEST/MIC DSP pair: auto margins here and before the AUDIO cap
+   split the free space evenly on both sides */
+.audio-conn .mictest-toggle{margin-left:auto}
 .audio-ctl label{display:flex; align-items:center; gap:8px;
   font-family:var(--font-ui); font-size:10px; letter-spacing:.16em; color:var(--text-dim)}
+.acg.is-auto{opacity:.45}                              /* TX slider greyed while TX-AGC is on */
 .audio-ctl select{font-family:var(--font-mono); font-size:12px; color:var(--text);
   background:var(--field-bg); border:1px solid var(--edge); border-radius:7px; padding:6px 8px; max-width:240px}
 .audio-ctl select:focus{outline:none; border-color:var(--cyan)}
@@ -1416,8 +1422,9 @@ body.theme-light .form-grid .check-label input{color-scheme:light}
 }
 .switch:checked{background:var(--tx); border-color:var(--tx)}
 .switch:checked::after{left:20px; background:#fff}
-/* DECODE + AUTO switches follow the panel accent (digi = green, selcall = bronze) */
-.digi-zone .switch:checked, .selcall-zone .switch:checked{
+/* DECODE + AUTO + MIC DSP switches follow the panel accent (digi = green,
+   selcall = bronze, audio = violet) */
+.digi-zone .switch:checked, .selcall-zone .switch:checked, #tx-auto:checked{
   background:var(--accent); border-color:var(--accent)}
 .switch:focus-visible{outline:none; box-shadow:0 0 0 2px var(--cyan)}
 body.theme-light .switch{--track-empty:#c8d2d9}
@@ -1723,7 +1730,9 @@ body.theme-light .hrf-graph{border-color:var(--edge)}
 .log-clear-btn{font-family:var(--font-ui); font-size:9px; letter-spacing:.14em;
   color:var(--text-dim); background:transparent; border:1px solid var(--edge);
   border-radius:5px; padding:3px 9px; cursor:pointer; transition:.15s}
-.log-clear-btn:hover{color:#fff; background:#c0392b; border-color:#c0392b}
+/* hover only with a real pointer — on touch :hover sticks after a tap and would
+   leave the button red until you tap elsewhere */
+@media (hover: hover){ .log-clear-btn:hover{color:#fff; background:#c0392b; border-color:#c0392b} }
 /* list + scroll-nav side by side */
 .log-recent-body{display:flex; gap:8px; align-items:stretch}
 /* fixed height so the panel never grows as QSOs are added — it just scrolls.
@@ -1766,8 +1775,10 @@ body.theme-light .log-recent-list{
   display:flex; align-items:center; justify-content:center; font-size:11px; line-height:1;
   color:var(--text-dim); background:transparent; border:1px solid transparent; border-radius:5px;
   opacity:.45; transition:.15s}
-.log-item:hover .li-del{opacity:1}
-.log-item .li-del:hover{color:#fff; background:#c0392b; border-color:#c0392b}
+@media (hover: hover){
+  .log-item:hover .li-del{opacity:1}
+  .log-item .li-del:hover{color:#fff; background:#c0392b; border-color:#c0392b}
+}
 
 /* settings: logging tab sections */
 .logsec{margin:4px 0 16px}

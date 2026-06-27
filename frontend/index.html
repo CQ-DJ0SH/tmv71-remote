@@ -273,17 +273,19 @@
       <h2 class="audio-title">AUDIO · WEBRTC/OPUS</h2>
     </div>
     <div class="audio-conn">
-      <label class="acd">AUDIO BAND
-        <select id="audio-band-sel" title="Radio data band (MU 38) — which VFO's audio you hear / where you transmit">
-          <option value="0">A — RX/TX A</option>
-          <option value="1">B — RX/TX B</option>
-          <option value="3">RX A · TX B</option>
-          <option value="2">RX B · TX A</option>
+      <label class="acd">BAND
+        <select id="audio-band-sel" title="Which VFO's received audio you hear (TX always goes via the radio's front mic input, so only the RX band matters)">
+          <option value="0">RX-A</option>
+          <option value="1">RX-B</option>
         </select>
       </label>
       <label class="switch-label mictest-toggle">
         <span>MIC TEST</span>
         <input type="checkbox" id="audio-mictest" class="switch">
+      </label>
+      <label class="switch-label audio-agc" title="TX AGC — automatic transmit level. On = the transmitted audio is auto-leveled and the manual TX Gain is overridden.">
+        <span>TX-AGC</span>
+        <input type="checkbox" id="tx-auto" class="switch">
       </label>
       <span class="audio-cap">AUDIO</span>
       <button id="audio-toggle">CONNECT</button>

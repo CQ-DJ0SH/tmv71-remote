@@ -156,6 +156,7 @@ class WebRTCOffer(BaseModel):
 class AudioGainRequest(BaseModel):
     rx_gain: Optional[float] = Field(default=None, ge=0, le=12)
     tx_gain: Optional[float] = Field(default=None, ge=0, le=12)
+    tx_auto_gain: Optional[bool] = None
 
 
 class AudioDeviceRequest(BaseModel):

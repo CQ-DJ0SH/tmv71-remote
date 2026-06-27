@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     audio_device: str = "NAD"        # substring matched against sound devices
     rx_gain: float = 1.0             # digital gain radio -> browser
     tx_gain: float = 1.0             # digital gain browser mic -> radio
+    tx_auto_gain: bool = False       # AGC on the TX mic path (overrides tx_gain)
 
     # Squelch threshold (0..31) per band, persisted so it is restored on the
     # radio after a power cycle. None = leave the radio's own setting alone.
@@ -90,6 +91,12 @@ class Settings(BaseSettings):
     selcall_own: str = ""
     selcall_code: str = ""
 
+    # Memory channel to restore after the radio is powered back on. Captured at
+    # power-off (manual or auto) only if the control band was in memory mode, so
+    # the radio doesn't come up on M001. -1 = nothing to restore.
+    boot_mem_band: int = 0
+    boot_mem_channel: int = -1
+
     # Highest memory channel number to scan when listing (TM-V71 has 0..999)
     max_memory_channels: int = 1000
 
@@ -102,7 +109,7 @@ class Settings(BaseSettings):
 # persisted next to the package so they survive restarts but stay out of git.
 _RUNTIME_FILE = os.path.join(os.path.dirname(__file__), "runtime.json")
 _RUNTIME_KEYS = ("serial_port", "serial_baud", "gpio_power_pin",
-                 "rx_gain", "tx_gain", "audio_device",
+                 "rx_gain", "tx_gain", "tx_auto_gain", "audio_device",
                  "squelch_a", "squelch_b",
                  "tx_buffer_ms", "ptt_tail_ms",
                  "auto_power_off_enabled", "auto_power_off_seconds",
@@ -110,7 +117,8 @@ _RUNTIME_KEYS = ("serial_port", "serial_baud", "gpio_power_pin",
                  "tx_lowpass_enabled", "rx_lowpass_enabled",
                  "wavelog_url", "wavelog_key", "wavelog_station_id",
                  "qrz_api_key", "qrz_username", "qrz_password",
-                 "selcall_own", "selcall_code")
+                 "selcall_own", "selcall_code",
+                 "boot_mem_band", "boot_mem_channel")
 
 
 def _load_runtime() -> dict:

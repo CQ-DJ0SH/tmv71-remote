@@ -218,7 +218,7 @@ function render(st) {
   // audio-band (data band) selector reflects the radio
   const abs = $("#audio-band-sel");
   if (abs && document.activeElement !== abs && st.data_band != null)
-    abs.value = String(st.data_band);
+    abs.value = (st.data_band === 1 || st.data_band === 2) ? "1" : "0";   // map to RX band
   const pttLabel = $("#ptt-band");
   pttLabel.textContent = `PTT → BAND ${st.ptt_band === 1 ? "B" : "A"}`;
   pttLabel.classList.toggle("is-b", st.ptt_band === 1);   // color = selected band
@@ -361,8 +361,12 @@ async function refreshAudio() {
     // mirror gain sliders unless the user is dragging them
     ["rx", "tx"].forEach(k => {
       const sl = document.getElementById(k + "-gain"), g = a[k + "_gain"];
-      if (sl && g != null && document.activeElement !== sl) { sl.value = g; setGainUi(k, g); }
+      // while AUTO is on, show the live AGC factor in the (disabled) TX slider
+      const v = (k === "tx" && a.tx_auto_gain && a.agc_gain != null) ? a.agc_gain : g;
+      if (sl && v != null && document.activeElement !== sl) { sl.value = v; setGainUi(k, v); }
     });
+    const ta = $("#tx-auto");
+    if (ta && document.activeElement !== ta) { ta.checked = !!a.tx_auto_gain; setTxAutoUi(!!a.tx_auto_gain); }
   } catch {}
 }
 
@@ -639,21 +643,12 @@ function bindControls() {
   const ptt = $("#ptt");
   const lockBtn = $("#ptt-lock");
   let keying = false;
-  // TX side of the data band (which VFO the DATA-connector mic / PKD modulates):
-  // data band 0/2 -> A, 1/3 -> B. Mic audio only goes out if this == PTT band.
-  const DATA_TX_BAND = { 0: 0, 1: 1, 2: 0, 3: 1 };
   const key = async (on) => {
     if (on && airbandRx) { toast("Air band is receive-only — TX disabled", "err"); return; }
     if (on && !audioConnected()) { toast("Connect audio first to transmit", "err"); return; }
     if (keying === on) return; keying = on;
-    // warn if the keyed band isn't where the USB-soundcard mic audio is routed:
-    // the audio band (data band) TX side must match the PTT band, else nothing
-    // is modulated on air. Warn only — keying is still allowed.
-    if (on && last && last.data_band != null && last.ptt_band != null &&
-        DATA_TX_BAND[last.data_band] !== last.ptt_band) {
-      toast(`Audio band ≠ PTT band: mic is on band ${DATA_TX_BAND[last.data_band] ? "B" : "A"}, ` +
-            `transmitting on band ${last.ptt_band ? "B" : "A"} — no modulation!`, "err");
-    }
+    // (TX audio is wired to the radio's front mic input, so it modulates the PTT
+    // band regardless of the data-band setting — no audio-band/PTT-band check.)
     // RX is not muted for TX (see render()); keep only selcall/mic-test muting
     const rx = $("#rx-audio"); if (rx) rx.muted = selcallMuted || micTestActive;
     try { await api("POST", "/api/ptt", { transmit: on }); }
@@ -919,9 +914,24 @@ async function pickNonBtMicId() {
     return nonBt ? nonBt.deviceId : null;
   } catch { return null; }
 }
+// Mic capture constraints depend on the platform — two conflicting needs:
+//  • Mobile / installed PWA: a Bluetooth headset must stay on A2DP. The browser
+//    enables echoCancellation by default, which switches the headset to mono
+//    HFP/SCO (pulling RX playback off A2DP, onto the phone speaker). So we force
+//    EC/NS/AGC OFF there to keep playback on the headset.
+//  • Desktop (e.g. macOS): forcing those off makes the browser reconfigure the
+//    input device and drop the level very low (across all browsers), so we leave
+//    them at the browser default.
+function micConstraintsBase() {
+  const pwa = window.matchMedia && window.matchMedia("(display-mode: standalone)").matches;
+  const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+  return (pwa || mobile)
+    ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    : {};
+}
 // Capture the mic, preferring a non-Bluetooth (built-in) input.
 async function captureBuiltinMic() {
-  const base = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+  const base = micConstraintsBase();
   let id = await pickNonBtMicId();                 // works if permission persisted
   let stream = await navigator.mediaDevices.getUserMedia({
     audio: id ? { ...base, deviceId: { exact: id } } : base });
@@ -1059,6 +1069,11 @@ function setGainUi(key, val) {
     const pct = (sl.value - sl.min) / (sl.max - sl.min) * 100;
     sl.style.setProperty("--gpct", pct + "%");
   }
+}
+// TX auto-gain on → the manual TX slider is overridden; grey + disable it.
+function setTxAutoUi(on) {
+  const sl = $("#tx-gain"); if (sl) sl.disabled = on;
+  const lbl = sl && sl.closest(".acg"); if (lbl) lbl.classList.toggle("is-auto", on);
 }
 async function loadAudioDevices() {
   const sel = $("#audio-device"); if (!sel) return;
@@ -1200,6 +1215,12 @@ function bindAudio() {
       try { await api("POST", "/api/audio/gain", body); }
       catch (e) { toast("Gain: " + e.message, "err"); }
     });
+  });
+  const txAuto = $("#tx-auto");
+  if (txAuto) txAuto.addEventListener("change", async () => {
+    setTxAutoUi(txAuto.checked);
+    try { await api("POST", "/api/audio/gain", { tx_auto_gain: txAuto.checked }); }
+    catch (e) { toast("Auto gain: " + e.message, "err"); txAuto.checked = !txAuto.checked; setTxAutoUi(txAuto.checked); }
   });
   [["tx-buffer", "tx_buffer_ms"], ["ptt-tail", "ptt_tail_ms"]].forEach(([id, key]) => {
     const sl = document.getElementById(id); if (!sl) return;
@@ -1356,6 +1377,9 @@ async function refreshPower() {
 // Wait until it's connected, then (re)label the M0-M9 quick keys — they're
 // loaded once at startup, so otherwise they keep the dimmed "M<n>" placeholder
 // that was read while the radio was still off.
+// The radio's memory channel is captured/restored across power cycles by the
+// backend (covers manual + auto power-off, shared across devices); here we just
+// relabel the quick keys once CAT is back.
 async function relabelQuickMemAfterBoot() {
   await new Promise(r => setTimeout(r, 1000));   // give it time before the first CAT query
   for (let i = 0; i < 15; i++) {
