@@ -36,6 +36,7 @@ function stopPttTimer() {
 }
 let selcallMuted = false; // RX muted by the selcall "MUTE until call" button
 let micTestActive = false; // RX muted while MIC TEST is on (silence radio noise)
+let micTestTimer = null;   // auto-stop the mic test after a cap (see bindAudio)
 let pttLock = false;      // latched (continuous) transmit
 let lockConfirmed = false; // radio has actually reported TX since locking
 let setPttLock = null;    // assigned in bindControls()
@@ -355,6 +356,8 @@ async function refreshAudio() {
     const warn = $("#ptt-warn"); if (warn) warn.hidden = !a.test_tone;
     const tt = $("#set-testtone"); if (tt && document.activeElement !== tt) tt.checked = !!a.test_tone;
     const mt = $("#audio-mictest"); if (mt && document.activeElement !== mt) mt.checked = !!a.mic_test;
+    const rec = $("#mt-record"); if (rec) rec.hidden = !a.mic_test;   // recording indicator
+    const pb = $("#mt-playback"); if (pb) pb.hidden = !a.echo_busy;   // replay indicator
     // scroll the level graph only while the browser audio is connected
     if (audioConnected()) pushLevel(a.rx_db, a.tx_db);
     else if (levelHist.length) { levelHist.length = 0; drawLevelGraph(); }
@@ -1179,9 +1182,15 @@ function bindAudio() {
     // echo replay is audible
     micTestActive = on;
     { const a = $("#rx-audio"); if (a) a.muted = on || selcallMuted; }
+    // cap the test at 30 s — auto-switch off (which starts the replay)
+    if (micTestTimer) { clearTimeout(micTestTimer); micTestTimer = null; }
+    if (on) micTestTimer = setTimeout(() => {
+      const cb = $("#audio-mictest");
+      if (cb && cb.checked) { cb.checked = false; cb.dispatchEvent(new Event("change")); }
+    }, 30000);
     try {
       const st = await api("POST", "/api/audio/tones", { mic_test: on });
-      toast(on ? "Mic test ON — speak; switch off to hear it back"
+      toast(on ? "Mic test ON (max 30 s) — speak; switch off to hear it back"
                : (st && st.echo_busy ? "Replaying your mic test…" : "Mic test off"),
             on || (st && st.echo_busy) ? "ok" : "");
     } catch (err) {

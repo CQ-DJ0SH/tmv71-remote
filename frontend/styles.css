@@ -1246,7 +1246,7 @@ body.theme-light .rng input{color-scheme:light}
 
 /* ---------------- audio panel ---------------- */
 .audio{padding:26px 30px 26px; display:flex; flex-direction:column}
-.audio-head{display:flex; align-items:center; justify-content:center; gap:12px; margin:-18px 0 14px}
+.audio-head{position:relative; display:flex; align-items:center; justify-content:center; gap:12px; margin:-18px 0 14px}
 .audio-head h2{font-family:var(--font-disp); font-weight:700; letter-spacing:.16em; font-size:16px; color:var(--accent)}
 /* audio status (LED + label) now lives in the title-bar status cluster, next to CAT */
 .audio-status{display:flex; align-items:center; gap:9px; white-space:nowrap; font-size:11px; letter-spacing:.16em; color:var(--text-dim)}
@@ -1296,6 +1296,16 @@ body.theme-light #audio-toggle.connected:hover{
 /* centre the MIC TEST/MIC DSP pair: auto margins here and before the AUDIO cap
    split the free space evenly on both sides */
 .audio-conn .mictest-toggle{margin-left:auto}
+/* MIC TEST record (red) / replay (accent) indicators — in the audio title row,
+   absolutely positioned so they don't shift the centred title when they appear.
+   Mutually exclusive; opacity pulse is compositor-cheap. */
+.mt-rec, .mt-pb{position:absolute; right:0; top:50%; transform:translateY(-50%);
+  font-family:var(--font-ui); font-size:9px; letter-spacing:.14em;
+  border-radius:5px; padding:3px 7px; white-space:nowrap;
+  animation:txpulse 1.4s ease-in-out infinite}
+.mt-rec{color:#fff; background:var(--tx)}
+.mt-pb{color:#06222a; background:var(--accent)}
+.mt-rec[hidden], .mt-pb[hidden]{display:none}
 .audio-ctl label{display:flex; align-items:center; gap:8px;
   font-family:var(--font-ui); font-size:10px; letter-spacing:.16em; color:var(--text-dim)}
 .acg.is-auto{opacity:.45}                              /* TX slider greyed while TX-AGC is on */
