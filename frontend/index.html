@@ -70,11 +70,18 @@
 <!-- reveal handle shown when the title bar is hidden (mobile) -->
 <button class="hdr-reveal" id="hdr-reveal" title="Show title bar" aria-label="Show title bar">▾</button>
 
-<!-- shown while the radio is powered off (GPIO) — tap to switch it on -->
+<!-- shown while the radio is powered off (GPIO) — informational only -->
 <div class="radio-hint" id="radio-hint" hidden>
-  <span class="rh-ico"><svg class="pwr-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="3" x2="12" y2="12"></line><path d="M7.1 6.4a8 8 0 1 0 9.8 0"></path></svg></span>
-  <span class="rh-txt">Radio is off — tap here (or the power button) to switch it on</span>
-  <button class="rh-x" id="radio-hint-x" title="Dismiss" aria-label="Dismiss">✕</button>
+  <div class="rh-plate">
+    <span class="screw screw-l" aria-hidden="true"></span>
+    <span class="screw screw-r" aria-hidden="true"></span>
+    <h2 class="rh-title">TM-V71<span class="dot">·</span>REMOTE</h2>
+    <div class="rh-msg">
+      <span class="rh-ico"><svg class="pwr-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="3" x2="12" y2="12"></line><path d="M7.1 6.4a8 8 0 1 0 9.8 0"></path></svg></span>
+      <span class="rh-txt">Radio is off — switch on with the power button</span>
+    </div>
+    <button class="rh-x" id="radio-hint-x" title="Dismiss" aria-label="Dismiss">✕</button>
+  </div>
 </div>
 
 <main class="console">
@@ -284,7 +291,7 @@
         <input type="checkbox" id="audio-mictest" class="switch">
       </label>
       <label class="switch-label audio-agc" title="TX AGC — automatic transmit level. On = the transmitted audio is auto-leveled and the manual TX Gain is overridden.">
-        <span>TX-AGC</span>
+        <span>TX AGC</span>
         <input type="checkbox" id="tx-auto" class="switch">
       </label>
       <span class="audio-cap">AUDIO</span>
@@ -292,11 +299,11 @@
     </div>
     <audio id="rx-audio" autoplay></audio>
     <div class="audio-ctl">
-      <label class="acg">RX Gain
+      <label class="acg">RX GAIN
         <input type="range" id="rx-gain" min="0" max="12" step="1" value="1">
         <span class="gv" id="rx-gain-val">1×</span>
       </label>
-      <label class="acg">TX Gain
+      <label class="acg">TX GAIN
         <input type="range" id="tx-gain" min="0" max="12" step="0.1" value="1">
         <span class="gv" id="tx-gain-val">1.0×</span>
       </label>

@@ -2407,10 +2407,7 @@ function updateRadioHint() {
 function bindRadioHint() {
   const el = $("#radio-hint");
   if (!el) return;
-  el.addEventListener("click", e => {
-    if (e.target.closest(".rh-x")) return;
-    $("#power-switch")?.click();
-  });
+  // informational only — switching on is done with the power button, not here
   $("#radio-hint-x")?.addEventListener("click", () => {
     el.dataset.dismissed = "1"; el.hidden = true;
   });
