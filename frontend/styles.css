@@ -191,7 +191,7 @@ body.theme-light .launch{background:radial-gradient(120% 90% at 50% 34%, #ffffff
   color:#bcd6c6; white-space:nowrap;
 }
 .rh-title .dot{color:var(--text-dim); margin:0 .22em}
-.rh-msg{display:flex; align-items:center; gap:8px; color:#ffd9d4;
+.rh-msg{display:flex; align-items:center; gap:8px; color:var(--text);
   font-family:var(--font-ui); font-size:12px; letter-spacing:.04em}
 .rh-msg .rh-ico{color:var(--tx); font-size:30px; display:flex; align-items:center}
 .rh-x{position:absolute; top:7px; right:9px; background:none; border:0; color:var(--text-dim);

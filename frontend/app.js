@@ -376,6 +376,9 @@ async function refreshAudio() {
 // ---- scrolling RX/MIC level graph (newest on the right) -------------------
 const GRAPH_MAX = 150;            // ~30 s of history at 200 ms/sample
 const levelHist = [];             // {rx,tx} normalized to 0..1
+const SAMPLE_MS = 200;            // status-poll cadence (see refreshAudio interval)
+let lastSampleTs = 0;             // when the newest sample arrived (for smooth scroll)
+let levelRAF = null, lastLvlDraw = 0, graphOnScreen = true;
 const lvlNorm = db =>
   db == null ? 0 : Math.max(0, Math.min(1, (db - VU_FLOOR) / (0 - VU_FLOOR)));
 
@@ -399,7 +402,7 @@ function drawSeries(ctx, vals, xAt, H, stroke, fill, lw) {
   ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.lineJoin = "round"; ctx.stroke();
 }
 
-function drawLevelGraph() {
+function drawLevelGraph(offset = 0) {
   const cv = $("#level-graph"); if (!cv) return;
   const ctx = cv.getContext("2d");
   const W = cv.width, H = cv.height;
@@ -429,7 +432,10 @@ function drawLevelGraph() {
   }
   const n = levelHist.length; if (!n) return;
   const dx = W / (GRAPH_MAX - 1);
-  const xAt = i => W - (n - 1 - i) * dx;        // newest sample at the right edge
+  // smooth scroll: shift everything left by up to one sample-width between polls
+  // (offset 0→1), so motion is continuous instead of stepping 5×/s
+  const shift = Math.max(0, Math.min(1, offset)) * dx;
+  const xAt = i => W - (n - 1 - i) * dx - shift; // newest sample at the right edge
   const lw = Math.max(1.5, (window.devicePixelRatio || 1) * 1.3);
   drawSeries(ctx, levelHist.map(s => s.rx), xAt, H, "rgba(139,122,214,0.9)",  "rgba(139,122,214,0.16)", lw);   // RX = audio-panel violet
   drawSeries(ctx, levelHist.map(s => s.tx), xAt, H, "rgba(207,97,89,0.95)", "rgba(207,97,89,0.14)",  lw);   // muted MIC red
@@ -438,7 +444,22 @@ function drawLevelGraph() {
 function pushLevel(rxDb, txDb) {
   levelHist.push({ rx: lvlNorm(rxDb), tx: lvlNorm(txDb) });
   if (levelHist.length > GRAPH_MAX) levelHist.shift();
-  drawLevelGraph();
+  lastSampleTs = performance.now();
+  startLevelLoop();
+}
+// Smooth-scroll render loop — decoupled from the 200 ms data poll. Runs at ~30fps
+// only while the graph is on-screen, audio is connected and the tab is visible;
+// otherwise it stops so it costs nothing when you're not watching it.
+function startLevelLoop() { if (levelRAF == null) levelRAF = requestAnimationFrame(levelTick); }
+function levelTick(now) {
+  if (!audioConnected() || document.hidden || !graphOnScreen) {
+    levelRAF = null; drawLevelGraph(0); return;      // settle at the final position
+  }
+  if (now - lastLvlDraw >= 33) {                     // ~30 fps
+    drawLevelGraph((now - lastSampleTs) / SAMPLE_MS);
+    lastLvlDraw = now;
+  }
+  levelRAF = requestAnimationFrame(levelTick);
 }
 
 // ---- websocket ------------------------------------------------------------
@@ -1163,6 +1184,14 @@ async function loadTones() {
 
 function bindAudio() {
   const t = $("#audio-toggle"); if (!t) return;
+  // only run the smooth-scroll graph loop while its canvas is actually on-screen
+  const gcv = $("#level-graph");
+  if (gcv && "IntersectionObserver" in window) {
+    new IntersectionObserver(es => {
+      graphOnScreen = es[0].isIntersecting;
+      if (graphOnScreen && audioConnected()) startLevelLoop();
+    }, { threshold: 0.01 }).observe(gcv);
+  }
   $("#audio-band-sel")?.addEventListener("change", async e => {
     const band = Number(e.target.value);
     try { const st = await api("POST", "/api/data-band", { band }); render(st); }
