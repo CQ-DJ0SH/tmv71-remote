@@ -216,10 +216,11 @@ function render(st) {
     p.classList.toggle("is-tx", !!st.transmitting && st.ptt_band === band);
     p.classList.toggle("is-off", !!st.single_band && band !== st.control_band);
   });
-  // audio-band (data band) selector reflects the radio
-  const abs = $("#audio-band-sel");
-  if (abs && document.activeElement !== abs && st.data_band != null)
-    abs.value = (st.data_band === 1 || st.data_band === 2) ? "1" : "0";   // map to RX band
+  // audio-band (data band) switch reflects the radio (data band 2/3 -> RX band)
+  if (st.data_band != null) {
+    const rxBand = (st.data_band === 1 || st.data_band === 2) ? 1 : 0;
+    $$("#audio-band-seg .sg").forEach(b => b.classList.toggle("active", Number(b.dataset.band) === rxBand));
+  }
   const pttLabel = $("#ptt-band");
   pttLabel.textContent = `PTT → BAND ${st.ptt_band === 1 ? "B" : "A"}`;
   pttLabel.classList.toggle("is-b", st.ptt_band === 1);   // color = selected band
@@ -369,7 +370,12 @@ async function refreshAudio() {
       if (sl && v != null && document.activeElement !== sl) { sl.value = v; setGainUi(k, v); }
     });
     const ta = $("#tx-auto");
-    if (ta && document.activeElement !== ta) { ta.checked = !!a.tx_auto_gain; setTxAutoUi(!!a.tx_auto_gain); }
+    if (ta && document.activeElement !== ta) {
+      // don't let the shared backend override this app's saved toggle position;
+      // reflect it only until the app has its own remembered preference
+      if (localStorage.getItem(txAgcKey()) === null) ta.checked = !!a.tx_auto_gain;
+      setTxAutoUi(!!a.tx_auto_gain);
+    }
   } catch {}
 }
 
@@ -946,13 +952,16 @@ async function pickNonBtMicId() {
 //  • Desktop (e.g. macOS): forcing those off makes the browser reconfigure the
 //    input device and drop the level very low (across all browsers), so we leave
 //    them at the browser default.
+const isPwaMode = () => !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
 function micConstraintsBase() {
-  const pwa = window.matchMedia && window.matchMedia("(display-mode: standalone)").matches;
   const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
-  return (pwa || mobile)
+  return (isPwaMode() || mobile)
     ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
     : {};
 }
+// TX AGC toggle position is remembered per app (browser vs installed PWA). They
+// share one localStorage (same origin), so key it by display mode to separate.
+const txAgcKey = () => "tmv71.txAgc." + (isPwaMode() ? "pwa" : "browser");
 // Capture the mic, preferring a non-Bluetooth (built-in) input.
 async function captureBuiltinMic() {
   const base = micConstraintsBase();
@@ -1144,6 +1153,9 @@ async function loadMixer() {
     const sl = row.querySelector(".mx-slider"), val = row.querySelector(".mx-val"),
           sw = row.querySelector(".mx-sw");
     sl.style.setProperty("--gpct", (c.percent ?? 0) + "%");
+    // recommended-default marker on the tick: RX (capture) 85 %, TX (playback) 33 %
+    if (label === "RX") sl.style.setProperty("--def-pct", "85%");
+    else if (label === "TX") sl.style.setProperty("--def-pct", "33%");
     sl.addEventListener("input", () => {
       val.textContent = sl.value + "%";
       sl.style.setProperty("--gpct", sl.value + "%");
@@ -1177,6 +1189,9 @@ async function loadTones() {
     const tt = $("#set-testtone"); if (tt) tt.checked = !!s.test_tone;
     const lp = $("#set-tx-lowpass"); if (lp) lp.checked = !!s.tx_lowpass;
     const rlp = $("#set-rx-lowpass"); if (rlp) rlp.checked = !!s.rx_lowpass;
+    const rde = $("#set-rx-deemph"); if (rde) rde.checked = !!s.rx_deemph;
+    const rsq = $("#set-rx-squelch"); if (rsq) rsq.checked = !!s.rx_squelch;
+    if (s.rx_deemph_us != null) { const sl = $("#deemph-us"); if (sl) { sl.value = s.rx_deemph_us; setDeemphUi(s.rx_deemph_us); } }
     if (s.tx_buffer_ms != null) { const sl = $("#tx-buffer"); if (sl) sl.value = s.tx_buffer_ms; setMsUi("tx-buffer", s.tx_buffer_ms); }
     if (s.ptt_tail_ms != null) { const sl = $("#ptt-tail"); if (sl) sl.value = s.ptt_tail_ms; setMsUi("ptt-tail", s.ptt_tail_ms); }
   } catch { /* leave as-is */ }
@@ -1192,11 +1207,11 @@ function bindAudio() {
       if (graphOnScreen && audioConnected()) startLevelLoop();
     }, { threshold: 0.01 }).observe(gcv);
   }
-  $("#audio-band-sel")?.addEventListener("change", async e => {
-    const band = Number(e.target.value);
+  $$("#audio-band-seg .sg").forEach(b => b.addEventListener("click", async () => {
+    const band = Number(b.dataset.band);
     try { const st = await api("POST", "/api/data-band", { band }); render(st); }
     catch (err) { toast("Audio band: " + err.message, "err"); }
-  });
+  }));
   $("#set-testtone")?.addEventListener("change", async e => {
     try {
       await api("POST", "/api/audio/tones", { test_tone: e.target.checked });
@@ -1240,6 +1255,18 @@ function bindAudio() {
       toast(e.target.checked ? "RX low-pass on" : "RX low-pass off", e.target.checked ? "ok" : "");
     } catch (err) { toast("RX low-pass: " + err.message, "err"); e.target.checked = !e.target.checked; }
   });
+  $("#set-rx-deemph")?.addEventListener("change", async e => {
+    try {
+      await api("POST", "/api/audio/tones", { rx_deemph: e.target.checked });
+      toast(e.target.checked ? "RX de-emphasis on" : "RX de-emphasis off", e.target.checked ? "ok" : "");
+    } catch (err) { toast("RX de-emphasis: " + err.message, "err"); e.target.checked = !e.target.checked; }
+  });
+  $("#set-rx-squelch")?.addEventListener("change", async e => {
+    try {
+      await api("POST", "/api/audio/tones", { rx_squelch: e.target.checked });
+      toast(e.target.checked ? "RX squelch on" : "RX squelch off", e.target.checked ? "ok" : "");
+    } catch (err) { toast("RX squelch: " + err.message, "err"); e.target.checked = !e.target.checked; }
+  });
   t.addEventListener("click", () => { (audioWant || audioPc) ? audioDisconnect() : audioConnect(); });
 
   $("#audio-device").addEventListener("change", async e => {
@@ -1256,11 +1283,22 @@ function bindAudio() {
     });
   });
   const txAuto = $("#tx-auto");
-  if (txAuto) txAuto.addEventListener("change", async () => {
-    setTxAutoUi(txAuto.checked);
-    try { await api("POST", "/api/audio/gain", { tx_auto_gain: txAuto.checked }); }
-    catch (e) { toast("Auto gain: " + e.message, "err"); txAuto.checked = !txAuto.checked; setTxAutoUi(txAuto.checked); }
-  });
+  if (txAuto) {
+    // apply this app's remembered TX AGC position (backend is shared/global, so
+    // pushing it here makes this app's preference take effect on launch)
+    const stored = localStorage.getItem(txAgcKey());
+    if (stored !== null) {
+      const on = stored === "1";
+      txAuto.checked = on; setTxAutoUi(on);
+      api("POST", "/api/audio/gain", { tx_auto_gain: on }).catch(() => {});
+    }
+    txAuto.addEventListener("change", async () => {
+      setTxAutoUi(txAuto.checked);
+      try { localStorage.setItem(txAgcKey(), txAuto.checked ? "1" : "0"); } catch {}
+      try { await api("POST", "/api/audio/gain", { tx_auto_gain: txAuto.checked }); }
+      catch (e) { toast("Auto gain: " + e.message, "err"); txAuto.checked = !txAuto.checked; setTxAutoUi(txAuto.checked); }
+    });
+  }
   [["tx-buffer", "tx_buffer_ms"], ["ptt-tail", "ptt_tail_ms"]].forEach(([id, key]) => {
     const sl = document.getElementById(id); if (!sl) return;
     sl.addEventListener("input", () => setMsUi(id, sl.value));
@@ -1270,6 +1308,19 @@ function bindAudio() {
       catch (e) { toast("TX timing: " + e.message, "err"); }
     });
   });
+  const du = $("#deemph-us");
+  if (du) {
+    du.addEventListener("input", () => setDeemphUi(du.value));
+    du.addEventListener("change", async () => {
+      try { await api("POST", "/api/audio/tones", { rx_deemph_us: Number(du.value) }); }
+      catch (e) { toast("De-emphasis: " + e.message, "err"); }
+    });
+  }
+}
+function setDeemphUi(val) {
+  const el = $("#deemph-us-val"); if (el) el.textContent = Math.round(val) + " µs";
+  const sl = $("#deemph-us");
+  if (sl) sl.style.setProperty("--gpct", (sl.value - sl.min) / (sl.max - sl.min) * 100 + "%");
 }
 
 // ---- VFO live parameters (shift / bandwidth / CTCSS) ----------------------
@@ -2480,6 +2531,8 @@ function bindDigi() {
     $$(".digi-mode").forEach(x => x.classList.toggle("active", x === b));
     $("#digi-params-cw").hidden = mode !== "cw";
     $("#digi-params-rtty").hidden = mode !== "rtty";
+    $("#digi-params-pocsag").hidden = mode !== "pocsag";
+    const dh = $(".digi-hint-pocsag"); if (dh) dh.hidden = mode !== "pocsag";
     post({ mode });
   }));
   // range params (value label + fill + server update on release)
@@ -2500,6 +2553,18 @@ function bindDigi() {
   range("#digi-mark", "#digi-mark-v", " Hz", "rtty_mark");
   $("#digi-baud")?.addEventListener("change", e => post({ rtty_baud: Number(e.target.value) }));
   $("#digi-shift")?.addEventListener("change", e => post({ rtty_shift: Number(e.target.value) }));
+  // POCSAG params
+  $("#pocsag-baud")?.addEventListener("change", e => post({ pocsag_baud: Number(e.target.value) }));
+  $("#pocsag-func")?.addEventListener("change", e => post({ pocsag_func: Number(e.target.value) }));
+  $("#pocsag-alpha")?.addEventListener("change", e => post({ pocsag_alpha: e.target.checked }));
+  $("#pocsag-all")?.addEventListener("change", e => {
+    post({ pocsag_listen_all: e.target.checked });
+    toast(e.target.checked ? "POCSAG: listen to all RICs" : "POCSAG: filter to RIC", "ok");
+  });
+  $("#pocsag-addr")?.addEventListener("change", e => {
+    const v = Math.max(0, Math.min(2097151, parseInt(e.target.value, 10) || 0));
+    e.target.value = String(v); post({ pocsag_addr: v });
+  });
   // decoder on/off
   $("#digi-rx")?.addEventListener("change", e => {
     post({ rx: e.target.checked });
@@ -2524,6 +2589,8 @@ function bindDigi() {
     $$(".digi-mode").forEach(x => x.classList.toggle("active", x.dataset.mode === s.mode));
     $("#digi-params-cw").hidden = s.mode !== "cw";
     $("#digi-params-rtty").hidden = s.mode !== "rtty";
+    $("#digi-params-pocsag").hidden = s.mode !== "pocsag";
+    { const dh = $(".digi-hint-pocsag"); if (dh) dh.hidden = s.mode !== "pocsag"; }
     const set = (id, val, vid, suffix) => {
       const el = $(id); if (!el) return;
       el.value = val; fill(el);
@@ -2534,6 +2601,11 @@ function bindDigi() {
     set("#digi-mark", s.rtty_mark, "#digi-mark-v", " Hz");
     if ($("#digi-baud")) $("#digi-baud").value = String(s.rtty_baud);
     if ($("#digi-shift")) $("#digi-shift").value = String(s.rtty_shift);
+    if ($("#pocsag-baud") && s.pocsag_baud != null) $("#pocsag-baud").value = String(s.pocsag_baud);
+    if ($("#pocsag-addr") && s.pocsag_addr != null) $("#pocsag-addr").value = String(s.pocsag_addr);
+    if ($("#pocsag-func") && s.pocsag_func != null) $("#pocsag-func").value = String(s.pocsag_func);
+    if ($("#pocsag-alpha")) $("#pocsag-alpha").checked = !!s.pocsag_alpha;
+    if ($("#pocsag-all") && s.pocsag_listen_all != null) $("#pocsag-all").checked = !!s.pocsag_listen_all;
     if ($("#digi-rx")) $("#digi-rx").checked = !!s.rx;
     if ($("#digi-auto")) $("#digi-auto").checked = s.cw_auto !== false;
   }).catch(() => {});
@@ -2546,7 +2618,13 @@ function connectDigiWS(decode) {
   ws.onmessage = ev => {
     let m; try { m = JSON.parse(ev.data); } catch { return; }
     if (m.t === "rx" && m.text) {
-      decode.textContent += m.text;
+      let text = m.text;
+      // POCSAG pages arrive as complete lines — prefix each with a timestamp
+      if (document.querySelector(".digi-mode.active")?.dataset.mode === "pocsag") {
+        const ts = new Date().toLocaleTimeString([], { hour12: false });
+        text = text.split("\n").map(l => (l ? ts + "  " + l : l)).join("\n");
+      }
+      decode.textContent += text;
       if (decode.textContent.length > 4000) decode.textContent = decode.textContent.slice(-3000);
       decode.scrollTop = decode.scrollHeight;
     }

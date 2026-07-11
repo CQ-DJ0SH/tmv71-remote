@@ -176,12 +176,15 @@ class TonesRequest(BaseModel):
     test_tone: Optional[bool] = None
     tx_lowpass: Optional[bool] = None
     rx_lowpass: Optional[bool] = None
+    rx_deemph: Optional[bool] = None
+    rx_deemph_us: Optional[float] = Field(default=None, ge=10, le=500)
+    rx_squelch: Optional[bool] = None
     mic_test: Optional[bool] = None
 
 
 class DigiConfig(BaseModel):
-    """CW/RTTY digimode parameters (all optional — only sent fields change)."""
-    mode: Optional[str] = None          # "cw" | "rtty"
+    """CW/RTTY/POCSAG digimode parameters (all optional — only sent fields change)."""
+    mode: Optional[str] = None          # "cw" | "rtty" | "pocsag"
     rx: Optional[bool] = None           # start/stop the decoder
     cw_wpm: Optional[float] = Field(default=None, ge=5, le=60)
     cw_pitch: Optional[float] = Field(default=None, ge=300, le=1200)
@@ -189,6 +192,11 @@ class DigiConfig(BaseModel):
     rtty_baud: Optional[float] = Field(default=None, ge=10, le=100)
     rtty_shift: Optional[float] = Field(default=None, ge=50, le=1000)
     rtty_mark: Optional[float] = Field(default=None, ge=500, le=3000)
+    pocsag_baud: Optional[int] = Field(default=None)          # 512 | 1200 | 2400
+    pocsag_addr: Optional[int] = Field(default=None, ge=0, le=2097151)   # RIC
+    pocsag_func: Optional[int] = Field(default=None, ge=0, le=3)         # function bits
+    pocsag_alpha: Optional[bool] = None  # alphanumeric (else numeric)
+    pocsag_listen_all: Optional[bool] = None  # decode every RIC (else filter to pocsag_addr)
 
 
 class DigiTxRequest(BaseModel):

@@ -78,7 +78,10 @@ radio_audio = RadioAudio(device=settings.audio_device,
                          ptt_tail_ms=settings.ptt_tail_ms,
                          tx_lowpass=settings.tx_lowpass_enabled,
                          rx_lowpass=settings.rx_lowpass_enabled,
-                         tx_auto_gain=settings.tx_auto_gain)
+                         tx_auto_gain=settings.tx_auto_gain,
+                         rx_deemph=settings.rx_deemph_enabled,
+                         rx_squelch=settings.rx_squelch_enabled,
+                         rx_deemph_us=settings.rx_deemph_us)
 pcs: set = set()      # active WebRTC peer connections
 
 
@@ -98,6 +101,11 @@ class DigiService:
         self.rtty_baud = 45.45
         self.rtty_shift = 170.0
         self.rtty_mark = 2125.0
+        self.pocsag_baud = 1200
+        self.pocsag_addr = 1234567
+        self.pocsag_func = 3
+        self.pocsag_alpha = False
+        self.pocsag_listen_all = True
         self.rx = False
         self._dec = None
         self._subs: set = set()
@@ -108,12 +116,18 @@ class DigiService:
         return {"mode": self.mode, "rx": self.rx, "tx": self.audio.digi_tx_busy(),
                 "cw_wpm": self.cw_wpm, "cw_pitch": self.cw_pitch, "cw_auto": self.cw_auto,
                 "rtty_baud": self.rtty_baud, "rtty_shift": self.rtty_shift,
-                "rtty_mark": self.rtty_mark}
+                "rtty_mark": self.rtty_mark,
+                "pocsag_baud": self.pocsag_baud, "pocsag_addr": self.pocsag_addr,
+                "pocsag_func": self.pocsag_func, "pocsag_alpha": self.pocsag_alpha,
+                "pocsag_listen_all": self.pocsag_listen_all}
 
     def _new_decoder(self):
         if self.mode == "rtty":
             return digimodes.RTTYDecoder(SAMPLE_RATE, self.rtty_baud,
                                          self.rtty_shift, self.rtty_mark)
+        if self.mode == "pocsag":
+            return digimodes.POCSAGDecoder(SAMPLE_RATE, self.pocsag_baud, self.pocsag_alpha,
+                                           self.pocsag_addr, self.pocsag_listen_all)
         return digimodes.CWDecoder(SAMPLE_RATE, self.cw_pitch, self.cw_wpm, self.cw_auto)
 
     def configure(self, cfg: DigiConfig) -> dict:
@@ -121,7 +135,9 @@ class DigiService:
         if cfg.cw_auto is not None and cfg.cw_auto != self.cw_auto:
             self.cw_auto = cfg.cw_auto
             changed = True
-        for f in ("mode", "cw_wpm", "cw_pitch", "rtty_baud", "rtty_shift", "rtty_mark"):
+        for f in ("mode", "cw_wpm", "cw_pitch", "rtty_baud", "rtty_shift", "rtty_mark",
+                  "pocsag_baud", "pocsag_addr", "pocsag_func", "pocsag_alpha",
+                  "pocsag_listen_all"):
             v = getattr(cfg, f)
             if v is not None and getattr(self, f) != v:
                 setattr(self, f, v)
@@ -181,6 +197,9 @@ class DigiService:
         if self.mode == "rtty":
             pcm = digimodes.rtty_encode(text, self.rtty_baud, self.rtty_shift,
                                         self.rtty_mark, SAMPLE_RATE)
+        elif self.mode == "pocsag":
+            pcm = digimodes.pocsag_encode(text, self.pocsag_addr, self.pocsag_baud,
+                                          self.pocsag_func, self.pocsag_alpha, SAMPLE_RATE)
         else:
             pcm = digimodes.cw_encode(text, self.cw_wpm, self.cw_pitch, SAMPLE_RATE)
         if len(pcm) == 0:
@@ -386,6 +405,28 @@ async def _restore_mem_after_boot() -> None:
         await asyncio.sleep(2.0)
 
 
+async def _rx_squelch_loop() -> None:
+    """Fast BUSY poll for the software squelch: when enabled and someone is
+    listening, read the audio band's BUSY (squelch-open) status ~16×/s and hand it
+    to the audio path, which mutes once it's been closed past the hang time. The
+    CAT link is RLock-serialised, so this coexists with the slow status poll."""
+    while True:
+        await asyncio.sleep(0.06)
+        if not radio_audio.rx_squelch or radio_audio.peers == 0:
+            radio_audio.rx_busy = True                 # feature idle -> don't gate
+            continue
+        st = service.status
+        if not st.connected or getattr(service, "_scanning", False):
+            radio_audio.rx_busy = True                 # can't poll -> fail-open
+            continue
+        try:
+            band = st.audio_band or 0
+            radio_audio.rx_busy = await asyncio.to_thread(
+                service.radio.get_squelch_open, band)
+        except Exception:  # noqa: BLE001
+            radio_audio.rx_busy = True                 # error -> pass audio
+
+
 async def _auto_power_off_loop() -> None:
     while True:
         await asyncio.sleep(2.0)
@@ -504,6 +545,7 @@ async def lifespan(app: FastAPI):
         audio_wd = asyncio.create_task(_audio_watchdog())
     apo_task = asyncio.create_task(_auto_power_off_loop())
     ptt_wd = asyncio.create_task(_ptt_safety_loop())
+    sq_task = asyncio.create_task(_rx_squelch_loop())
     yield
     if audio_wd:
         audio_wd.cancel()
@@ -511,6 +553,7 @@ async def lifespan(app: FastAPI):
     await sel.stop()
     apo_task.cancel()
     ptt_wd.cancel()
+    sq_task.cancel()
     await sdr.stop()
     for pc in list(pcs):
         await pc.close()
@@ -1052,7 +1095,7 @@ async def set_audio_gain(req: AudioGainRequest) -> dict:
     if req.tx_auto_gain is not None:
         radio_audio.tx_auto_gain = req.tx_auto_gain
         if req.tx_auto_gain:
-            radio_audio._agc_gain = 1.0    # start from unity each time it's armed
+            radio_audio._agc_gain = 12.0   # start at max sensitivity, then regulate down
     save_runtime(rx_gain=radio_audio.rx_gain, tx_gain=radio_audio.tx_gain,
                  tx_auto_gain=radio_audio.tx_auto_gain)
     settings.rx_gain = radio_audio.rx_gain
@@ -1108,6 +1151,18 @@ async def set_audio_tones(req: TonesRequest) -> dict:
         radio_audio.rx_lowpass = req.rx_lowpass
         settings.rx_lowpass_enabled = req.rx_lowpass
         save_runtime(rx_lowpass_enabled=req.rx_lowpass)
+    if req.rx_deemph is not None:
+        radio_audio.rx_deemph = req.rx_deemph
+        settings.rx_deemph_enabled = req.rx_deemph
+        save_runtime(rx_deemph_enabled=req.rx_deemph)
+    if req.rx_deemph_us is not None:
+        radio_audio.set_deemph_us(req.rx_deemph_us)
+        settings.rx_deemph_us = radio_audio.rx_deemph_us
+        save_runtime(rx_deemph_us=radio_audio.rx_deemph_us)
+    if req.rx_squelch is not None:
+        radio_audio.rx_squelch = req.rx_squelch
+        settings.rx_squelch_enabled = req.rx_squelch
+        save_runtime(rx_squelch_enabled=req.rx_squelch)
     return radio_audio.status()
 
 

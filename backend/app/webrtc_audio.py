@@ -59,6 +59,36 @@ class _FIRLowpass:
         self._tail[:] = 0.0
 
 
+# FM de-emphasis time constant (µs). 75 µs = 6 dB/oct roll-off with a ~2.1 kHz
+# corner — restores natural voice tone when the RX audio comes from a flat
+# discriminator / 9600-baud data output (which has no de-emphasis).
+DEEMPH_TAU_US = 75.0
+
+# Software-squelch hang time: keep audio open this long after BUSY drops, so the
+# ~60 ms BUSY poll gaps and short speech pauses don't chop the audio.
+SQ_HANG_S = 0.060
+
+
+class _DeEmphasis:
+    """1st-order FM de-emphasis (6 dB/oct) as a truncated-exponential FIR, stateful
+    via overlap-save — same vectorised, loop-free block processing as _FIRLowpass."""
+
+    def __init__(self, tau_us: float, fs: float, ntaps: int = 48):
+        a = 1.0 - np.exp(-1.0 / (tau_us * 1e-6 * fs))
+        h = a * (1.0 - a) ** np.arange(ntaps)
+        self.h = (h / h.sum()).astype(np.float64)   # unity DC gain
+        self._tail = np.zeros(ntaps - 1, dtype=np.float64)
+
+    def process(self, pcm: np.ndarray) -> np.ndarray:
+        x = np.concatenate([self._tail, pcm.astype(np.float64)])
+        y = np.convolve(x, self.h, mode="valid")
+        self._tail = x[-(self.h.size - 1):]
+        return np.clip(y, -32768, 32767).astype(np.int16)
+
+    def reset(self) -> None:
+        self._tail[:] = 0.0
+
+
 def _level(samples, prev):
     """RMS of an int16 block as dBFS, with fast-attack / slow-release."""
     if samples.size == 0:
@@ -78,10 +108,22 @@ class RadioAudio:
     def __init__(self, device: str = "NAD", rx_gain: float = 1.0,
                  tx_gain: float = 1.0, tx_buffer_ms: int = DEF_TX_BUFFER_MS,
                  ptt_tail_ms: int = DEF_PTT_TAIL_MS, tx_lowpass: bool = False,
-                 rx_lowpass: bool = False, tx_auto_gain: bool = False):
+                 rx_lowpass: bool = False, tx_auto_gain: bool = False,
+                 rx_deemph: bool = False, rx_squelch: bool = False,
+                 rx_deemph_us: float = DEEMPH_TAU_US):
         self.device = device
         self.rx_gain = rx_gain
         self.tx_gain = tx_gain
+        # RX de-emphasis for a flat discriminator / 9600-baud audio source
+        self.rx_deemph = rx_deemph
+        self.rx_deemph_us = rx_deemph_us
+        self._rx_deemph = _DeEmphasis(rx_deemph_us, SAMPLE_RATE)
+        # Software squelch gated by the radio's BUSY status (for the always-open
+        # discriminator/9600 output). rx_busy is updated by a fast CAT poller;
+        # audio is muted once BUSY has been closed for longer than the hang time.
+        self.rx_squelch = rx_squelch
+        self.rx_busy = True                     # fail-open until the poller reports
+        self._sq_open_ts = 0.0
         # TX auto-gain (AGC on the mic path): drives the level toward a target,
         # overriding the manual tx_gain while on. _agc_gain is the live factor.
         self.tx_auto_gain = tx_auto_gain
@@ -245,7 +287,6 @@ class RadioAudio:
         if self.rx_lowpass:
             samples = self._rx_lp.process(samples)
         self.rx_frames += 1
-        self.rx_db = _level(samples, self.rx_db)
         # digimodes decoder tap: stash RX blocks for the decode loop to consume
         if self.digi_rx or self.sel_rx:
             with self._digi_lock:
@@ -260,6 +301,7 @@ class RadioAudio:
         # mic-test echo replay: while a recording is being played back, override
         # the published RX block with it (single pos writer = this callback).
         pub = samples
+        live = True
         if self._echo_buf is not None:
             e = self._echo_buf
             blk = np.zeros(frames, dtype=np.int16)
@@ -270,11 +312,27 @@ class RadioAudio:
             if self._echo_pos >= len(e):
                 self._echo_buf = None
             pub = blk
-            self.rx_db = _level(blk, self.rx_db)
+            live = False
         elif self.mic_test:
             # mute the radio RX while a mic test is recording, so only the test
             # (and its replay on switch-off) is heard — not live radio audio.
             pub = np.zeros(frames, dtype=np.int16)
+            live = False
+        # live listen path only (after the decoder taps, which want the flat,
+        # un-squelched signal); off for the echo replay / mic-test mute.
+        if live:
+            if self.rx_deemph:
+                pub = self._rx_deemph.process(pub)
+            if self.rx_squelch:                 # gate on the radio's BUSY status
+                now = time.monotonic()
+                if self.rx_busy:
+                    self._sq_open_ts = now
+                if now - self._sq_open_ts > SQ_HANG_S:   # closed long enough -> mute
+                    pub = np.zeros(frames, dtype=np.int16)
+        # RX meter (S-meter + level graph) reads rx_db — measure it from the final
+        # published block, so a squelch/mic-test mute reads as silence. Decoders
+        # still get the raw signal via the taps above.
+        self.rx_db = _level(pub, self.rx_db)
         # publish the latest block; the clock-paced RX track(s) pick it up.
         self._latest = pub.tobytes()
         self._latest_ts = time.monotonic()
@@ -504,6 +562,12 @@ class RadioAudio:
     def echo_busy(self) -> bool:
         return self._echo_buf is not None
 
+    def set_deemph_us(self, us: float) -> None:
+        """Change the de-emphasis time constant (rebuilds the filter)."""
+        us = max(10.0, min(500.0, float(us)))
+        self.rx_deemph_us = us
+        self._rx_deemph = _DeEmphasis(us, SAMPLE_RATE)
+
     # -- status ------------------------------------------------------------
     def status(self) -> dict:
         return {"enabled": True, "connected": self.connected, "error": self.error,
@@ -516,7 +580,9 @@ class RadioAudio:
                 "device": self.device, "peers": self.peers,
                 "test_tone": self.test_tone, "tone_1750": self.tone_1750,
                 "roger_beep": self.roger_beep, "tx_lowpass": self.tx_lowpass,
-                "rx_lowpass": self.rx_lowpass, "mic_test": self.mic_test,
+                "rx_lowpass": self.rx_lowpass, "rx_deemph": self.rx_deemph,
+                "rx_deemph_us": self.rx_deemph_us,
+                "rx_squelch": self.rx_squelch, "mic_test": self.mic_test,
                 "echo_busy": self.echo_busy(),
                 "digi_rx": self.digi_rx, "digi_tx": self.digi_tx_busy(),
                 "transport": "webrtc", "web_client": self.peers > 0}

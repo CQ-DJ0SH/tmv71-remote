@@ -33,6 +33,12 @@ the theme toggle in the header (light is the default).*
   straight to the browser over **WebRTC/Opus** via `aiortc` — no extra app
   or proxy. Listen in the browser; the mic is fed to the radio only
   while PTT is engaged.
+- **Digimodes & selcall** — a **Digi** panel encodes/decodes **CW** (MCW), **RTTY**
+  (AFSK) and **POCSAG** paging (512/1200/2400 baud, numeric + alphanumeric, with
+  BCH error correction) straight over the FM audio — e.g. monitor **DAPNET**
+  (439.9875 MHz) with per-page RIC/FUNC/timestamp output and a "listen all"
+  toggle. A separate **Selcall** panel does classic 5-tone selective calling
+  (ZVEI/CCIR/EEA …), both decode and transmit.
 - **SDR waterfall (optional, HackRF)** — if a HackRF One is connected, an extra
   panel shows a live spectrum + waterfall: a real-time **panadapter** centred on
   the tuned frequency (auto-following the radio) or a **wideband sweep** across a
@@ -172,7 +178,23 @@ and the browser microphone is fed to the radio's mic input **only while PTT is
 engaged** (keyed from the web UI).
 
 In the web UI, open the **AUDIO** panel, click **CONNECT** and allow the
-microphone. Listen there; hold the large **PTT** button to transmit.
+microphone. Listen there; hold the large **PTT** button to transmit. Pick which
+band's RX audio you hear with the **BAND** switch (RX‑A / RX‑B); TX always goes
+via the radio's front mic input.
+
+Optional processing (Settings → Audio; the decoders always get the raw signal):
+
+- **RX de-emphasis** (adjustable time constant, on by default) — restores natural
+  voice tone when the RX audio is taken from a flat **discriminator / 9600-baud
+  data output** (which has no built-in de-emphasis). That output is ideal for the
+  digimode decoders (POCSAG etc.) since it keeps the full low-frequency content.
+- **RX squelch (software)** — the data output bypasses the hardware squelch, so
+  this re-applies muting from the radio's own **BUSY** status (polled ~16×/s over
+  CAT). It gates only what you hear (S-meter + level graph follow); the decoders
+  still receive the un-squelched signal.
+- **TX AGC** — automatic transmit-level control on the mic path (fast attack, slow
+  release), overriding the manual TX Gain. A voice low-pass and per-device mic
+  gain round out the audio options.
 
 ## Mobile app (PWA)
 
@@ -194,7 +216,7 @@ backend reachable). The screen is kept awake (Wake Lock) while the app is open.
 | ![PWA PTT](docs/pwa-ptt.png) | ![PWA audio](docs/pwa-audio.png) |
 | **HackRF** waterfall (panadapter) | **Selcall** (5-tone) |
 | ![PWA HackRF](docs/pwa-hackrf.png) | ![PWA selcall](docs/pwa-selcall.png) |
-| **Digimodes — CW** | **Digimodes — RTTY** |
+| **Digimodes — CW** | **Digimodes — RTTY / POCSAG** |
 | ![PWA digimodes CW](docs/pwa-digi-cw.png) | ![PWA digimodes RTTY](docs/pwa-digi-rtty.png) |
 | **Band / memory scan** | **App & browser info** |
 | ![PWA scan](docs/pwa-scan.png) | ![PWA info](docs/pwa-info.png) |
@@ -328,6 +350,12 @@ the repository.
 | `POST` | `/api/memories/import` | CSV import (multipart) |
 | `GET` | `/api/audio/status` | WebRTC audio bridge status + levels |
 | `POST` | `/api/webrtc/offer` | WebRTC SDP offer → answer (browser audio) |
+| `POST` | `/api/audio/gain` | `{rx_gain, tx_gain, tx_auto_gain}` RX/TX gain + TX AGC |
+| `POST` | `/api/audio/tones` | roger beep / mic test / TX+RX low-pass / **de-emphasis** / **software squelch** |
+| `POST` | `/api/data-band` | `{band}` which VFO's RX audio you hear |
+| `GET`/`POST` | `/api/power-switch` | GPIO power on/off + auto-power-off status |
+| `GET`/`POST` | `/api/digi` · `/api/digi/config` · `/api/digi/tx` | CW / RTTY / **POCSAG** decode + transmit |
+| `POST` | `/api/selcall/config` | 5-tone selcall config + transmit |
 | `GET` | `/api/hackrf` | SDR waterfall status (optional HackRF) |
 | `POST` | `/api/hackrf/start` · `/stop` · `/config` | control the SDR waterfall |
 | `GET`/`POST` | `/api/log/config` | get / set logbook (Wavelog + QRZ) settings |
@@ -339,6 +367,7 @@ the repository.
 | `POST` | `/api/log/recent/delete` · `/recent/clear` | remove / clear local recents |
 | `WS` | `/ws` | live status stream |
 | `WS` | `/ws/hackrf` | live spectrum / waterfall frames (optional HackRF) |
+| `WS` | `/ws/digi` · `/ws/selcall` | decoded digimode / selcall text stream |
 
 ## Security
 
@@ -355,6 +384,9 @@ proxy with TLS + auth.
 - ✅ Optional HackRF SDR waterfall (panadapter + wideband sweep)
 - ✅ Installable PWA with a mobile swipe-deck layout (Add to Home Screen)
 - ✅ Logbook panel — Wavelog QSO logging + QRZ.com lookup
+- ✅ Digimodes — CW, RTTY and POCSAG (512/1200/2400, DAPNET) encode/decode
+- ✅ 5-tone selcall (ZVEI/CCIR/EEA …) decode + transmit
+- ✅ Audio processing — RX de-emphasis, BUSY-gated software squelch, TX AGC
 
 ## Credits
 

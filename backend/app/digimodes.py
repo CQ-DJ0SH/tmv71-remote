@@ -298,6 +298,240 @@ class RTTYDecoder:
         return "".join(out)
 
 
+# --------------------------------------------------------------------- POCSAG
+# POCSAG (CCIR Radiopaging Code No. 1): 2-FSK NRZ at 512/1200/2400 baud. On an FM
+# radio the NRZ bitstream directly frequency-modulates the carrier, so on the
+# audio path we send a band-limited bipolar baseband (bit 0 = +level, bit 1 =
+# -level) and slice it back on RX. Structure: a 576-bit 1010… preamble, then
+# batches of a 32-bit sync word + 8 frames × 2 codewords; every codeword is
+# BCH(31,21) with an even-parity bit (bit 0).
+POCSAG_SYNC = 0x7CD215D8
+POCSAG_IDLE = 0x7A89C197
+POCSAG_IDLE31 = POCSAG_IDLE >> 1
+POCSAG_PREAMBLE_BITS = 576
+_BCH_GEN = 0b11101101001            # x^10+x^9+x^8+x^6+x^5+x^3+1
+_POCSAG_NUM = "0123456789*U -)("    # numeric value 0..15 -> char
+
+
+def _rev4(v: int) -> int:
+    """Reverse the low 4 bits (POCSAG sends numeric nibbles LSB-first)."""
+    return ((v & 1) << 3) | ((v & 2) << 1) | ((v & 4) >> 1) | ((v & 8) >> 3)
+
+
+def _pocsag_syndrome(w31: int) -> int:
+    """BCH remainder of a 31-bit codeword (0 = no detected error)."""
+    reg = w31 & 0x7FFFFFFF
+    for i in range(30, 9, -1):
+        if reg & (1 << i):
+            reg ^= _BCH_GEN << (i - 10)
+    return reg & 0x3FF
+
+
+def _pocsag_codeword(data21: int) -> int:
+    """21 data bits (MSB = flag) -> full 32-bit codeword (BCH + even parity)."""
+    c31 = ((data21 & 0x1FFFFF) << 10) | _pocsag_syndrome((data21 & 0x1FFFFF) << 10)
+    return (c31 << 1) | (bin(c31).count("1") & 1)
+
+
+def _bits_of(word: int, n: int = 32):
+    return [(word >> (n - 1 - i)) & 1 for i in range(n)]
+
+
+def _num_payloads(text: str):
+    nib = []
+    for ch in text.upper():
+        v = _POCSAG_NUM.find(ch)
+        nib.append(_rev4(v if v >= 0 else _POCSAG_NUM.find(" ")))
+    while len(nib) % 5:
+        nib.append(_rev4(_POCSAG_NUM.find(" ")))
+    out = []
+    for i in range(0, len(nib), 5):
+        w = 0
+        for r in nib[i:i + 5]:
+            w = (w << 4) | r
+        out.append(w & 0xFFFFF)
+    return out
+
+
+def _alpha_payloads(text: str):
+    bits = []
+    for ch in text:
+        c = ord(ch) & 0x7F
+        for b in range(7):                       # LSB first
+            bits.append((c >> b) & 1)
+    while len(bits) % 20:
+        bits.append(0)
+    out = []
+    for i in range(0, len(bits), 20):
+        w = 0
+        for b in bits[i:i + 20]:
+            w = (w << 1) | b                     # first stream bit -> field MSB
+        out.append(w & 0xFFFFF)
+    return out
+
+
+def _pocsag_message_bits(address: int, function: int, text: str, alpha: bool):
+    addr_cw = _pocsag_codeword(((address >> 3) & 0x3FFFF) << 2 | (function & 3))
+    payloads = _alpha_payloads(text) if alpha else _num_payloads(text)
+    seq = [addr_cw] + [_pocsag_codeword((1 << 20) | p) for p in payloads]
+    words = [POCSAG_IDLE] * ((address & 7) * 2) + seq       # address in its frame
+    while len(words) % 16:
+        words.append(POCSAG_IDLE)
+    bits = [1, 0] * (POCSAG_PREAMBLE_BITS // 2)
+    for i in range(0, len(words), 16):
+        bits += _bits_of(POCSAG_SYNC)
+        for w in words[i:i + 16]:
+            bits += _bits_of(w)
+    return bits
+
+
+def pocsag_encode(text: str, address: int = 1234567, baud: int = 1200,
+                  function: int = 3, alpha: bool = False,
+                  fs: int = SAMPLE_RATE) -> np.ndarray:
+    """Encode a numeric/alphanumeric page as band-limited bipolar FSK baseband."""
+    bits = _pocsag_message_bits(int(address), int(function), text or "", bool(alpha))
+    spb = fs / float(baud)
+    sig = np.zeros(int(round(len(bits) * spb)), dtype=np.float32)
+    for i, b in enumerate(bits):
+        a, z = int(round(i * spb)), int(round((i + 1) * spb))
+        sig[a:z] = 1.0 if b == 0 else -1.0       # bit 0 -> +level
+    k = max(1, int(spb / 3))                      # gentle low-pass (limit splatter)
+    if k > 1:
+        sig = np.convolve(sig, np.ones(k, np.float32) / k, mode="same")
+    ramp = min(len(sig) // 2, int(0.005 * fs))
+    if ramp:
+        sig[:ramp] *= np.linspace(0, 1, ramp)
+        sig[-ramp:] *= np.linspace(1, 0, ramp)
+    return np.clip(sig * 24000, -32768, 32767).astype(np.int16)
+
+
+class POCSAGDecoder:
+    """Streaming POCSAG decoder: transition-tracked bit slicer -> sync search ->
+    BCH-corrected codewords -> numeric/alphanumeric text. Handles either FSK
+    polarity. ``feed`` returns any newly completed pages ("[RIC] text\\n")."""
+
+    def __init__(self, fs: int = SAMPLE_RATE, baud: int = 1200, alpha: bool = False,
+                 addr: int = 0, listen_all: bool = True):
+        self.fs = fs
+        self.spb = fs / float(baud)
+        self.alpha = alpha
+        self.addr = addr
+        self.listen_all = listen_all
+        self.dc = 0.0
+        self.env = 0.0
+        self.last_sign = 1
+        self.idx = 0.0
+        self.next_center = self.spb / 2.0
+        self.reg = 0
+        self.synced = False
+        self.inv = False
+        self.words: list = []
+        self.bitcount = 0
+        self.cur_active = False
+        self.cur_ric = 0
+        self.cur_func = 0
+        self.msg = []
+
+    def _flush(self) -> str:
+        active, ric, func, payloads = self.cur_active, self.cur_ric, self.cur_func, self.msg
+        self.cur_active, self.msg = False, []
+        if not active or not payloads:
+            return ""
+        if not self.listen_all and ric != self.addr:      # filter to our RIC
+            return ""
+        if self.alpha:
+            bits = []
+            for w in payloads:
+                bits += [(w >> b) & 1 for b in range(19, -1, -1)]
+            chars = []
+            for i in range(0, len(bits) - 6, 7):
+                c = sum(bits[i + k] << k for k in range(7))
+                if c == 0:
+                    continue
+                chars.append(chr(c) if 32 <= c < 127 else "")
+            text = "".join(chars).rstrip()
+        else:
+            text = ""
+            for w in payloads:
+                for k in range(5):
+                    text += _POCSAG_NUM[_rev4((w >> (16 - 4 * k)) & 0xF)]
+            text = text.rstrip()
+        if not text:
+            return ""
+        kind = "ALPHA" if self.alpha else "NUM"
+        return f"RIC {ric:>7} · FUNC {'ABCD'[func & 3]} · {kind} · {text}\n"
+
+    def _decode_batch(self, words) -> str:
+        out = []
+        for j, w in enumerate(words):
+            w31 = w >> 1
+            if _pocsag_syndrome(w31) != 0:               # single-bit BCH correction
+                for i in range(31):
+                    if _pocsag_syndrome(w31 ^ (1 << i)) == 0:
+                        w31 ^= (1 << i)
+                        break
+                else:
+                    continue                             # uncorrectable -> skip
+            if w31 == POCSAG_IDLE31:
+                out.append(self._flush())
+            elif (w31 >> 30) & 1:                         # message codeword
+                if self.cur_active:
+                    self.msg.append((w31 >> 10) & 0xFFFFF)
+            else:                                         # address codeword
+                out.append(self._flush())
+                self.cur_ric = (((w31 >> 12) & 0x3FFFF) << 3) | (j // 2)
+                self.cur_func = (w31 >> 10) & 0x3
+                self.cur_active, self.msg = True, []
+        return "".join(out)
+
+    def _push_bit(self, bit: int) -> str:
+        self.reg = ((self.reg << 1) | bit) & 0xFFFFFFFF
+        if not self.synced:
+            if bin((self.reg ^ POCSAG_SYNC) & 0xFFFFFFFF).count("1") <= 2:
+                self.synced, self.inv, self.words, self.bitcount = True, False, [], 0
+            elif bin((self.reg ^ POCSAG_SYNC ^ 0xFFFFFFFF) & 0xFFFFFFFF).count("1") <= 2:
+                self.synced, self.inv, self.words, self.bitcount = True, True, [], 0
+            return ""
+        self.bitcount += 1
+        if self.bitcount < 32:
+            return ""
+        self.bitcount = 0
+        self.words.append((self.reg ^ (0xFFFFFFFF if self.inv else 0)) & 0xFFFFFFFF)
+        if len(self.words) < 16:
+            return ""
+        text = self._decode_batch(self.words)
+        self.words, self.synced = [], False          # re-acquire sync for next batch
+        return text
+
+    def feed(self, pcm: np.ndarray) -> str:
+        out = []
+        for s in pcm.astype(np.float32):
+            self.dc += 0.025 * (s - self.dc)         # ~1-bit baseline tracker (follows the
+            v = s - self.dc                          # AC-coupled RX droop / baseline wander)
+            a = v if v >= 0 else -v
+            self.env = a if a > self.env else self.env * 0.9998   # slow peak follower (AGC)
+            h = 0.30 * self.env                      # Schmitt hysteresis (reject noise flutter)
+            if v > h:
+                sign = 1
+            elif v < -h:
+                sign = -1
+            else:
+                sign = self.last_sign                # hold within the deadband
+            self.idx += 1.0
+            if sign != self.last_sign:               # data edge -> nudge phase to mid-bit
+                self.next_center += 0.05 * ((self.idx + self.spb / 2.0) - self.next_center)
+                self.last_sign = sign
+            if self.idx >= self.next_center:
+                self.next_center += self.spb
+                t = self._push_bit(0 if sign > 0 else 1)   # +level -> bit 0
+                if t:
+                    out.append(t)
+        if self.idx > 1e7:                           # keep the phase counter bounded
+            self.idx -= 1e7
+            self.next_center -= 1e7
+        return "".join(out)
+
+
 # --------------------------------------------------------------------- self-test
 if __name__ == "__main__":
     rng = np.random.default_rng(1)
@@ -319,3 +553,13 @@ if __name__ == "__main__":
     r = RTTYDecoder()
     got2 = "".join(r.feed(noisy(b, 30)[i:i + 4800]) for i in range(0, len(b), 4800))
     print(f"RTTY in={msg2!r}  out={got2.strip()!r}")
+
+    for baud in (512, 1200, 2400):
+        for alpha, msg3 in ((False, "1234567890"), (True, "HELLO DJ0SH")):
+            ric = 1234567
+            p = pocsag_encode(msg3, address=ric, baud=baud, alpha=alpha)
+            pd = POCSAGDecoder(baud=baud, alpha=alpha)
+            got3 = "".join(pd.feed(noisy(p, 30)[i:i + 4800]) for i in range(0, len(p), 4800))
+            got3 += pd.feed(noisy(p[:1], 30) * 0)     # (no-op flush guard)
+            print(f"POCSAG {baud:>4} {'ALPHA' if alpha else 'NUM  '} "
+                  f"in={msg3!r}  out={got3.strip()!r}")

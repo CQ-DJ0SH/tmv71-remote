@@ -6,7 +6,7 @@ import os
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-APP_VERSION = "3.2"
+APP_VERSION = "3.3"
 
 
 class Settings(BaseSettings):
@@ -73,6 +73,15 @@ class Settings(BaseSettings):
     # from the radio for more comfortable listening.
     rx_lowpass_enabled: bool = False
 
+    # RX de-emphasis (6 dB/oct) for a flat discriminator / 9600-baud audio source.
+    # On by default; the time constant (µs) is adjustable.
+    rx_deemph_enabled: bool = True
+    rx_deemph_us: float = 75.0
+
+    # Software squelch gated by the radio's BUSY status (for the always-open
+    # discriminator/9600 output that bypasses the hardware squelch).
+    rx_squelch_enabled: bool = False
+
     # UI colour theme ("light" | "dark"). Persisted server-side so the choice
     # survives across browsers/devices and storage clears.
     theme: str = "light"
@@ -114,7 +123,8 @@ _RUNTIME_KEYS = ("serial_port", "serial_baud", "gpio_power_pin",
                  "tx_buffer_ms", "ptt_tail_ms",
                  "auto_power_off_enabled", "auto_power_off_seconds",
                  "callsign", "roger_beep_enabled", "theme",
-                 "tx_lowpass_enabled", "rx_lowpass_enabled",
+                 "tx_lowpass_enabled", "rx_lowpass_enabled", "rx_deemph_enabled",
+                 "rx_deemph_us", "rx_squelch_enabled",
                  "wavelog_url", "wavelog_key", "wavelog_station_id",
                  "qrz_api_key", "qrz_username", "qrz_password",
                  "selcall_own", "selcall_code",

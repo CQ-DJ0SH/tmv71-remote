@@ -282,18 +282,19 @@
       <span class="mt-pb" id="mt-playback" hidden>▶ PLAYBACK</span>
     </div>
     <div class="audio-conn">
-      <label class="acd">BAND
-        <select id="audio-band-sel" title="Which VFO's received audio you hear (TX always goes via the radio's front mic input, so only the RX band matters)">
-          <option value="0">RX-A</option>
-          <option value="1">RX-B</option>
-        </select>
-      </label>
+      <div class="acd audio-band-field">
+        <span>BAND</span>
+        <div class="seg" id="audio-band-seg" title="Which VFO's received audio you hear (TX always goes via the radio's front mic input, so only the RX band matters)">
+          <button type="button" class="sg" data-band="0">RX-A</button>
+          <button type="button" class="sg" data-band="1">RX-B</button>
+        </div>
+      </div>
       <label class="switch-label mictest-toggle">
         <span>MIC TEST</span>
         <input type="checkbox" id="audio-mictest" class="switch">
       </label>
-      <label class="switch-label audio-agc" title="TX AGC — automatic transmit level. On = the transmitted audio is auto-leveled and the manual TX Gain is overridden.">
-        <span>TX AGC</span>
+      <label class="switch-label audio-agc" title="AGC — automatic transmit level. On = the transmitted audio is auto-leveled and the manual TX Gain is overridden.">
+        <span>AGC</span>
         <input type="checkbox" id="tx-auto" class="switch">
       </label>
       <span class="audio-cap">AUDIO</span>
@@ -419,6 +420,7 @@
       <div class="digi-modes" role="tablist" aria-label="Mode">
         <button class="digi-mode active" data-mode="cw" role="tab">CW</button>
         <button class="digi-mode" data-mode="rtty" role="tab">RTTY</button>
+        <button class="digi-mode" data-mode="pocsag" role="tab">POCSAG</button>
       </div>
       <label class="switch-label digi-rx-toggle" title="Decode the received audio">
         <span>DECODE</span><input type="checkbox" id="digi-rx" class="switch">
@@ -437,6 +439,17 @@
         </label>
         <label class="acg">MARK<input type="range" id="digi-mark" min="800" max="2600" step="25" value="2125"><span class="gv" id="digi-mark-v">2125 Hz</span></label>
       </div>
+      <div class="digi-params" id="digi-params-pocsag" hidden>
+        <label class="acd">BAUD
+          <select id="pocsag-baud"><option value="512">512</option><option value="1200" selected>1200</option><option value="2400">2400</option></select>
+        </label>
+        <label class="acd">RIC<input type="text" id="pocsag-addr" inputmode="numeric" maxlength="7" value="1234567" title="Pager address (RIC), 0–2097151"></label>
+        <label class="acd">FUNC
+          <select id="pocsag-func" title="Function bits"><option value="0">A</option><option value="1">B</option><option value="2">C</option><option value="3" selected>D</option></select>
+        </label>
+        <label class="digi-auto dp-alpha" title="Alphanumeric message (else numeric)"><span>ALPHA</span><input type="checkbox" id="pocsag-alpha" class="switch"></label>
+        <label class="digi-auto" title="Decode every pager address (else only the RIC above)"><span>LISTEN ALL</span><input type="checkbox" id="pocsag-all" class="switch" checked></label>
+      </div>
       <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="digi-body" title="Show / hide digimodes">▲</button>
     </div>
     <div class="panel-body" id="digi-body">
@@ -446,7 +459,7 @@
         <input type="text" id="digi-text" placeholder="text to transmit…" autocomplete="off" autocapitalize="characters">
         <button class="digi-send" id="digi-send" title="Encode &amp; transmit (keys PTT)">SEND</button>
       </div>
-      <p class="digi-hint">FM MCW / AFSK — keys PTT while sending. Use a dummy load to set up.</p>
+      <p class="digi-hint">FM MCW (CW) · AFSK (RTTY) · FSK (POCSAG 512/1200/2400) — keys PTT while sending. Use a dummy load to set up.<span class="digi-hint-pocsag" hidden> · DAPNET 439.9875 MHz</span></p>
     </div>
   </section>
 
@@ -665,6 +678,25 @@
           <span>Low-pass (voice only, ≤ 3.5 kHz)</span>
         </label>
         <p class="pane-hint">Band-limits the received radio audio to the voice range, cutting high-frequency hiss/noise above ~3.5 kHz for more comfortable listening.</p>
+      </div>
+      <div class="mixer-field">
+        <span class="logo-label">RX de-emphasis</span>
+        <label class="switch-label">
+          <input type="checkbox" id="set-rx-deemph" class="switch" checked>
+          <span>De-emphasis (6 dB/oct)</span>
+        </label>
+        <div class="audio-ctl">
+          <label class="acg">τ<input type="range" id="deemph-us" min="30" max="300" step="5" value="75"><span class="gv" id="deemph-us-val">75 µs</span></label>
+        </div>
+        <p class="pane-hint">Restores natural voice tone when the RX audio comes from a flat discriminator / 9600-baud data output (no built-in de-emphasis). τ = time constant: higher = more treble roll-off (50 µs Europe, 75 µs US are FM standards). Leave off when feeding the normal speaker output. Applies only to what you hear, not to the digimode/selcall decoders.</p>
+      </div>
+      <div class="mixer-field">
+        <span class="logo-label">RX squelch</span>
+        <label class="switch-label">
+          <input type="checkbox" id="set-rx-squelch" class="switch">
+          <span>Software squelch (radio BUSY)</span>
+        </label>
+        <p class="pane-hint">Mutes the received audio when the radio reports no signal (BUSY off) — for the always-open discriminator / 9600-baud output that bypasses the hardware squelch. Uses the radio's own busy detection (set the squelch level on the rig). Off = pass everything. The decoders always get the un-squelched signal.</p>
       </div>
       <div class="mixer-field">
         <span class="logo-label">TX voice filter</span>

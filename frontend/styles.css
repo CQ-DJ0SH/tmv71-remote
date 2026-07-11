@@ -690,8 +690,14 @@ body.theme-light .screw::before{
 .digi-params .gv{color:#6fd89a; font-size:11px; letter-spacing:.02em; min-width:46px}
 .digi-auto{display:flex; align-items:center; gap:7px; margin-left:-13px; margin-right:18px;
   font-family:var(--font-ui); font-size:10px; letter-spacing:.14em; color:var(--text-dim)}
+.digi-auto.dp-alpha{margin-left:10px}   /* nudge the POCSAG ALPHA toggle to the right */
 .digi-params select{font-family:var(--font-mono); font-size:12px; color:var(--text);
   background:var(--field-bg); border:1px solid var(--edge); border-radius:7px; padding:6px 8px}
+.digi-params .acd{display:flex; align-items:center; gap:8px;
+  font-family:var(--font-ui); font-size:10px; letter-spacing:.16em; color:var(--text-dim)}
+.digi-params input[type=text]{width:74px; font-family:var(--font-mono); font-size:12px; color:var(--text);
+  background:var(--field-bg); border:1px solid var(--edge); border-radius:7px; padding:6px 8px}
+.digi-params input[type=text]:focus{outline:none; border-color:var(--accent)}
 .digi-decode{font-family:var(--font-mono); font-size:13px; line-height:1.5;
   color:var(--accent); text-shadow:0 0 7px var(--accent-glow);
   background:radial-gradient(120% 140% at 50% 0%, #0c1418, #060a0d);
@@ -1331,8 +1337,8 @@ body.theme-light #audio-toggle.connected:hover{
 #tx-gain{--g-accent:#cf6159}   /* MIC gain slider: muted red */
 /* TX timing sliders: muted cyan — without --g-accent the gradient is invalid
    and the browser falls back to a glaring default track */
-#tx-buffer, #ptt-tail{--g-accent:#3fa6b3}
-#tx-buffer-val, #ptt-tail-val{color:#5cc3cf}
+#tx-buffer, #ptt-tail, #deemph-us{--g-accent:#3fa6b3}
+#tx-buffer-val, #ptt-tail-val, #deemph-us-val{color:#5cc3cf}
 .audio-ctl .gv{font-family:var(--font-mono); font-size:11px; color:var(--cyan); width:40px; text-align:right}
 /* RX value: audio-panel violet; shrink to content + left-align so the short
    whole-number value sits snug to the slider instead of a wide right-aligned box */
@@ -1481,10 +1487,18 @@ body.theme-light .switch{--track-empty:#c8d2d9}
   color:var(--text); letter-spacing:.03em; text-transform:capitalize}
 /* gradient track like the gain/timing sliders so the unfilled part stays dark
    (native accent-color tracks render a glaring light grey in the dark theme) */
-.mixer-row .mx-slider{flex:1 1 auto; --g-accent:var(--cyan);
+.mixer-row .mx-slider{flex:1 1 auto; --g-accent:var(--cyan); --mark:rgba(232,237,242,0.7);
   -webkit-appearance:none; appearance:none; height:5px; border-radius:3px;
   cursor:pointer; outline:none;
-  background:linear-gradient(90deg, var(--g-accent) var(--gpct,0%), var(--track-empty,#0c151b) var(--gpct,0%));
+  /* top layer: a 2px recommended-default tick at --def-pct (off-track when unset);
+     bottom layer: the coloured fill (--gpct) over the empty track */
+  background:
+    linear-gradient(90deg,
+      transparent calc(var(--def-pct,-100px) - 1px),
+      var(--mark) calc(var(--def-pct,-100px) - 1px),
+      var(--mark) calc(var(--def-pct,-100px) + 1px),
+      transparent calc(var(--def-pct,-100px) + 1px)),
+    linear-gradient(90deg, var(--g-accent) var(--gpct,0%), var(--track-empty,#0c151b) var(--gpct,0%));
 }
 .mixer-row .mx-slider::-webkit-slider-thumb{
   -webkit-appearance:none; appearance:none; width:14px; height:14px; border-radius:50%;
@@ -1493,7 +1507,7 @@ body.theme-light .switch{--track-empty:#c8d2d9}
 .mixer-row .mx-slider::-moz-range-thumb{
   width:14px; height:14px; border:none; border-radius:50%; background:var(--g-accent); cursor:pointer;
 }
-body.theme-light .mixer-row .mx-slider{--track-empty:#c8d2d9}
+body.theme-light .mixer-row .mx-slider{--track-empty:#c8d2d9; --mark:rgba(40,55,65,0.55)}
 .mixer-row .mx-val{flex:0 0 42px; text-align:right; font-family:var(--font-mono);
   font-size:12px; color:var(--cyan)}
 .mixer-row .mx-mute{flex:0 0 auto; display:flex; align-items:center; gap:5px;
