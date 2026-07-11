@@ -103,8 +103,9 @@ class Settings(BaseSettings):
     # Memory channel to restore after the radio is powered back on. Captured at
     # power-off (manual or auto) only if the control band was in memory mode, so
     # the radio doesn't come up on M001. -1 = nothing to restore.
-    boot_mem_band: int = 0
-    boot_mem_channel: int = -1
+    boot_mem_a: int = -1     # per-band memory channel to restore (-1 = not in memory)
+    boot_mem_b: int = -1
+    boot_control_band: int = -1   # control band to restore after boot (-1 = none)
 
     # Highest memory channel number to scan when listing (TM-V71 has 0..999)
     max_memory_channels: int = 1000
@@ -128,7 +129,7 @@ _RUNTIME_KEYS = ("serial_port", "serial_baud", "gpio_power_pin",
                  "wavelog_url", "wavelog_key", "wavelog_station_id",
                  "qrz_api_key", "qrz_username", "qrz_password",
                  "selcall_own", "selcall_code",
-                 "boot_mem_band", "boot_mem_channel")
+                 "boot_mem_a", "boot_mem_b", "boot_control_band")
 
 
 def _load_runtime() -> dict:

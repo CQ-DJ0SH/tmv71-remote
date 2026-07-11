@@ -722,7 +722,7 @@ body.theme-light .digi-decode{background:#f3f7f4; border-color:#cfe0d6;
 .digi-clear{color:var(--text-dim); background:var(--ctrl-bg); border:1px solid var(--edge)}
 .digi-clear:hover{color:var(--accent); border-color:var(--accent)}
 .digi-hint{margin:8px 0 0; font-family:var(--font-ui); font-size:10px;
-  letter-spacing:.04em; color:var(--text-dim); opacity:.8}
+  letter-spacing:.04em; color:var(--text-dim); opacity:.8; text-align:center}
 
 /* ---------------- selcall (5-tone) — muted bronze ---------------- */
 .selcall-zone{--accent:#c9a066; --accent-glow:#c9a066; padding:22px 26px}
@@ -773,7 +773,7 @@ body.theme-light .sel-decode{background:#f6f1e8; color:#8a6a2f; border-color:#dd
 .sel-decode:empty::before{content:"— no calls —"; color:var(--text-dim); opacity:.6}
 .sel-decode .mine{color:var(--ok); font-weight:700}
 .sel-hint{margin:8px 0 0; font-family:var(--font-ui); font-size:10px;
-  letter-spacing:.04em; color:var(--text-dim); opacity:.8}
+  letter-spacing:.04em; color:var(--text-dim); opacity:.8; text-align:center}
 
 /* VFO-panel switch borders in the band's accent colour (A=amber, B=cyan) */
 .band .seg, .band .seg .sg+.sg,

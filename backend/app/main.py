@@ -374,33 +374,44 @@ async def _shut_down_peripherals() -> None:
 
 
 def _remember_mem_for_boot() -> None:
-    """Before power-off, capture the control band's memory channel so it can be
-    restored on the next boot — but only if that band is in memory mode; in VFO
-    mode clear it so the boot doesn't force memory. Covers manual and auto off."""
+    """Before power-off, capture EACH band's memory channel so both can be
+    restored on the next boot — but only for bands actually in memory mode; a
+    VFO-mode band is cleared so the boot doesn't force it into memory. Covers
+    manual and auto off."""
     st = service.status
-    cb = next((b for b in (st.bands or []) if b.band == (st.control_band or 0)), None)
-    if cb is not None and cb.mode == MR_MODE and cb.memory_channel is not None:
-        settings.boot_mem_band = cb.band
-        settings.boot_mem_channel = cb.memory_channel
-        save_runtime(boot_mem_band=cb.band, boot_mem_channel=cb.memory_channel)
-    elif settings.boot_mem_channel != -1:
-        settings.boot_mem_channel = -1
-        save_runtime(boot_mem_channel=-1)
+    for band, key in ((0, "boot_mem_a"), (1, "boot_mem_b")):
+        bs = next((b for b in (st.bands or []) if b.band == band), None)
+        ch = (bs.memory_channel if bs is not None and bs.mode == MR_MODE
+              and bs.memory_channel is not None else -1)
+        if getattr(settings, key) != ch:
+            setattr(settings, key, ch)
+            save_runtime(**{key: ch})
+    cb = st.control_band if st.control_band is not None else -1   # also keep CTRL band
+    if settings.boot_control_band != cb:
+        settings.boot_control_band = cb
+        save_runtime(boot_control_band=cb)
 
 
 async def _restore_mem_after_boot() -> None:
-    """After the radio is powered back on, wait for CAT then recall the channel
-    captured at the last power-off (it otherwise comes up on M001)."""
-    if settings.boot_mem_channel < 0:
+    """After the radio is powered back on, wait for CAT then recall each band's
+    channel captured at the last power-off (it otherwise comes up on M001)."""
+    targets = [(b, ch) for b, ch in ((0, settings.boot_mem_a), (1, settings.boot_mem_b)) if ch >= 0]
+    ctrl = settings.boot_control_band
+    if not targets and ctrl < 0:
         return
-    band, channel = settings.boot_mem_band, settings.boot_mem_channel
     await asyncio.sleep(1.0)
     for _ in range(20):                      # ~40 s for the radio to boot + CAT
         if service.status.connected:
-            try:
-                await service.recall_memory(band, channel)
-            except Exception:  # noqa: BLE001
-                pass
+            for band, channel in targets:
+                try:
+                    await service.recall_memory(band, channel)
+                except Exception:  # noqa: BLE001
+                    pass
+            if ctrl >= 0:                    # restore CTRL band last (recalls can shift it)
+                try:
+                    await service.set_control_band(ctrl)
+                except Exception:  # noqa: BLE001
+                    pass
             return
         await asyncio.sleep(2.0)
 
