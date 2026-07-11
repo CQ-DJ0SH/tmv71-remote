@@ -432,6 +432,34 @@ class POCSAGDecoder:
         self.cur_func = 0
         self.msg = []
 
+    @staticmethod
+    def _decode_alpha(payloads):
+        """7-bit ASCII decode -> (text, printable_ratio). Ratio = printable chars
+        over non-null chars; a numeric page decoded as alpha yields many control
+        chars (low ratio), which is how auto-detect tells the two apart."""
+        bits = []
+        for w in payloads:
+            bits += [(w >> b) & 1 for b in range(19, -1, -1)]
+        printable = nonnull = 0
+        out = []
+        for i in range(0, len(bits) - 6, 7):
+            c = sum(bits[i + k] << k for k in range(7))
+            if c == 0:                         # null padding
+                continue
+            nonnull += 1
+            if 32 <= c < 127:
+                printable += 1
+                out.append(chr(c))
+        return "".join(out).rstrip(), (printable / nonnull if nonnull else 0.0)
+
+    @staticmethod
+    def _decode_num(payloads):
+        text = ""
+        for w in payloads:
+            for k in range(5):
+                text += _POCSAG_NUM[_rev4((w >> (16 - 4 * k)) & 0xF)]
+        return text.rstrip()
+
     def _flush(self) -> str:
         active, ric, func, payloads = self.cur_active, self.cur_ric, self.cur_func, self.msg
         self.cur_active, self.msg = False, []
@@ -439,26 +467,15 @@ class POCSAGDecoder:
             return ""
         if not self.listen_all and ric != self.addr:      # filter to our RIC
             return ""
-        if self.alpha:
-            bits = []
-            for w in payloads:
-                bits += [(w >> b) & 1 for b in range(19, -1, -1)]
-            chars = []
-            for i in range(0, len(bits) - 6, 7):
-                c = sum(bits[i + k] << k for k in range(7))
-                if c == 0:
-                    continue
-                chars.append(chr(c) if 32 <= c < 127 else "")
-            text = "".join(chars).rstrip()
+        # auto-detect numeric vs alphanumeric per message: prefer the ASCII decode
+        # when it reads as mostly-printable text, else fall back to numeric.
+        alpha_text, ratio = self._decode_alpha(payloads)
+        if alpha_text and ratio >= 0.6:
+            text, kind = alpha_text, "ALPHA"
         else:
-            text = ""
-            for w in payloads:
-                for k in range(5):
-                    text += _POCSAG_NUM[_rev4((w >> (16 - 4 * k)) & 0xF)]
-            text = text.rstrip()
+            text, kind = self._decode_num(payloads), "NUM"
         if not text:
             return ""
-        kind = "ALPHA" if self.alpha else "NUM"
         return f"RIC {ric:>7} · FUNC {'ABCD'[func & 3]} · {kind} · {text}\n"
 
     def _decode_batch(self, words) -> str:

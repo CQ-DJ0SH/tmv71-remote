@@ -313,6 +313,7 @@
     </div>
     <div class="audio-graph">
       <canvas id="level-graph"></canvas>
+      <span class="graph-bytes" id="graph-bytes" title="WebRTC audio data rate (RX ↓ from radio · TX ↑ mic)"></span>
       <div class="graph-axis"><span>30s</span><span>20s</span><span>10s</span><span>now</span></div>
       <div class="graph-legend">
         <span class="lg rx">RX</span><span class="lg mic">MIC</span>
@@ -447,7 +448,7 @@
         <label class="acd">FUNC
           <select id="pocsag-func" title="Function bits"><option value="0">A</option><option value="1">B</option><option value="2">C</option><option value="3" selected>D</option></select>
         </label>
-        <label class="digi-auto dp-alpha" title="Alphanumeric message (else numeric)"><span>ALPHA</span><input type="checkbox" id="pocsag-alpha" class="switch"></label>
+        <label class="digi-auto dp-alpha" title="TX message type — alphanumeric (else numeric). RX auto-detects."><span>ALPHA</span><input type="checkbox" id="pocsag-alpha" class="switch" checked></label>
         <label class="digi-auto" title="Decode every pager address (else only the RIC above)"><span>LISTEN ALL</span><input type="checkbox" id="pocsag-all" class="switch" checked></label>
       </div>
       <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="digi-body" title="Show / hide digimodes">▲</button>

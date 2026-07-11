@@ -104,7 +104,7 @@ class DigiService:
         self.pocsag_baud = 1200
         self.pocsag_addr = 1234567
         self.pocsag_func = 3
-        self.pocsag_alpha = False
+        self.pocsag_alpha = True       # DAPNET etc. are alphanumeric (7-bit ASCII)
         self.pocsag_listen_all = True
         self.rx = False
         self._dec = None

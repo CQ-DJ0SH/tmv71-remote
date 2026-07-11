@@ -362,6 +362,7 @@ async function refreshAudio() {
     // scroll the level graph only while the browser audio is connected
     if (audioConnected()) pushLevel(a.rx_db, a.tx_db);
     else if (levelHist.length) { levelHist.length = 0; drawLevelGraph(); }
+    updateAudioBytes();     // WebRTC RX/TX data rate readout (throttled inside)
     // mirror gain sliders unless the user is dragging them
     ["rx", "tx"].forEach(k => {
       const sl = document.getElementById(k + "-gain"), g = a[k + "_gain"];
@@ -447,6 +448,33 @@ function drawLevelGraph(offset = 0) {
   drawSeries(ctx, levelHist.map(s => s.tx), xAt, H, "rgba(207,97,89,0.95)", "rgba(207,97,89,0.14)",  lw);   // muted MIC red
 }
 
+// WebRTC audio data-rate readout (bytes/s) shown in the graph corner. Computed
+// from getStats() byte deltas; throttled to ~1 s so the rate is stable.
+let _rtcPrev = null;      // {rx, tx, t}
+function fmtRate(bps) {
+  if (bps >= 1e6) return (bps / 1e6).toFixed(1) + " MB/s";
+  if (bps >= 1e3) return (bps / 1e3).toFixed(1) + " kB/s";
+  return Math.round(bps) + " B/s";
+}
+async function updateAudioBytes() {
+  const el = $("#graph-bytes"); if (!el) return;
+  if (!audioPc || !audioConnected()) { el.textContent = ""; _rtcPrev = null; return; }
+  const now = performance.now();
+  if (_rtcPrev && now - _rtcPrev.t < 900) return;      // throttle to ~1 s
+  let stats; try { stats = await audioPc.getStats(); } catch { return; }
+  let rx = 0, tx = 0;
+  stats.forEach(r => {
+    if (r.type === "inbound-rtp" && r.kind === "audio") rx += r.bytesReceived || 0;
+    if (r.type === "outbound-rtp" && r.kind === "audio") tx += r.bytesSent || 0;
+  });
+  if (_rtcPrev) {
+    const dt = (now - _rtcPrev.t) / 1000;
+    if (dt > 0) el.innerHTML =
+      '<span class="gb-rx">↓ ' + fmtRate((rx - _rtcPrev.rx) / dt) + '</span> ' +
+      '<span class="gb-tx">↑ ' + fmtRate((tx - _rtcPrev.tx) / dt) + '</span>';
+  }
+  _rtcPrev = { rx, tx, t: now };
+}
 function pushLevel(rxDb, txDb) {
   levelHist.push({ rx: lvlNorm(rxDb), tx: lvlNorm(txDb) });
   if (levelHist.length > GRAPH_MAX) levelHist.shift();

@@ -1347,12 +1347,24 @@ body.theme-light #audio-toggle.connected:hover{
 
 /* scrolling RX/MIC level history graph (newest on the right) */
 .audio-graph{
+  position:relative;
   display:flex; flex-direction:column;
   margin-top:2px; flex:1 1 auto; min-height:160px; overflow:hidden;
   border:1px solid #4a5a67; border-radius:10px; background:var(--field-bg);
   box-shadow:inset 0 1px 6px #00000033;
 }
 #level-graph{flex:1 1 auto; width:100%; min-height:0; display:block}
+/* WebRTC data-rate readout in the top-right corner of the level graph */
+.graph-bytes{position:absolute; top:6px; right:8px; z-index:2; pointer-events:none;
+  font-family:var(--font-mono); font-size:11px; letter-spacing:.02em; white-space:nowrap;
+  color:var(--text); background:rgba(6,10,13,0.62); padding:2px 7px; border-radius:6px;
+  box-shadow:0 0 0 1px #00000040}
+.graph-bytes:empty{display:none}
+.graph-bytes .gb-rx{color:#8b7ad6}   /* RX = graph violet */
+.graph-bytes .gb-tx{color:#cf6159; margin-left:10px}   /* TX = graph red */
+body.theme-light .graph-bytes{background:rgba(255,255,255,0.72)}
+body.theme-light .graph-bytes .gb-rx{color:#6a5ab0}
+body.theme-light .graph-bytes .gb-tx{color:#b64a42}
 .graph-axis{
   flex:none; display:flex; justify-content:space-between;
   padding:3px 8px 4px; border-top:1px solid var(--edge);
