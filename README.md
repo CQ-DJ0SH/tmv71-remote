@@ -151,11 +151,11 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
   -keyout certs/key.pem -out certs/cert.pem -subj "/CN=tmv71-remote" \
   -addext "subjectAltName=IP:<pi-ip>,DNS:localhost,IP:127.0.0.1"
 
-.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 \
+.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8443 \
   --ssl-keyfile certs/key.pem --ssl-certfile certs/cert.pem
 ```
 
-Open **`https://<pi-ip>:8000/`** and accept the self-signed certificate once.
+Open **`https://<pi-ip>:8443/`** and accept the self-signed certificate once.
 This single process serves radio control, live status and the WebRTC audio
 signalling — no extra services. For a reboot-proof setup see [`deploy/`](deploy/).
 
@@ -320,7 +320,7 @@ All settings are overridable via `TMV71_*` environment variables (see
 |---|---|---|
 | `TMV71_SERIAL_PORT` | `/dev/ttyUSB0` | radio serial device |
 | `TMV71_SERIAL_BAUD` | `57600` | serial baud rate |
-| `TMV71_PORT` | `8000` | HTTP port |
+| `TMV71_PORT` | `8443` | HTTPS port |
 | `TMV71_AUDIO_DEVICE` | `NAD` | substring matched against the USB sound device |
 | `TMV71_RX_GAIN` / `TMV71_TX_GAIN` | `1.0` | digital audio gain |
 | `TMV71_AUDIO_ENABLED` | `true` | open the audio device / WebRTC bridge |
@@ -371,7 +371,7 @@ the repository.
 
 ## Security
 
-LAN-only by design. There is no authentication. Do **not** expose port 8000
+LAN-only by design. There is no authentication. Do **not** expose port 8443
 directly to the internet — use a VPN (e.g. WireGuard/Tailscale) or a reverse
 proxy with TLS + auth.
 

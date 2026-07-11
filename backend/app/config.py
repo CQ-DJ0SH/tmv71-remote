@@ -17,9 +17,9 @@ class Settings(BaseSettings):
     serial_baud: int = 57600
     serial_timeout: float = 1.0
 
-    # HTTP server (LAN only for now)
+    # HTTPS server (LAN only for now)
     host: str = "0.0.0.0"
-    port: int = 8000
+    port: int = 8443
 
     # How often the background poller refreshes radio status (seconds)
     poll_interval: float = 0.8
