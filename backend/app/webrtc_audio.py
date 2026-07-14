@@ -169,6 +169,8 @@ class RadioAudio:
         self._digi_rx_chunks: list = []
         self.sel_rx = False                          # 5-tone selcall decoder tap
         self._sel_rx_chunks: list = []
+        self.asr_rx = False                          # callsign-ASR (Vosk) tap
+        self._asr_rx_chunks: list = []
         self._digi_lock = threading.Lock()
         self._digi_tx: Optional[np.ndarray] = None   # queued encoded samples
         self._digi_pos = 0
@@ -284,11 +286,14 @@ class RadioAudio:
         if self.rx_gain != 1.0:
             samples = np.clip(samples.astype(np.float32) * self.rx_gain,
                               -32768, 32767).astype(np.int16)
+        # ASR taps the full-band signal (pre listening low-pass); it applies its
+        # own de-emphasis + high-pass, so the listening filters must not affect it.
+        asr_src = samples
         if self.rx_lowpass:
             samples = self._rx_lp.process(samples)
         self.rx_frames += 1
         # digimodes decoder tap: stash RX blocks for the decode loop to consume
-        if self.digi_rx or self.sel_rx:
+        if self.digi_rx or self.sel_rx or self.asr_rx:
             with self._digi_lock:
                 if self.digi_rx:
                     self._digi_rx_chunks.append(samples.copy())
@@ -298,6 +303,10 @@ class RadioAudio:
                     self._sel_rx_chunks.append(samples.copy())
                     if len(self._sel_rx_chunks) > 250:
                         self._sel_rx_chunks.pop(0)
+                if self.asr_rx and not self.mic_test:   # mic test feeds ASR from the mic
+                    self._asr_rx_chunks.append(asr_src.copy())
+                    if len(self._asr_rx_chunks) > 250:
+                        self._asr_rx_chunks.pop(0)
         # mic-test echo replay: while a recording is being played back, override
         # the published RX block with it (single pos writer = this callback).
         pub = samples
@@ -427,6 +436,20 @@ class RadioAudio:
             with self._digi_lock:
                 self._sel_rx_chunks = []
 
+    def pop_asr_rx(self) -> Optional[np.ndarray]:
+        with self._digi_lock:
+            if not self._asr_rx_chunks:
+                return None
+            chunks = self._asr_rx_chunks
+            self._asr_rx_chunks = []
+        return np.concatenate(chunks)
+
+    def set_asr_rx(self, on: bool) -> None:
+        self.asr_rx = on
+        if not on:
+            with self._digi_lock:
+                self._asr_rx_chunks = []
+
     def play_digi(self, pcm: np.ndarray) -> None:
         """Queue encoded CW/RTTY audio for the radio mic (played while keyed)."""
         self._digi_pos = 0
@@ -486,6 +509,12 @@ class RadioAudio:
                     total = sum(len(c) for c in self._mic_rec_chunks)
                     while total > self._mic_rec_cap and len(self._mic_rec_chunks) > 1:
                         total -= len(self._mic_rec_chunks.pop(0))
+                # also evaluate the mic audio for callsigns (ASR) during the test
+                if self.asr_rx:
+                    with self._digi_lock:
+                        self._asr_rx_chunks.append(pcm.copy())
+                        if len(self._asr_rx_chunks) > 250:
+                            self._asr_rx_chunks.pop(0)
             return
         with self._pb_lock:
             self._playback.extend(pcm.tolist())

@@ -11,6 +11,9 @@ __pycache__/
 backend/app/runtime.json
 backend/app/logbook.json
 
+# Vosk speech model for callsign recognition (downloaded on setup, ~90 MB)
+models/
+
 # Title-bar logo (may be a trademarked brand logo — never commit it)
 backend/app/branding/
 

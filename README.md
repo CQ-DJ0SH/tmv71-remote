@@ -49,6 +49,15 @@ the theme toggle in the header (light is the default).*
   the radio, and a [QRZ.com](https://www.qrz.com/) lookup auto-fills name, grid,
   QTH, e-mail and country. A "worked before" check and the latest contacts/totals
   are shown inline; recent entries are kept locally so they survive restarts.
+- **Off-air callsign recognition (optional, Vosk)** — a speech-recognition pass on
+  the RX audio that reads out spoken **German callsigns** — international *and*
+  German phonetic alphabets plus German letter names ("Delta Bravo null Sierra
+  Papa", "Dora Berta null Samuel Paula" or "de-be-null-es-pe"). A
+  grammar-constrained [Vosk](https://alphacephei.com/vosk/) model keeps
+  recognition usable on noisy FM voice; each hit shows in the title bar (in the
+  active RX band's colour) and as a toast enriched with the QRZ.com lookup. Runs
+  only while the squelch is open, ignores your own callsign, and can also grade
+  the mic-test audio. Off by default. See [Callsign recognition](#callsign-recognition-vosk).
 - **No build step for the control UI** — the SPA is plain HTML/CSS/JS served
   directly by the backend. No Node toolchain required on the Pi.
 - **Installable PWA / mobile-ready** — runs as an installable Progressive Web App
@@ -96,6 +105,8 @@ Protocol reference: [LA3QMA/TM-V71_TM-D710-Kenwood](https://github.com/LA3QMA/TM
   in-process via `aiortc` (pip) — no audio server needed.
 - Optional: a **HackRF One** plus the `hackrf` host tools for the SDR waterfall
   (see [SDR waterfall](#sdr-waterfall-optional-hackrf)).
+- Optional: **`vosk`** + the small German speech model for off-air callsign
+  recognition (see [Callsign recognition](#callsign-recognition-vosk)).
 
 ### Python dependencies
 
@@ -109,8 +120,9 @@ Installed from [`backend/requirements.txt`](backend/requirements.txt):
 | `python-multipart` | file uploads (logo, CSV import) |
 | `aiortc` | **two-way browser audio over WebRTC/Opus** |
 | `sounddevice` | USB sound-card I/O (PortAudio); `av`/`numpy` pulled in for frames |
-| `numpy` | audio sample processing (levels, gain, tones) |
+| `numpy` | audio sample processing (levels, gain, tones, filters) |
 | `gpiozero`, `lgpio` | optional GPIO power switch (Raspberry Pi) |
+| `vosk` | optional offline speech recognition for callsign detection |
 
 ## Radio setup
 
@@ -195,6 +207,52 @@ Optional processing (Settings → Audio; the decoders always get the raw signal)
 - **TX AGC** — automatic transmit-level control on the mic path (fast attack, slow
   release), overriding the manual TX Gain. A voice low-pass and per-device mic
   gain round out the audio options.
+
+## Callsign recognition (Vosk)
+
+An optional, offline speech-recognition pass on the RX audio that detects spoken
+**German callsigns** (prefix D) and surfaces them in the UI. It is off by default;
+enable **Callsign detect** in *Settings → Audio*.
+
+**How it works.** Callsigns are read out letter-by-letter over the air, so free
+dictation would be hopeless on noisy FM. Instead a [Vosk](https://alphacephei.com/vosk/)
+recognizer is **grammar-constrained** to just the spelling vocabulary — the
+international phonetic alphabet, the German *Buchstabiertafel*, German letter
+names, and German digits — which stays reliable even on weak signals. Recognised
+words are mapped back to letters and a valid German callsign is pulled out. Every
+hit is shown in a framed field in the title bar (coloured to the active RX band),
+announced as a toast enriched with a **QRZ.com** lookup (name/QTH/country), and
+de-duplicated for ~90 s. Your **own callsign is ignored**, and recognition only
+runs while the squelch reports **BUSY** (open). It can also grade the **mic-test**
+audio, so you can try it with your own voice without a signal.
+
+**ASR audio conditioning.** The recognizer feeds on the *flat*
+discriminator / 9600-baud output (independent of the listening filters) and
+applies its own front-end — **75 µs de-emphasis** (the flat output has none, so
+it is otherwise too bright for the acoustic model) and a **~250 Hz high-pass**
+(drops CTCSS/sub-audio + DC) — before decoding at 16 kHz. This is the single
+biggest factor for good accuracy from a data-port feed.
+
+**Setup.** Install the dependency and the small German model on the Pi:
+
+```bash
+# in the backend venv
+pip install vosk
+
+# download the model into ./models (gitignored, ~90 MB)
+mkdir -p models && cd models
+curl -LO https://alphacephei.com/vosk/models/vosk-model-small-de-0.15.zip
+unzip vosk-model-small-de-0.15.zip && rm vosk-model-small-de-0.15.zip
+```
+
+The backend expects it at `models/vosk-model-small-de-0.15` (override with
+`TMV71_ASR_MODEL_DIR`). On a Raspberry Pi 4 the model loads in ~1–2 s and runs
+comfortably in real time on one core (only while enabled). QRZ enrichment reuses
+the logbook's QRZ credentials.
+
+> Best-effort assist on voice — expect the occasional miss or false hit; the
+> strict callsign pattern filters most noise, and detections are only *shown*,
+> never auto-logged.
 
 ## Mobile app (PWA)
 
@@ -356,6 +414,7 @@ the repository.
 | `GET`/`POST` | `/api/power-switch` | GPIO power on/off + auto-power-off status |
 | `GET`/`POST` | `/api/digi` · `/api/digi/config` · `/api/digi/tx` | CW / RTTY / **POCSAG** decode + transmit |
 | `POST` | `/api/selcall/config` | 5-tone selcall config + transmit |
+| `GET`/`POST` | `/api/asr/config` | off-air callsign recognition state / enable (Vosk) |
 | `GET` | `/api/hackrf` | SDR waterfall status (optional HackRF) |
 | `POST` | `/api/hackrf/start` · `/stop` · `/config` | control the SDR waterfall |
 | `GET`/`POST` | `/api/log/config` | get / set logbook (Wavelog + QRZ) settings |
@@ -368,6 +427,7 @@ the repository.
 | `WS` | `/ws` | live status stream |
 | `WS` | `/ws/hackrf` | live spectrum / waterfall frames (optional HackRF) |
 | `WS` | `/ws/digi` · `/ws/selcall` | decoded digimode / selcall text stream |
+| `WS` | `/ws/callsign` | recognised-callsign events (+ QRZ details) |
 
 ## Security
 
@@ -387,6 +447,7 @@ proxy with TLS + auth.
 - ✅ Digimodes — CW, RTTY and POCSAG (512/1200/2400, DAPNET) encode/decode
 - ✅ 5-tone selcall (ZVEI/CCIR/EEA …) decode + transmit
 - ✅ Audio processing — RX de-emphasis, BUSY-gated software squelch, TX AGC
+- ✅ Off-air callsign recognition — grammar-constrained Vosk ASR + QRZ toast
 
 ## Credits
 

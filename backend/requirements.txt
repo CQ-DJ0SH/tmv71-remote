@@ -15,6 +15,11 @@ numpy>=2.1,<2.3
 # pymumble==1.6.1
 # opuslib==3.0.1
 
+# Off-air callsign recognition (grammar-constrained ASR on the RX audio).
+# Optional: only needed when the "callsign detect" feature is switched on.
+# Requires the model dir models/vosk-model-small-de-0.15 (downloaded separately).
+vosk==0.3.45
+
 # GPIO power switch (relay/MOSFET on the radio's DC line). lgpio backend works
 # on Raspberry Pi 5 / Debian 13. Needs system pkg liblgpio (liblgpio-dev to build).
 gpiozero==2.0.1

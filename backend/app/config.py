@@ -6,7 +6,7 @@ import os
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-APP_VERSION = "3.3"
+APP_VERSION = "3.4"
 
 
 class Settings(BaseSettings):
@@ -82,6 +82,13 @@ class Settings(BaseSettings):
     # discriminator/9600 output that bypasses the hardware squelch).
     rx_squelch_enabled: bool = False
 
+    # Off-air callsign recognition: grammar-constrained Vosk ASR on the RX audio.
+    # Detects German callsigns (spoken phonetic alphabet + German digits) while the
+    # squelch is open, looks them up on QRZ, and shows them in the title bar.
+    asr_callsign_enabled: bool = False
+    # Vosk model directory. Empty -> <repo>/models/vosk-model-small-de-0.15.
+    asr_model_dir: str = ""
+
     # UI colour theme ("light" | "dark"). Persisted server-side so the choice
     # survives across browsers/devices and storage clears.
     theme: str = "light"
@@ -125,7 +132,7 @@ _RUNTIME_KEYS = ("serial_port", "serial_baud", "gpio_power_pin",
                  "auto_power_off_enabled", "auto_power_off_seconds",
                  "callsign", "roger_beep_enabled", "theme",
                  "tx_lowpass_enabled", "rx_lowpass_enabled", "rx_deemph_enabled",
-                 "rx_deemph_us", "rx_squelch_enabled",
+                 "rx_deemph_us", "rx_squelch_enabled", "asr_callsign_enabled",
                  "wavelog_url", "wavelog_key", "wavelog_station_id",
                  "qrz_api_key", "qrz_username", "qrz_password",
                  "selcall_own", "selcall_code",

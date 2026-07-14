@@ -47,6 +47,9 @@
     <span class="brand-mark" id="brand-mark">▚</span>
     <img class="brand-logo" id="brand-logo" alt="Logo" hidden>
     <div class="callsign" id="callsign"></div>
+    <span class="asr-live" id="asr-live" hidden title="Callsign ASR active">ASR</span>
+    <button class="rx-call" id="rx-call" type="button" hidden
+            title="Auto-detected callsign (none yet)"></button>
   </div>
   <div class="title-center">
     <span class="screw screw-l" aria-hidden="true"></span>
@@ -687,7 +690,7 @@
           <span>De-emphasis (6 dB/oct)</span>
         </label>
         <div class="audio-ctl">
-          <label class="acg">τ<input type="range" id="deemph-us" min="30" max="300" step="5" value="75"><span class="gv" id="deemph-us-val">75 µs</span></label>
+          <label class="acg">τ<input type="range" id="deemph-us" min="30" max="300" step="5" value="75" style="--def-pct:16.67%"><span class="gv" id="deemph-us-val">75 µs</span></label>
         </div>
         <p class="pane-hint">Restores natural voice tone when the RX audio comes from a flat discriminator / 9600-baud data output (no built-in de-emphasis). τ = time constant: higher = more treble roll-off (50 µs Europe, 75 µs US are FM standards). Leave off when feeding the normal speaker output. Applies only to what you hear, not to the digimode/selcall decoders.</p>
       </div>
@@ -698,6 +701,14 @@
           <span>Software squelch (radio BUSY)</span>
         </label>
         <p class="pane-hint">Mutes the received audio when the radio reports no signal (BUSY off) — for the always-open discriminator / 9600-baud output that bypasses the hardware squelch. Uses the radio's own busy detection (set the squelch level on the rig). Off = pass everything. The decoders always get the un-squelched signal.</p>
+      </div>
+      <div class="mixer-field">
+        <span class="logo-label">Callsign detect</span>
+        <label class="switch-label">
+          <input type="checkbox" id="set-asr-callsign" class="switch">
+          <span>Auto-detect callsigns (Vosk)</span>
+        </label>
+        <p class="pane-hint" id="asr-hint">Listens to the RX audio while the squelch is open and recognises spoken German callsigns (international &amp; German phonetic alphabet plus German letter names — "Delta Bravo null Sierra Papa" or "de-be-null-es-pe"). A hit is shown in the title bar next to your callsign and as a toast with QRZ.com details; your own callsign is ignored. Best-effort assist on voice — expect occasional misses/false hits. Needs the Vosk model on the Pi.</p>
       </div>
       <div class="mixer-field">
         <span class="logo-label">TX voice filter</span>
@@ -719,15 +730,15 @@
         <span class="logo-label">TX timing</span>
         <div class="audio-ctl">
           <label class="acg">BUFFER
-            <input type="range" id="tx-buffer" min="40" max="500" step="5" value="250">
+            <input type="range" id="tx-buffer" min="40" max="500" step="5" value="250" style="--def-pct:13.04%">
             <span class="gv" id="tx-buffer-val">250 ms</span>
           </label>
           <label class="acg">TRAIL
-            <input type="range" id="ptt-tail" min="0" max="500" step="10" value="250">
+            <input type="range" id="ptt-tail" min="0" max="500" step="10" value="250" style="--def-pct:22%">
             <span class="gv" id="ptt-tail-val">250 ms</span>
           </label>
         </div>
-        <p class="pane-hint">BUFFER: mic backlog cap — lower = less TX latency, higher = more tolerant of network jitter (default 250 ms). TRAIL: how long TX stays keyed after you release, so the buffered tail isn't chopped (default 250 ms).</p>
+        <p class="pane-hint">BUFFER: mic backlog cap — lower = less TX latency, higher = more tolerant of network jitter (tick = recommended 100 ms). TRAIL: how long TX stays keyed after you release, so the buffered tail isn't chopped (tick = recommended 110 ms).</p>
       </div>
       <div class="modal-actions">
         <button id="set-cancel-audio" class="btn-ghost">CLOSE</button>

@@ -30,7 +30,7 @@ from .models import (AudioDeviceRequest, AudioGainRequest, AutoPowerOffRequest,
                      AudioBufferRequest,
                      MemoryChannel, MixerSetRequest, PowerRequest,
                      PowerSwitchRequest, TonesRequest, DigiConfig, DigiTxRequest,
-                     SelcallConfig, SelcallTxRequest,
+                     SelcallConfig, SelcallTxRequest, AsrConfigRequest,
                      PttBandRequest, PttRequest, RadioInfo, RadioStatus,
                      Tone1750Request,
                      RecallRequest, ScanStartRequest, SerialConfig,
@@ -45,6 +45,7 @@ from .power_switch import PowerSwitch
 from .webrtc_audio import RadioAudio, RadioRxTrack, consume_mic, SAMPLE_RATE
 from . import digimodes
 from . import selcall
+from . import callsign_asr
 from .logbook import logbook, band_for_hz, _FM_MODE, LogError
 from aiortc import RTCPeerConnection, RTCSessionDescription
 from .radio_service import RadioService
@@ -332,6 +333,138 @@ class SelcallService:
 
 sel = SelcallService(radio_audio)
 
+
+class CallsignService:
+    """Off-air callsign recognition via grammar-constrained Vosk ASR.
+
+    While enabled it pulls RX blocks (only while the squelch is open, i.e.
+    ``rx_busy``), feeds Vosk restricted to the phonetic/spelling alphabets +
+    German digits, extracts German callsigns (prefix D), dedupes, looks each up
+    on QRZ and pushes the result to WebSocket subscribers (title bar + toast).
+    The model is loaded lazily on first enable so the dependency is optional."""
+
+    def __init__(self, audio: RadioAudio):
+        self.audio = audio
+        self.enabled = False
+        self._rec = None                       # lazy callsign_asr.CallsignRecognizer
+        self._subs: set = set()
+        self._task = None
+        self._seen: dict = {}                  # callsign -> last-emit monotonic ts
+        self._repeat_s = 90.0                  # suppress a repeat of the same call
+        self._lock = asyncio.Lock()
+
+    def _model_dir(self) -> str:
+        if settings.asr_model_dir:
+            return settings.asr_model_dir
+        return os.path.normpath(os.path.join(
+            os.path.dirname(__file__), "..", "..", "models",
+            "vosk-model-small-de-0.15"))
+
+    @property
+    def available(self) -> bool:
+        try:
+            import vosk  # noqa: F401
+        except Exception:  # noqa: BLE001
+            return False
+        return os.path.isdir(self._model_dir())
+
+    def status(self) -> dict:
+        return {"enabled": self.enabled, "available": self.available,
+                "ready": self._rec is not None}
+
+    async def set_enabled(self, on: bool) -> dict:
+        async with self._lock:
+            if on and self._rec is None:
+                try:
+                    self._rec = await asyncio.to_thread(
+                        callsign_asr.CallsignRecognizer, self._model_dir(),
+                        settings.callsign)
+                except Exception as exc:  # noqa: BLE001
+                    logging.getLogger("tmv71").warning(
+                        "callsign ASR: model load failed: %s", exc)
+                    raise HTTPException(500, f"Vosk model load failed: {exc}")
+            self.enabled = on
+            self.audio.set_asr_rx(on)
+            if not on:
+                self._seen.clear()
+            if settings.asr_callsign_enabled != on:
+                settings.asr_callsign_enabled = on
+                save_runtime(asr_callsign_enabled=on)
+            return self.status()
+
+    def set_own(self, call: str) -> None:
+        if self._rec is not None:
+            self._rec.set_own(call)
+
+    def subscribe(self):
+        q: asyncio.Queue = asyncio.Queue()
+        self._subs.add(q)
+        return q
+
+    def unsubscribe(self, q) -> None:
+        self._subs.discard(q)
+
+    def _broadcast(self, msg: dict) -> None:
+        for q in list(self._subs):
+            try:
+                q.put_nowait(msg)
+            except Exception:  # noqa: BLE001
+                pass
+
+    async def start(self) -> None:
+        self._task = asyncio.create_task(self._decode_loop())
+
+    async def stop(self) -> None:
+        if self._task:
+            self._task.cancel()
+
+    async def _decode_loop(self) -> None:
+        prev_active = True
+        while True:
+            await asyncio.sleep(0.12)
+            if not self.enabled or self._rec is None:
+                self.audio.pop_asr_rx()              # keep the tap drained
+                prev_active = True
+                continue
+            # active = squelch open (radio RX) OR mic test running (evaluate the
+            # mic audio too, regardless of the radio's busy state).
+            active = self.audio.rx_busy or self.audio.mic_test
+            pcm = self.audio.pop_asr_rx()
+            calls = []
+            try:
+                if active and pcm is not None and len(pcm):
+                    calls = await asyncio.to_thread(self._rec.feed, pcm)
+                if prev_active and not active:       # end of over / mic test -> finalise
+                    calls += await asyncio.to_thread(self._rec.flush)
+            except Exception:  # noqa: BLE001
+                calls = []
+            prev_active = active
+            for call, conf in calls:
+                await self._emit(call, conf)
+
+    async def _emit(self, call: str, conf: float) -> None:
+        now = time.monotonic()
+        if now - self._seen.get(call, 0.0) < self._repeat_s:
+            return
+        self._seen[call] = now
+        if len(self._seen) > 64:                      # prune stale entries
+            self._seen = {k: v for k, v in self._seen.items()
+                          if now - v < self._repeat_s}
+        info = {}
+        try:
+            info = await asyncio.to_thread(logbook.qrz.lookup, call) or {}
+        except Exception:  # noqa: BLE001
+            info = {}
+        self._broadcast({
+            "t": "callsign", "call": call, "conf": round(conf, 2),
+            "name": info.get("name", ""), "qth": info.get("qth", ""),
+            "state": info.get("state", ""), "country": info.get("country", ""),
+            "grid": info.get("gridsquare", ""),
+        })
+
+
+callsign_svc = CallsignService(radio_audio)
+
 # Auto power off: the backend itself cuts GPIO power after a period of
 # inactivity, so the radio shuts down even when the browser is gone (no API
 # call required). Activity = any control command OR a connected WebSocket.
@@ -423,7 +556,10 @@ async def _rx_squelch_loop() -> None:
     CAT link is RLock-serialised, so this coexists with the slow status poll."""
     while True:
         await asyncio.sleep(0.06)
-        if not radio_audio.rx_squelch or radio_audio.peers == 0:
+        # Poll BUSY when the software squelch needs it (someone listening) OR when
+        # callsign ASR is on (it gates recognition on the squelch being open).
+        want = (radio_audio.rx_squelch and radio_audio.peers > 0) or callsign_svc.enabled
+        if not want:
             radio_audio.rx_busy = True                 # feature idle -> don't gate
             continue
         st = service.status
@@ -553,6 +689,14 @@ async def lifespan(app: FastAPI):
         service.level_provider = lambda: radio_audio.rx_db
         await digi.start()
         await sel.start()
+        await callsign_svc.start()
+        # Restore the persisted "callsign ASR on" state (loads the Vosk model).
+        if settings.asr_callsign_enabled and callsign_svc.available:
+            try:
+                await callsign_svc.set_enabled(True)
+            except Exception as exc:  # noqa: BLE001
+                logging.getLogger("tmv71").warning(
+                    "callsign ASR: could not auto-enable: %s", exc)
         audio_wd = asyncio.create_task(_audio_watchdog())
     apo_task = asyncio.create_task(_auto_power_off_loop())
     ptt_wd = asyncio.create_task(_ptt_safety_loop())
@@ -562,6 +706,7 @@ async def lifespan(app: FastAPI):
         audio_wd.cancel()
     await digi.stop()
     await sel.stop()
+    await callsign_svc.stop()
     apo_task.cancel()
     ptt_wd.cancel()
     sq_task.cancel()
@@ -821,6 +966,7 @@ async def set_callsign(req: CallsignRequest) -> dict:
     cs = req.callsign.strip().upper()
     settings.callsign = cs
     save_runtime(callsign=cs)
+    callsign_svc.set_own(cs)          # keep ASR from flagging our own callsign
     return {"callsign": cs}
 
 
@@ -1257,6 +1403,41 @@ async def ws_selcall(ws: WebSocket) -> None:
         pass
     finally:
         sel.unsubscribe(q)
+
+
+@app.get("/api/asr/config")
+async def asr_config_get() -> dict:
+    """Callsign-ASR state (for the settings toggle on load)."""
+    return callsign_svc.status()
+
+
+@app.post("/api/asr/config")
+async def asr_config_set(req: AsrConfigRequest) -> dict:
+    """Enable/disable off-air callsign recognition (loads the Vosk model)."""
+    if req.enabled is not None:
+        return await callsign_svc.set_enabled(req.enabled)
+    return callsign_svc.status()
+
+
+@app.websocket("/ws/callsign")
+async def ws_callsign(ws: WebSocket) -> None:
+    await ws.accept()
+    q = callsign_svc.subscribe()
+    try:
+        await ws.send_json({"t": "status", **callsign_svc.status()})
+        while True:
+            try:
+                msg = await asyncio.wait_for(q.get(), timeout=15)
+            except asyncio.TimeoutError:
+                await ws.send_json({"t": "idle"})
+                continue
+            await ws.send_json(msg)
+    except WebSocketDisconnect:
+        pass
+    except Exception:  # noqa: BLE001
+        pass
+    finally:
+        callsign_svc.unsubscribe(q)
 
 
 @app.get("/api/system")

@@ -182,6 +182,11 @@ class TonesRequest(BaseModel):
     mic_test: Optional[bool] = None
 
 
+class AsrConfigRequest(BaseModel):
+    """Toggle off-air callsign recognition (Vosk)."""
+    enabled: Optional[bool] = None
+
+
 class DigiConfig(BaseModel):
     """CW/RTTY/POCSAG digimode parameters (all optional — only sent fields change)."""
     mode: Optional[str] = None          # "cw" | "rtty" | "pocsag"

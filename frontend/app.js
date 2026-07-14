@@ -220,6 +220,9 @@ function render(st) {
   if (st.data_band != null) {
     const rxBand = (st.data_band === 1 || st.data_band === 2) ? 1 : 0;
     $$("#audio-band-seg .sg").forEach(b => b.classList.toggle("active", Number(b.dataset.band) === rxBand));
+    // detected-callsign field follows the active RX band's colour
+    const rc = $("#rx-call");
+    if (rc) { rc.classList.toggle("band-a", rxBand === 0); rc.classList.toggle("band-b", rxBand === 1); }
   }
   const pttLabel = $("#ptt-band");
   pttLabel.textContent = `PTT → BAND ${st.ptt_band === 1 ? "B" : "A"}`;
@@ -2749,6 +2752,66 @@ function connectSelcallWS(decode, isMuted, setMute) {
   ws.onerror = () => { try { ws.close(); } catch {} };
 }
 
+// ---- callsign auto-detect (Vosk ASR) --------------------------------------
+function reflectAsr(s) {
+  if (!s) return;
+  const tgl = $("#set-asr-callsign");
+  if (tgl) { tgl.checked = !!s.enabled; tgl.disabled = !s.available; }
+  const rc = $("#rx-call");            // field + ASR-active tag only while detection is on
+  if (rc) { rc.hidden = !s.enabled; if (!s.enabled) rc.textContent = ""; }
+  const live = $("#asr-live");
+  if (live) live.hidden = !s.enabled;
+  document.body.classList.toggle("asr-on", !!s.enabled);   // PWA: drop nameplate, rotate ASR
+  const hint = $("#asr-hint");
+  if (hint && !s.available)
+    hint.textContent = "Vosk model not found on the Pi — install vosk-model-small-de-0.15 under models/ to enable callsign detection.";
+}
+
+function showRxCall(m) {
+  const chip = $("#rx-call");
+  if (!chip) return;
+  chip.textContent = m.call;
+  const info = [m.name, m.qth || m.state, m.country].filter(Boolean).join(" · ");
+  chip.title = (info ? m.call + " — " + info : m.call + " (auto-detected)") + " · click to clear";
+  chip.classList.remove("flash"); void chip.offsetWidth; chip.classList.add("flash");   // restart flash
+}
+
+function bindCallsign() {
+  const chip = $("#rx-call");
+  if (chip) chip.addEventListener("click", () => {
+    chip.textContent = ""; chip.classList.remove("flash");
+    chip.title = "Auto-detected callsign (none yet)";
+  });
+  const tgl = $("#set-asr-callsign");
+  if (tgl) tgl.addEventListener("change", async e => {
+    const on = e.target.checked;
+    try {
+      reflectAsr(await api("POST", "/api/asr/config", { enabled: on }));
+      toast(on ? "Callsign detect on" : "Callsign detect off", on ? "ok" : "");
+    } catch (err) {
+      e.target.checked = !on;                         // revert on failure
+      toast("Callsign detect: " + err.message, "err");
+    }
+  });
+  connectCallsignWS();
+}
+
+function connectCallsignWS() {
+  let ws;
+  try { ws = new WebSocket(wsUrl("/ws/callsign")); } catch { return; }
+  ws.onmessage = ev => {
+    let m; try { m = JSON.parse(ev.data); } catch { return; }
+    if (m.t === "status") { reflectAsr(m); return; }
+    if (m.t === "callsign" && m.call) {
+      showRxCall(m);
+      const info = [m.name, m.qth || m.state, m.country].filter(Boolean).join(" · ");
+      toast(info ? `📻 ${m.call} · ${info}` : `📻 ${m.call} heard`, "ok");
+    }
+  };
+  ws.onclose = () => setTimeout(connectCallsignWS, 2500);
+  ws.onerror = () => { try { ws.close(); } catch {} };
+}
+
 // ---- logbook (Wavelog) ----------------------------------------------------
 const logEsc = s => String(s ?? "").replace(/[&<>"]/g,
   c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -2984,6 +3047,7 @@ bindHeaderHide();
 bindRadioHint();
 bindDigi();
 bindSelcall();
+bindCallsign();
 lockLandscape();
 bindWakeLock();
 bindQuickKeys();

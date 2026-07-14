@@ -74,6 +74,7 @@ body.theme-light .sm-seg{background:#c8d2d9}
 /* lighten the unfilled (rest) part of the SQL / gain sliders on light bg */
 body.theme-light .sql-slider, body.theme-light .acg input[type=range],
 body.theme-light .hrf-field input[type=range]{--track-empty:#c8d2d9}
+body.theme-light .acg input[type=range]{--mark:rgba(40,55,65,0.55)}
 /* lit segments need strong, dark colors to read on the light bar */
 body.theme-light #band-0 .sm-seg.on{background:#c8770f; box-shadow:none}
 body.theme-light #band-1 .sm-seg.on{background:#0c7b71; box-shadow:none}
@@ -304,6 +305,45 @@ body.theme-light .power-switch.off .ps-icon{filter:none}
 .callsign:empty{display:none}
 body.theme-light .callsign{color:#0c7b71; text-shadow:none}
 
+/* Auto-detected (heard) callsign — a reserved, grey-framed field in the title
+   bar; only the callsign text takes the active RX band's colour (A = amber,
+   B = cyan). */
+.rx-call{
+  --rxc:#8b7ad6;                        /* text colour — fallback until RX band known */
+  --rxc-frame:rgba(210,218,226,0.28);   /* neutral grey frame */
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:104px; height:32px; box-sizing:border-box;
+  font-family:var(--font-disp); font-weight:700; letter-spacing:.16em; font-size:20px;
+  color:var(--rxc); background:rgba(255,255,255,0.04);
+  border:1px solid var(--rxc-frame); border-radius:7px;
+  padding:2px 12px; cursor:pointer; white-space:nowrap; transition:background .18s;
+}
+.rx-call.band-a{--rxc:var(--amber)}
+.rx-call.band-b{--rxc:var(--cyan)}
+body.theme-light .rx-call{--rxc-frame:rgba(40,55,65,0.30); background:rgba(0,0,0,0.03)}
+body.theme-light .rx-call.band-a{--rxc:#b3650f}
+body.theme-light .rx-call.band-b{--rxc:#0c7b71}
+.rx-call[hidden]{display:none}          /* only shown while callsign detect is on */
+.rx-call:hover{background:rgba(255,255,255,0.09)}
+body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}
+.rx-call:empty::before{content:"REMOTE-CS"; color:var(--text-dim); font-weight:600; font-size:13px; letter-spacing:.12em; opacity:.6}
+.rx-call.flash{animation:rxCallFlash .6s ease}
+@keyframes rxCallFlash{from{text-shadow:0 0 10px var(--rxc)} to{text-shadow:none}}
+
+/* "ASR active" indicator next to the field — same font/size/LED as the CAT
+   status; visible only while detection is on */
+.asr-live{
+  display:inline-flex; align-items:center; gap:9px; margin-left:10px;
+  font-size:11px; letter-spacing:.24em; color:var(--text-dim); white-space:nowrap;
+}
+.asr-live::before{
+  content:""; width:9px; height:9px; border-radius:50%;
+  background:var(--ok); box-shadow:0 0 10px var(--ok), inset 0 0 3px #fff8;
+  animation:asrPulse 1.6s ease-in-out infinite;
+}
+.asr-live[hidden]{display:none}
+@keyframes asrPulse{0%,100%{opacity:1} 50%{opacity:.3}}
+
 /* VFO live parameter controls: shift / bandwidth / CTCSS */
 .vfo-params{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:14px}
 .seg{display:inline-flex; height:30px; border:1px solid var(--sw-edge); border-radius:7px; overflow:hidden}
@@ -445,6 +485,16 @@ body.theme-light .callsign{color:#0c7b71; text-shadow:none}
   .brand .brand-mark, .brand .brand-logo{display:none}
   .brand .callsign{writing-mode:vertical-rl; transform:rotate(180deg);
     font-size:12px; letter-spacing:.08em; max-height:70px; overflow:hidden}
+  /* ASR indicator + detected-call field read vertically (rotated 90° left) like
+     the callsign so they fit the narrow strip. */
+  /* PWA: keep only the LED dot, drop the "ASR" label (no room in the strip) */
+  .brand .asr-live{writing-mode:vertical-rl; transform:rotate(180deg);
+    margin-left:0; margin-top:16px; gap:0; font-size:0}
+  .brand .rx-call{writing-mode:vertical-rl; transform:rotate(180deg);
+    min-width:0; height:auto; min-height:92px; padding:6px 1px;
+    font-size:13px; letter-spacing:.16em}
+  /* the title nameplate is dropped from the strip while ASR is on (makes room) */
+  body.asr-on .title-center{display:none}
   .title-center{writing-mode:vertical-rl; transform:none; padding:0; gap:2px;
     max-width:none; max-height:none; background:none; border:none; box-shadow:none; overflow:visible}
   .title-center .screw{display:none}
@@ -1322,8 +1372,16 @@ body.theme-light #audio-toggle.connected:hover{
    colored fill (--gpct) and a colored thumb — never the white native slider */
 .acg input[type=range], .hrf-field input[type=range]{
   -webkit-appearance:none; appearance:none; height:5px; border-radius:3px;
-  cursor:pointer; outline:none;
-  background:linear-gradient(90deg, var(--g-accent) var(--gpct,0%), var(--track-empty,#26333d) var(--gpct,0%));
+  cursor:pointer; outline:none; --mark:rgba(232,237,242,0.7);
+  /* top layer: a 2px recommended-default tick at --def-pct (off-track when unset);
+     bottom layer: the coloured fill (--gpct) over the empty track */
+  background:
+    linear-gradient(90deg,
+      transparent calc(var(--def-pct,-100px) - 1px),
+      var(--mark) calc(var(--def-pct,-100px) - 1px),
+      var(--mark) calc(var(--def-pct,-100px) + 1px),
+      transparent calc(var(--def-pct,-100px) + 1px)),
+    linear-gradient(90deg, var(--g-accent) var(--gpct,0%), var(--track-empty,#26333d) var(--gpct,0%));
 }
 .acg input[type=range]{width:120px}
 .acg input[type=range]::-webkit-slider-thumb, .hrf-field input[type=range]::-webkit-slider-thumb{
