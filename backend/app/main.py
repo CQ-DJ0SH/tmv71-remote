@@ -419,12 +419,12 @@ class CallsignService:
             self._task.cancel()
 
     async def _decode_loop(self) -> None:
-        prev_active = True
+        tail = 0
         while True:
             await asyncio.sleep(0.12)
             if not self.enabled or self._rec is None:
                 self.audio.pop_asr_rx()              # keep the tap drained
-                prev_active = True
+                tail = 0
                 continue
             # active = squelch open (radio RX) OR mic test running (evaluate the
             # mic audio too, regardless of the radio's busy state).
@@ -432,13 +432,20 @@ class CallsignService:
             pcm = self.audio.pop_asr_rx()
             calls = []
             try:
-                if active and pcm is not None and len(pcm):
+                # Keep feeding for a couple of chunks after the over ends: the
+                # chunk popped right after BUSY drops still carries the tail of
+                # the speech, and the trailing silence lets Vosk commit the final
+                # word. Cutting at BUSY swallowed the last spoken letter.
+                if (active or tail > 0) and pcm is not None and len(pcm):
                     calls = await asyncio.to_thread(self._rec.feed, pcm)
-                if prev_active and not active:       # end of over / mic test -> finalise
-                    calls += await asyncio.to_thread(self._rec.flush)
+                if active:
+                    tail = 2
+                elif tail > 0:
+                    tail -= 1
+                    if tail == 0:                    # tail fed -> finalise
+                        calls += await asyncio.to_thread(self._rec.flush)
             except Exception:  # noqa: BLE001
                 calls = []
-            prev_active = active
             for call, conf in calls:
                 await self._emit(call, conf)
 

@@ -53,8 +53,16 @@ WORD_MAP = {
 # word. ensure_ascii=False keeps "fünf"/"québec" as real UTF-8 (Vosk needs it).
 GRAMMAR = json.dumps(list(WORD_MAP) + ["[unk]"], ensure_ascii=False)
 
-# German amateur callsign: D + [A-R] + one digit + 1..4 letter suffix.
-CALL_RE = re.compile(r"D[A-R][0-9][A-Z]{1,4}")
+# German amateur callsign: D + [A-R] + one digit + 1..3 letter suffix — never
+# longer than 6 characters.
+CALL_RE = re.compile(r"D[A-R][0-9][A-Z]{1,3}")
+
+# A callsign is spelled as one contiguous group. Recognised letters carry no word
+# boundary, so a call read out twice ("DN6YI DN6YI") would run together into
+# DN6YIDN6YI and match wrongly. Split on a speech gap between words instead.
+# Kept generous: splitting a slowly spelled call mid-way loses its last letters,
+# whereas two calls running together are resolved by _tile() anyway.
+GROUP_GAP_S = 0.9
 
 TARGET_SR = 16000
 _DECIM = 3               # 48 kHz radio audio -> 16 kHz for Vosk
@@ -134,24 +142,61 @@ class CallsignRecognizer:
     def set_own(self, own_call: str) -> None:
         self.own = normalize_call(own_call)
 
+    @staticmethod
+    def _tile(s: str):
+        """Split `s` into back-to-back callsigns covering it completely, else None.
+
+        Disambiguates a group spoken without a pause: greedy matching would read
+        "DN6YIDN6YI" as DN6YID + leftovers, while the only tiling that consumes
+        the whole run is DN6YI + DN6YI."""
+        end = len(s)
+        memo = {end: []}                       # position -> spans tiling s[pos:]
+
+        def solve(i):
+            if i in memo:
+                return memo[i]
+            res = None
+            for k in (6, 5, 4):                # longest first; 4 = shortest legal
+                if i + k <= end and CALL_RE.fullmatch(s[i:i + k]):
+                    rest = solve(i + k)
+                    if rest is not None:
+                        res = [(i, i + k)] + rest
+                        break
+            memo[i] = res                      # memoised -> linear, never blows up
+            return res
+
+        return solve(0)
+
     def _extract(self, result: dict) -> List[Tuple[str, float]]:
-        words = result.get("result") or []
-        chars: List[str] = []
-        confs: List[float] = []
-        for w in words:
+        # (letter, confidence, start, end) for every word that maps to a letter/digit
+        items = []
+        for w in result.get("result") or []:
             ch = WORD_MAP.get(w.get("word", ""))
             if ch:
-                chars.append(ch)
-                confs.append(float(w.get("conf", 1.0)))
-        s = "".join(chars)
+                items.append((ch, float(w.get("conf", 1.0)),
+                              float(w.get("start", 0.0)), float(w.get("end", 0.0))))
+        # group contiguous spelling; a pause starts a new group (see GROUP_GAP_S)
+        groups: List[list] = []
+        for it in items:
+            if groups and it[2] - groups[-1][-1][3] <= GROUP_GAP_S:
+                groups[-1].append(it)
+            else:
+                groups.append([it])
         out: List[Tuple[str, float]] = []
-        for m in CALL_RE.finditer(s):
-            seg = confs[m.start():m.end()]
-            avg = sum(seg) / len(seg) if seg else 0.0
-            call = m.group()
-            if call == self.own or avg < self.min_conf:
-                continue
-            out.append((call, avg))
+        for g in groups:
+            s = "".join(i[0] for i in g)
+            confs = [i[1] for i in g]
+            # a clean tiling of the whole group wins; else scan for calls in it
+            spans = self._tile(s)
+            if spans is None:
+                spans = [(m.start(), m.end()) for m in CALL_RE.finditer(s)]
+            for a, b in spans:
+                seg = confs[a:b]
+                avg = sum(seg) / len(seg) if seg else 0.0
+                call = s[a:b]
+                if call == self.own or avg < self.min_conf:
+                    continue
+                out.append((call, avg))
         return out
 
     def _shape(self, x16: np.ndarray) -> np.ndarray:
