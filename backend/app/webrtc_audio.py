@@ -12,9 +12,11 @@ from __future__ import annotations
 
 import asyncio
 import fractions
+import io
 import logging
 import threading
 import time
+import wave
 from collections import deque
 from typing import Optional
 
@@ -164,6 +166,12 @@ class RadioAudio:
         self._echo_buf: Optional[np.ndarray] = None   # samples being replayed
         self._echo_pos = 0
         self._mic_rec_cap = 30 * SAMPLE_RATE          # keep at most ~30 s
+        # raw RX recorder: capture the un-squelched RX feed (the same signal the
+        # ASR sees) into a buffer for WAV download — e.g. to build ASR training data.
+        self.rec_on = False
+        self._rec_chunks: list = []
+        self._rec_lock = threading.Lock()
+        self._rec_cap = 60 * 60 * SAMPLE_RATE         # keep at most 60 min
         # digimodes: tap RX for the decoder; inject CW/RTTY audio on TX
         self.digi_rx = False
         self._digi_rx_chunks: list = []
@@ -289,6 +297,13 @@ class RadioAudio:
         # ASR taps the full-band signal (pre listening low-pass); it applies its
         # own de-emphasis + high-pass, so the listening filters must not affect it.
         asr_src = samples
+        # raw RX recorder (un-squelched, pre listening low-pass) for WAV download
+        if self.rec_on:
+            with self._rec_lock:
+                self._rec_chunks.append(asr_src.copy())
+                total = sum(len(c) for c in self._rec_chunks)
+                while total > self._rec_cap and len(self._rec_chunks) > 1:
+                    total -= len(self._rec_chunks.pop(0))
         if self.rx_lowpass:
             samples = self._rx_lp.process(samples)
         self.rx_frames += 1
@@ -597,6 +612,34 @@ class RadioAudio:
         self.rx_deemph_us = us
         self._rx_deemph = _DeEmphasis(us, SAMPLE_RATE)
 
+    # -- raw RX recorder ---------------------------------------------------
+    def set_record(self, on: bool) -> None:
+        if on and not self.rec_on:
+            with self._rec_lock:
+                self._rec_chunks = []          # fresh take
+        self.rec_on = on
+
+    def rec_clear(self) -> None:
+        with self._rec_lock:
+            self._rec_chunks = []
+
+    def rec_samples(self) -> int:
+        with self._rec_lock:
+            return sum(len(c) for c in self._rec_chunks)
+
+    def rec_wav_bytes(self) -> bytes:
+        """The recorded RX buffer as a 16-bit mono WAV (native 48 kHz)."""
+        with self._rec_lock:
+            data = (np.concatenate(self._rec_chunks) if self._rec_chunks
+                    else np.zeros(0, dtype=np.int16))
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(SAMPLE_RATE)                   # 48 kHz native
+            w.writeframes(data.astype(np.int16).tobytes())
+        return buf.getvalue()
+
     # -- status ------------------------------------------------------------
     def status(self) -> dict:
         return {"enabled": True, "connected": self.connected, "error": self.error,
@@ -613,6 +656,9 @@ class RadioAudio:
                 "rx_deemph_us": self.rx_deemph_us,
                 "rx_squelch": self.rx_squelch, "mic_test": self.mic_test,
                 "echo_busy": self.echo_busy(),
+                "recording": self.rec_on,
+                "rec_seconds": round(self.rec_samples() / SAMPLE_RATE, 1),
+                "rec_bytes": self.rec_samples() * 2,     # buffer RAM (16-bit mono)
                 "digi_rx": self.digi_rx, "digi_tx": self.digi_tx_busy(),
                 "transport": "webrtc", "web_client": self.peers > 0}
 

@@ -31,6 +31,7 @@ from .models import (AudioDeviceRequest, AudioGainRequest, AutoPowerOffRequest,
                      MemoryChannel, MixerSetRequest, PowerRequest,
                      PowerSwitchRequest, TonesRequest, DigiConfig, DigiTxRequest,
                      SelcallConfig, SelcallTxRequest, AsrConfigRequest,
+                     AudioRecordRequest,
                      PttBandRequest, PttRequest, RadioInfo, RadioStatus,
                      Tone1750Request,
                      RecallRequest, ScanStartRequest, SerialConfig,
@@ -1266,6 +1267,28 @@ async def set_audio_gain(req: AudioGainRequest) -> dict:
     settings.tx_gain = radio_audio.tx_gain
     settings.tx_auto_gain = radio_audio.tx_auto_gain
     return radio_audio.status()
+
+
+@app.post("/api/audio/record")
+async def set_audio_record(req: AudioRecordRequest) -> dict:
+    """Start/stop the raw RX audio recorder (for WAV download / ASR training)."""
+    if req.on is not None:
+        radio_audio.set_record(req.on)
+    return radio_audio.status()
+
+
+@app.post("/api/audio/record/clear")
+async def clear_audio_record() -> dict:
+    radio_audio.rec_clear()
+    return radio_audio.status()
+
+
+@app.get("/api/audio/record.wav")
+async def download_audio_record() -> Response:
+    """The recorded raw RX buffer as a 16-bit mono 48 kHz WAV."""
+    data = await asyncio.to_thread(radio_audio.rec_wav_bytes)
+    return Response(data, media_type="audio/wav", headers={
+        "Content-Disposition": 'attachment; filename="tmv71-rx-recording.wav"'})
 
 
 @app.post("/api/audio/buffer")

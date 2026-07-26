@@ -254,6 +254,15 @@ the logbook's QRZ credentials.
 > strict callsign pattern filters most noise, and detections are only *shown*,
 > never auto-logged.
 
+**Raw RX recorder.** The audio panel has a small recorder (**● REC / ▶ PLAY**)
+that captures the raw, un-squelched RX feed — exactly the signal the ASR ingests —
+into a server-side ring buffer and offers it as a **WAV download** (16-bit mono
+48 kHz). Play it back in the browser, or download it to build ASR training/test
+data. The buffer holds up to **60 minutes** (older audio rolls off); hover the
+recorder to see the current duration and RAM use (~330 MB for a full hour).
+Endpoints: `POST /api/audio/record`, `/api/audio/record/clear`,
+`GET /api/audio/record.wav`.
+
 ## Mobile app (PWA)
 
 The UI is an installable **Progressive Web App**. Once installed it runs
@@ -410,6 +419,8 @@ the repository.
 | `POST` | `/api/webrtc/offer` | WebRTC SDP offer → answer (browser audio) |
 | `POST` | `/api/audio/gain` | `{rx_gain, tx_gain, tx_auto_gain}` RX/TX gain + TX AGC |
 | `POST` | `/api/audio/tones` | roger beep / mic test / TX+RX low-pass / **de-emphasis** / **software squelch** |
+| `POST` | `/api/audio/record` · `/record/clear` | start/stop / clear the raw RX recorder |
+| `GET` | `/api/audio/record.wav` | download the recording (16-bit mono 48 kHz WAV) |
 | `POST` | `/api/data-band` | `{band}` which VFO's RX audio you hear |
 | `GET`/`POST` | `/api/power-switch` | GPIO power on/off + auto-power-off status |
 | `GET`/`POST` | `/api/digi` · `/api/digi/config` · `/api/digi/tx` | CW / RTTY / **POCSAG** decode + transmit |
@@ -448,6 +459,7 @@ proxy with TLS + auth.
 - ✅ 5-tone selcall (ZVEI/CCIR/EEA …) decode + transmit
 - ✅ Audio processing — RX de-emphasis, BUSY-gated software squelch, TX AGC
 - ✅ Off-air callsign recognition — grammar-constrained Vosk ASR + QRZ toast
+- ✅ Raw RX recorder with WAV download (for ASR training data)
 
 ## Credits
 

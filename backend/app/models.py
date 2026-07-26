@@ -187,6 +187,11 @@ class AsrConfigRequest(BaseModel):
     enabled: Optional[bool] = None
 
 
+class AudioRecordRequest(BaseModel):
+    """Start/stop the raw RX audio recorder."""
+    on: Optional[bool] = None
+
+
 class DigiConfig(BaseModel):
     """CW/RTTY/POCSAG digimode parameters (all optional — only sent fields change)."""
     mode: Optional[str] = None          # "cw" | "rtty" | "pocsag"

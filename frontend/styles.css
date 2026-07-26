@@ -1159,9 +1159,19 @@ body.airband #quick-mem .qbtn.active{color:var(--amber); text-shadow:0 0 9px var
 body.airband .ptt,
 body.airband .ptt-lock-row,
 body.airband #quick-dtmf{ opacity:.28; pointer-events:none; filter:grayscale(.7); }
-body.airband .ptt-hint{color:var(--amber); opacity:.85}
 .ptt-meta{text-align:center; display:flex; flex-direction:column; gap:6px}
-.ptt-hint{font-size:10px; letter-spacing:.26em; color:var(--text-dim)}
+/* per-band BUSY (squelch-open) lamps — replace the transmit hint */
+.ptt-busy{display:flex; gap:16px; align-items:center; justify-content:center}
+.pb-lamp{display:inline-flex; align-items:center; gap:6px;
+  font-family:var(--font-ui); font-size:9px; letter-spacing:.16em;
+  color:var(--text-dim); opacity:.4; transition:.15s}
+.pb-lamp::before{content:""; width:7px; height:7px; border-radius:50%;
+  background:currentColor}
+#pb-busy-0.on{color:var(--amber); opacity:1}
+#pb-busy-1.on{color:var(--cyan); opacity:1}
+.pb-lamp.on::before{box-shadow:0 0 7px currentColor}
+body.theme-light #pb-busy-0.on{color:#b3650f}
+body.theme-light #pb-busy-1.on{color:#0c7b71}
 /* two-tone test active warning — emitted independent of PTT */
 .ptt-warn{
   align-self:center; font-family:var(--font-disp); font-weight:700; font-size:11px;
@@ -1355,13 +1365,34 @@ body.theme-light #audio-toggle.connected:hover{
 /* MIC TEST record (red) / replay (accent) indicators — in the audio title row,
    absolutely positioned so they don't shift the centred title when they appear.
    Mutually exclusive; opacity pulse is compositor-cheap. */
-.mt-rec, .mt-pb{position:absolute; right:0; top:50%; transform:translateY(-50%);
-  font-family:var(--font-ui); font-size:9px; letter-spacing:.14em;
+.mt-rec, .mt-pb{font-family:var(--font-ui); font-size:9px; letter-spacing:.14em;
   border-radius:5px; padding:3px 7px; white-space:nowrap;
   animation:txpulse 1.4s ease-in-out infinite}
 .mt-rec{color:#fff; background:var(--tx)}
 .mt-pb{color:#06222a; background:var(--accent)}
 .mt-rec[hidden], .mt-pb[hidden]{display:none}
+/* raw RX recorder controls — always visible, left of the centred title */
+.rec-tools{position:absolute; left:0; top:50%; transform:translateY(-50%);
+  display:flex; align-items:center; gap:5px}
+.rec-btn{font-family:var(--font-mono); font-size:10px; letter-spacing:.06em;
+  color:var(--text-dim); background:transparent; border:1px solid var(--edge);
+  border-radius:5px; padding:3px 7px; cursor:pointer; white-space:nowrap; transition:.15s}
+.rec-btn:hover:not(:disabled){color:var(--text); border-color:var(--text-dim)}
+.rec-btn:disabled{opacity:.4; cursor:default}
+/* size readout + download sit together on the RIGHT of the centred title
+   (REC/PLAY stay on the left) so neither group overlaps the title */
+.rec-right{position:absolute; right:0; top:50%; transform:translateY(-50%);
+  display:flex; align-items:center; gap:6px}
+#rec-toggle.on{color:#fff; background:var(--tx); border-color:var(--tx);
+  animation:txpulse 1.4s ease-in-out infinite}
+.rec-time{display:none; font-family:var(--font-mono); font-size:10px;
+  color:var(--text-dim); text-align:right; white-space:nowrap}
+/* size/duration only on hover (keeps the header clean) */
+.rec-right:hover .rec-time{display:inline-block}
+/* live playback time next to the play/stop button (shown only while playing) */
+.rec-playtime{font-family:var(--font-mono); font-size:10px; color:var(--accent);
+  white-space:nowrap}
+.rec-playtime[hidden]{display:none}
 .audio-ctl label{display:flex; align-items:center; gap:8px;
   font-family:var(--font-ui); font-size:10px; letter-spacing:.16em; color:var(--text-dim)}
 .acg.is-auto{opacity:.45}                              /* TX slider greyed while TX-AGC is on */

@@ -248,7 +248,10 @@
         <span class="ptt-vu-lbl">TX</span>
       </div>
       <div class="ptt-meta">
-        <span class="ptt-hint">HOLD SPACEBAR TO TRANSMIT</span>
+        <div class="ptt-busy" aria-hidden="true">
+          <span class="pb-lamp" id="pb-busy-0">BUSY VFO-A</span>
+          <span class="pb-lamp" id="pb-busy-1">BUSY VFO-B</span>
+        </div>
         <span class="ptt-band" id="ptt-band">PTT → BAND A</span>
         <span class="ptt-warn" id="ptt-warn" hidden>⚠ TWO-TONE TEST</span>
       </div>
@@ -283,6 +286,19 @@
       <h2 class="audio-title">AUDIO · WEBRTC/OPUS</h2>
       <span class="mt-rec" id="mt-record" hidden>● REC</span>
       <span class="mt-pb" id="mt-playback" hidden>▶ PLAYBACK</span>
+      <div class="rec-tools">
+        <button type="button" class="rec-btn" id="rec-toggle"
+                title="Record the raw RX audio (un-squelched, the ASR feed) into a buffer">● REC</button>
+        <button type="button" class="rec-btn" id="rec-play"
+                title="Play the recording" disabled>▶</button>
+        <span class="rec-playtime" id="rec-playtime" hidden>0:00 / 0:00</span>
+      </div>
+      <div class="rec-right">
+        <span class="rec-time" id="rec-time">0.0s</span>
+        <button type="button" class="rec-btn rec-dl" id="rec-dl"
+                title="Download the recording as WAV (16-bit mono 48 kHz — e.g. for ASR training)" disabled>⭳ WAV</button>
+      </div>
+      <audio id="rec-audio" hidden></audio>
     </div>
     <div class="audio-conn">
       <div class="acd audio-band-field">

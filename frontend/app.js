@@ -175,6 +175,7 @@ function renderBand(b) {
 
   const panel = $(`#band-${i}`);
   panel.classList.toggle("is-busy", !!b.squelch_open);
+  $(`#pb-busy-${i}`)?.classList.toggle("on", !!b.squelch_open);   // PTT-panel busy lamp
 
   // mode toggle active state
   $$(`.mode-toggle[data-band="${i}"] .mt`).forEach(btn =>
@@ -362,6 +363,7 @@ async function refreshAudio() {
     const mt = $("#audio-mictest"); if (mt && document.activeElement !== mt) mt.checked = !!a.mic_test;
     const rec = $("#mt-record"); if (rec) rec.hidden = !a.mic_test;   // recording indicator
     const pb = $("#mt-playback"); if (pb) pb.hidden = !a.echo_busy;   // replay indicator
+    reflectRec(a);                                                    // raw RX recorder state
     // scroll the level graph only while the browser audio is connected
     if (audioConnected()) pushLevel(a.rx_db, a.tx_db);
     else if (levelHist.length) { levelHist.length = 0; drawLevelGraph(); }
@@ -1780,8 +1782,6 @@ function updateMemBase(st) {
   // the M-keys in Band A's colour while disabling PTT/DTMF/side keys.
   airbandRx = inAir;
   document.body.classList.toggle("airband", inAir);
-  const hint = $(".ptt-hint");
-  if (hint) hint.textContent = inAir ? "AIR BAND · RECEIVE ONLY" : "HOLD SPACEBAR TO TRANSMIT";
   const base = inAir ? 50 : 0;
   if (base === memBase) return;
   memBase = base;
@@ -2812,6 +2812,76 @@ function connectCallsignWS() {
   ws.onerror = () => { try { ws.close(); } catch {} };
 }
 
+// ---- raw RX audio recorder (WAV download, e.g. for ASR training) ----------
+let recBlobUrl = null;
+function reflectRec(a) {
+  if (!a) return;
+  const btn = $("#rec-toggle"), t = $("#rec-time");
+  const play = $("#rec-play"), dl = $("#rec-dl");
+  const on = !!a.recording, secs = Number(a.rec_seconds) || 0;
+  const mb = (Number(a.rec_bytes) || 0) / 1048576;
+  if (btn) { btn.classList.toggle("on", on); btn.textContent = on ? "■ STOP" : "● REC"; }
+  if (t) t.textContent = secs.toFixed(1) + "s · " + mb.toFixed(1) + " MB";
+  const has = secs > 0;
+  if (play) play.disabled = !has;
+  if (dl) dl.disabled = !has;
+}
+
+async function recFetchBlob() {
+  const r = await fetch("/api/audio/record.wav?t=" + Date.now());
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return await r.blob();
+}
+
+function bindRecorder() {
+  const btn = $("#rec-toggle");
+  if (!btn) return;
+  btn.addEventListener("click", async () => {
+    const on = !btn.classList.contains("on");
+    try { reflectRec(await api("POST", "/api/audio/record", { on })); }
+    catch (e) { toast("Record: " + e.message, "err"); }
+  });
+  const au = $("#rec-audio"), play = $("#rec-play"), ptime = $("#rec-playtime");
+  if (au && play) {
+    const fmt = s => { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
+    // ▶ toggles to ■ while playing; a live time readout shows only during playback
+    const update = () => {
+      const playing = !au.paused && !au.ended;
+      play.textContent = playing ? "■" : "▶";
+      if (ptime) {
+        ptime.hidden = !playing;
+        if (playing) ptime.textContent = fmt(au.currentTime) + " / " +
+          fmt(isFinite(au.duration) ? au.duration : 0);
+      }
+    };
+    au.addEventListener("play", update);
+    au.addEventListener("pause", update);
+    au.addEventListener("ended", update);
+    au.addEventListener("timeupdate", update);
+  }
+  play?.addEventListener("click", async () => {
+    if (!au.paused) { au.pause(); au.currentTime = 0; return; }   // playing -> stop
+    try {
+      const b = await recFetchBlob();
+      if (b.size < 64) { toast("Nothing recorded yet", "err"); return; }
+      if (recBlobUrl) URL.revokeObjectURL(recBlobUrl);
+      recBlobUrl = URL.createObjectURL(b);
+      au.src = recBlobUrl; au.play();
+    } catch (e) { toast("Play: " + e.message, "err"); }
+  });
+  $("#rec-dl")?.addEventListener("click", async () => {
+    try {
+      const b = await recFetchBlob();
+      if (b.size < 64) { toast("Nothing recorded yet", "err"); return; }
+      const url = URL.createObjectURL(b);
+      const a = document.createElement("a");
+      a.href = url; a.download = "tmv71-rx-recording.wav";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    } catch (e) { toast("Download: " + e.message, "err"); }
+  });
+}
+
 // ---- logbook (Wavelog) ----------------------------------------------------
 const logEsc = s => String(s ?? "").replace(/[&<>"]/g,
   c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -3048,6 +3118,7 @@ bindRadioHint();
 bindDigi();
 bindSelcall();
 bindCallsign();
+bindRecorder();
 lockLandscape();
 bindWakeLock();
 bindQuickKeys();
