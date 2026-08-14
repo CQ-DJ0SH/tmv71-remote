@@ -88,6 +88,10 @@ class Settings(BaseSettings):
     asr_callsign_enabled: bool = False
     # Vosk model directory. Empty -> <repo>/models/vosk-model-small-de-0.15.
     asr_model_dir: str = ""
+    # Official BNetzA callsign list (PDF) used to verify recognised callsigns; a
+    # recognised call not in the list is flagged VOID. Empty -> default path.
+    # Neither the PDF nor its extracted cache is committed (gitignored).
+    asr_calllist_pdf: str = ""
 
     # UI colour theme ("light" | "dark"). Persisted server-side so the choice
     # survives across browsers/devices and storage clears.

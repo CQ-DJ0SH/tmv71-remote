@@ -55,9 +55,10 @@ the theme toggle in the header (light is the default).*
   Papa", "Dora Berta null Samuel Paula" or "de-be-null-es-pe"). A
   grammar-constrained [Vosk](https://alphacephei.com/vosk/) model keeps
   recognition usable on noisy FM voice; each hit shows in the title bar (in the
-  active RX band's colour) and as a toast enriched with the QRZ.com lookup. Runs
-  only while the squelch is open, ignores your own callsign, and can also grade
-  the mic-test audio. Off by default. See [Callsign recognition](#callsign-recognition-vosk).
+  active RX band's colour) and as a toast. Recognised calls are verified against
+  the official **BNetzA callsign list** — one that isn't assigned is flagged
+  **·VOID**. Runs only while the squelch is open, ignores your own callsign, and
+  can also grade the mic-test audio. Off by default. See [Callsign recognition](#callsign-recognition-vosk).
 - **No build step for the control UI** — the SPA is plain HTML/CSS/JS served
   directly by the backend. No Node toolchain required on the Pi.
 - **Installable PWA / mobile-ready** — runs as an installable Progressive Web App
@@ -247,12 +248,30 @@ unzip vosk-model-small-de-0.15.zip && rm vosk-model-small-de-0.15.zip
 
 The backend expects it at `models/vosk-model-small-de-0.15` (override with
 `TMV71_ASR_MODEL_DIR`). On a Raspberry Pi 4 the model loads in ~1–2 s and runs
-comfortably in real time on one core (only while enabled). QRZ enrichment reuses
-the logbook's QRZ credentials.
+comfortably in real time on one core (only while enabled).
 
-> Best-effort assist on voice — expect the occasional miss or false hit; the
-> strict callsign pattern filters most noise, and detections are only *shown*,
-> never auto-logged.
+**Verification against the official callsign list.** Every recognised call is
+checked against the **BNetzA *Rufzeichenliste*** (the register of assigned German
+callsigns) — a call that is actually assigned shows normally (in the RX band's
+colour); one that is **not** in the list is still shown but flagged **·VOID** (in
+red), so mishears stand out at a glance. Supply the current list PDF on the Pi at
+`/opt/rufzeichenliste_afu.pdf` (override with `TMV71_ASR_CALLLIST_PDF`). It is
+parsed **once** (~700 pages, a few minutes) into a gitignored cache at
+`models/rufzeichenliste.txt`; afterwards only the cache is read (~30 ms for ~70k
+calls). If no list is present, verification is skipped (nothing is flagged VOID).
+
+Refresh the list any time by dropping in a newer PDF — it is re-parsed
+automatically when the PDF is newer than the cache, or force a rebuild:
+
+```bash
+cd backend && .venv/bin/python -m app.callsign_list        # uses the default paths
+# or: .venv/bin/python -m app.callsign_list <PDF> <CACHE>
+```
+
+> Best-effort assist on voice — expect the occasional miss; the strict callsign
+> pattern plus the assigned-list check filter most noise. **QRZ.com is not queried
+> by the ASR** — only on a manual lookup in the log panel. Detections are only
+> *shown*, never auto-logged.
 
 **Raw RX recorder.** The audio panel has a small recorder (**● REC / ▶ PLAY**)
 that captures the raw, un-squelched RX feed — exactly the signal the ASR ingests —

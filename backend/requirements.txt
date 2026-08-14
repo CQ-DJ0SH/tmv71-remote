@@ -19,6 +19,9 @@ numpy>=2.1,<2.3
 # Optional: only needed when the "callsign detect" feature is switched on.
 # Requires the model dir models/vosk-model-small-de-0.15 (downloaded separately).
 vosk==0.3.45
+# Parses the BNetzA callsign-list PDF into a cache for ASR verification (only
+# needed to (re)build the cache; pure-Python, no system deps).
+pypdf==6.16.1
 
 # GPIO power switch (relay/MOSFET on the radio's DC line). lgpio backend works
 # on Raspberry Pi 5 / Debian 13. Needs system pkg liblgpio (liblgpio-dev to build).

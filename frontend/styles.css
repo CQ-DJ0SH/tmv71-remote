@@ -323,6 +323,11 @@ body.theme-light .callsign{color:#0c7b71; text-shadow:none}
 body.theme-light .rx-call{--rxc-frame:rgba(40,55,65,0.30); background:rgba(0,0,0,0.03)}
 body.theme-light .rx-call.band-a{--rxc:#b3650f}
 body.theme-light .rx-call.band-b{--rxc:#0c7b71}
+/* recognised call NOT in the assigned-callsign list: muted red + a VOID tag
+   (still shows the call). Placed after the band rules so it wins --rxc. */
+.rx-call.void, body.theme-light .rx-call.void{--rxc:#cf6159}
+.rx-call.void::after{content:"·VOID"; font-weight:700; margin-left:5px;
+  letter-spacing:.06em}
 .rx-call[hidden]{display:none}          /* only shown while callsign detect is on */
 .rx-call:hover{background:rgba(255,255,255,0.09)}
 body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}
@@ -484,7 +489,8 @@ body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}
   .brand{flex-direction:column; gap:6px; justify-self:auto; min-width:0}
   .brand .brand-mark, .brand .brand-logo{display:none}
   .brand .callsign{writing-mode:vertical-rl; transform:rotate(180deg);
-    font-size:12px; letter-spacing:.08em; max-height:70px; overflow:hidden}
+    font-size:17px; letter-spacing:.12em; max-height:none; overflow:visible;
+    align-self:center; margin-bottom:18px}
   /* ASR indicator + detected-call field read vertically (rotated 90° left) like
      the callsign so they fit the narrow strip. */
   /* PWA: keep only the LED dot, drop the "ASR" label (no room in the strip) */
@@ -1161,17 +1167,34 @@ body.airband .ptt-lock-row,
 body.airband #quick-dtmf{ opacity:.28; pointer-events:none; filter:grayscale(.7); }
 .ptt-meta{text-align:center; display:flex; flex-direction:column; gap:6px}
 /* per-band BUSY (squelch-open) lamps — replace the transmit hint */
-.ptt-busy{display:flex; gap:16px; align-items:center; justify-content:center}
+.ptt-hint{font-size:10px; letter-spacing:.26em; color:var(--text-dim)}
+/* status line only in the installed PWA; the browser shows the hint text */
+.ptt-busy{display:none; align-self:center; flex-wrap:wrap; gap:11px;
+  align-items:center; justify-content:center; padding:3px 0}
+@media (display-mode:standalone){
+  .ptt-hint{display:none}
+  .ptt-busy{display:inline-flex}
+  .asr-live{display:none}          /* ASR shown in the PTT status line instead */
+}
+/* RX/TX gain readout beside the busy lamps (audio-panel colours) */
+.pb-gain{display:inline-flex; align-items:center; gap:9px;
+  font-family:var(--font-mono); font-size:9px; letter-spacing:.06em}
+.pg-rx{color:#8b7ad6}
+.pg-tx{color:#cf6159}
+.pb-sep{color:var(--text-dim); opacity:.5; font-size:9px}
+/* per-band A/B lamps; letters steady, only the dot switches */
 .pb-lamp{display:inline-flex; align-items:center; gap:6px;
   font-family:var(--font-ui); font-size:9px; letter-spacing:.16em;
-  color:var(--text-dim); opacity:.4; transition:.15s}
-.pb-lamp::before{content:""; width:7px; height:7px; border-radius:50%;
-  background:currentColor}
-#pb-busy-0.on{color:var(--amber); opacity:1}
-#pb-busy-1.on{color:var(--cyan); opacity:1}
-.pb-lamp.on::before{box-shadow:0 0 7px currentColor}
-body.theme-light #pb-busy-0.on{color:#b3650f}
-body.theme-light #pb-busy-1.on{color:#0c7b71}
+  color:var(--text-dim)}
+.pb-lamp::after{content:""; width:7px; height:7px; border-radius:50%;
+  background:#3a4650; box-shadow:inset 0 0 3px #000; transition:.15s}
+#pb-busy-0.on::after{background:var(--amber); box-shadow:0 0 7px var(--amber)}
+#pb-busy-1.on::after{background:var(--cyan);  box-shadow:0 0 7px var(--cyan)}
+#pb-asr.on::after{background:var(--ok); box-shadow:0 0 7px var(--ok);
+  animation:asrPulse 1.6s ease-in-out infinite}
+body.theme-light .pb-lamp::after{background:#c8d2d9; box-shadow:none}
+body.theme-light #pb-busy-0.on::after{background:#b3650f; box-shadow:0 0 7px #b3650f}
+body.theme-light #pb-busy-1.on::after{background:#0c7b71; box-shadow:0 0 7px #0c7b71}
 /* two-tone test active warning — emitted independent of PTT */
 .ptt-warn{
   align-self:center; font-family:var(--font-disp); font-weight:700; font-size:11px;

@@ -75,12 +75,12 @@ async function api(method, path, body) {
 }
 
 let toastTimer;
-function toast(msg, kind = "") {
+function toast(msg, kind = "", ms = 2600) {
   const t = $("#toast");
   t.textContent = msg;
   t.className = `toast show ${kind}`;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (t.className = "toast"), 2600);
+  toastTimer = setTimeout(() => (t.className = "toast"), ms);
 }
 
 // Themed confirmation dialog — drop-in async replacement for window.confirm().
@@ -375,6 +375,13 @@ async function refreshAudio() {
       const v = (k === "tx" && a.tx_auto_gain && a.agc_gain != null) ? a.agc_gain : g;
       if (sl && v != null && document.activeElement !== sl) { sl.value = v; setGainUi(k, v); }
     });
+    // PTT-panel RX/TX gain readout (TX shows the live AGC factor while AUTO is on)
+    const pgr = $("#pb-gain-rx"), pgt = $("#pb-gain-tx");
+    if (pgr && a.rx_gain != null) pgr.textContent = "RX " + Number(a.rx_gain).toFixed(0) + "×";
+    if (pgt) {
+      const txv = (a.tx_auto_gain && a.agc_gain != null) ? a.agc_gain : a.tx_gain;
+      if (txv != null) pgt.textContent = "TX " + Number(txv).toFixed(1) + "×";
+    }
     const ta = $("#tx-auto");
     if (ta && document.activeElement !== ta) {
       // don't let the shared backend override this app's saved toggle position;
@@ -2761,27 +2768,39 @@ function reflectAsr(s) {
   if (rc) { rc.hidden = !s.enabled; if (!s.enabled) rc.textContent = ""; }
   const live = $("#asr-live");
   if (live) live.hidden = !s.enabled;
+  $("#pb-asr")?.classList.toggle("on", !!s.enabled);        // PTT status-line ASR lamp
   document.body.classList.toggle("asr-on", !!s.enabled);   // PWA: drop nameplate, rotate ASR
   const hint = $("#asr-hint");
   if (hint && !s.available)
     hint.textContent = "Vosk model not found on the Pi — install vosk-model-small-de-0.15 under models/ to enable callsign detection.";
 }
 
+let rxCallTimer = null;
+function clearRxCall() {
+  if (rxCallTimer) { clearTimeout(rxCallTimer); rxCallTimer = null; }
+  const chip = $("#rx-call");
+  if (chip) {
+    chip.textContent = ""; chip.classList.remove("flash", "void");
+    chip.title = "Auto-detected callsign (none yet)";
+  }
+}
+
 function showRxCall(m) {
   const chip = $("#rx-call");
   if (!chip) return;
-  chip.textContent = m.call;
-  const info = [m.name, m.qth || m.state, m.country].filter(Boolean).join(" · ");
-  chip.title = (info ? m.call + " — " + info : m.call + " (auto-detected)") + " · click to clear";
+  const isVoid = m.valid === false;                  // not in the assigned-callsign list
+  chip.textContent = m.call;                          // always show the recognised call
+  chip.classList.toggle("void", isVoid);
+  chip.title = (isVoid ? m.call + " — not in the callsign list (VOID)"
+                       : m.call + " (auto-detected)") + " · click to clear";
   chip.classList.remove("flash"); void chip.offsetWidth; chip.classList.add("flash");   // restart flash
+  if (rxCallTimer) clearTimeout(rxCallTimer);
+  rxCallTimer = setTimeout(clearRxCall, 30000);      // auto-clear 30 s after a detection
 }
 
 function bindCallsign() {
   const chip = $("#rx-call");
-  if (chip) chip.addEventListener("click", () => {
-    chip.textContent = ""; chip.classList.remove("flash");
-    chip.title = "Auto-detected callsign (none yet)";
-  });
+  if (chip) chip.addEventListener("click", clearRxCall);
   const tgl = $("#set-asr-callsign");
   if (tgl) tgl.addEventListener("change", async e => {
     const on = e.target.checked;
@@ -2804,8 +2823,9 @@ function connectCallsignWS() {
     if (m.t === "status") { reflectAsr(m); return; }
     if (m.t === "callsign" && m.call) {
       showRxCall(m);
-      const info = [m.name, m.qth || m.state, m.country].filter(Boolean).join(" · ");
-      toast(info ? `📻 ${m.call} · ${info}` : `📻 ${m.call} heard`, "ok");
+      // callsign toast stays longer (7 s) than normal toasts so it can be read
+      toast(m.valid === false ? `📻 ${m.call} · VOID (not in list)` : `📻 ${m.call}`,
+            m.valid === false ? "err" : "ok", 7000);
     }
   };
   ws.onclose = () => setTimeout(connectCallsignWS, 2500);

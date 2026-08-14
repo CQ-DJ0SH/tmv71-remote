@@ -47,6 +47,7 @@ from .webrtc_audio import RadioAudio, RadioRxTrack, consume_mic, SAMPLE_RATE
 from . import digimodes
 from . import selcall
 from . import callsign_asr
+from . import callsign_list
 from .logbook import logbook, band_for_hz, _FM_MODE, LogError
 from aiortc import RTCPeerConnection, RTCSessionDescription
 from .radio_service import RadioService
@@ -352,6 +353,7 @@ class CallsignService:
         self._task = None
         self._seen: dict = {}                  # callsign -> last-emit monotonic ts
         self._repeat_s = 90.0                  # suppress a repeat of the same call
+        self._valid_calls: set = set()         # assigned callsigns (empty = unverified)
         self._lock = asyncio.Lock()
 
     def _model_dir(self) -> str:
@@ -384,6 +386,11 @@ class CallsignService:
                     logging.getLogger("tmv71").warning(
                         "callsign ASR: model load failed: %s", exc)
                     raise HTTPException(500, f"Vosk model load failed: {exc}")
+            if on and not self._valid_calls:
+                # verify recognised calls against the official BNetzA list (loads
+                # a pre-built cache; empty on failure -> everything shown, unverified)
+                self._valid_calls = await asyncio.to_thread(
+                    callsign_list.load, settings.asr_calllist_pdf, "")
             self.enabled = on
             self.audio.set_asr_rx(on)
             if not on:
@@ -458,17 +465,12 @@ class CallsignService:
         if len(self._seen) > 64:                      # prune stale entries
             self._seen = {k: v for k, v in self._seen.items()
                           if now - v < self._repeat_s}
-        info = {}
-        try:
-            info = await asyncio.to_thread(logbook.qrz.lookup, call) or {}
-        except Exception:  # noqa: BLE001
-            info = {}
-        self._broadcast({
-            "t": "callsign", "call": call, "conf": round(conf, 2),
-            "name": info.get("name", ""), "qth": info.get("qth", ""),
-            "state": info.get("state", ""), "country": info.get("country", ""),
-            "grid": info.get("gridsquare", ""),
-        })
+        # Verify against the assigned-callsign list; a call not in it is flagged
+        # VOID (still shown). When no list is loaded we can't verify -> valid.
+        valid = (not self._valid_calls) or (call in self._valid_calls)
+        # QRZ is NOT queried here — only on a manual lookup in the log panel.
+        self._broadcast({"t": "callsign", "call": call,
+                         "conf": round(conf, 2), "valid": valid})
 
 
 callsign_svc = CallsignService(radio_audio)

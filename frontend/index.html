@@ -248,9 +248,19 @@
         <span class="ptt-vu-lbl">TX</span>
       </div>
       <div class="ptt-meta">
+        <span class="ptt-hint">HOLD SPACEBAR TO TRANSMIT</span>
         <div class="ptt-busy" aria-hidden="true">
-          <span class="pb-lamp" id="pb-busy-0">BUSY VFO-A</span>
-          <span class="pb-lamp" id="pb-busy-1">BUSY VFO-B</span>
+          <span class="pb-lamp" id="pb-busy-0">VFO-A</span>
+          <span class="pb-sep">·</span>
+          <span class="pb-lamp" id="pb-busy-1">VFO-B</span>
+          <span class="pb-sep">·</span>
+          <span class="pb-lamp pb-asr" id="pb-asr">ASR</span>
+          <span class="pb-sep">·</span>
+          <span class="pb-gain">
+            <span class="pg-rx" id="pb-gain-rx">RX 1×</span>
+            <span class="pb-sep">·</span>
+            <span class="pg-tx" id="pb-gain-tx">TX 1.0×</span>
+          </span>
         </div>
         <span class="ptt-band" id="ptt-band">PTT → BAND A</span>
         <span class="ptt-warn" id="ptt-warn" hidden>⚠ TWO-TONE TEST</span>
@@ -485,7 +495,7 @@
 
   <section class="log-zone collapsed" id="log-zone">
     <div class="panel-head">
-      <h2>LOGBOOK · WAVELOG</h2>
+      <h2>WAVELOG</h2>
       <span class="log-online" id="log-online" title="Wavelog connection" hidden><span class="dot"></span></span>
       <span class="log-last" id="log-last" title="Most recent logged QSO" hidden></span>
       <div class="log-head-right">

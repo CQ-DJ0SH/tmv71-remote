@@ -11,8 +11,12 @@ __pycache__/
 backend/app/runtime.json
 backend/app/logbook.json
 
-# Vosk speech model for callsign recognition (downloaded on setup, ~90 MB)
+# Vosk speech model for callsign recognition (downloaded on setup, ~90 MB) +
+# the extracted BNetzA callsign-list cache (models/rufzeichenliste.txt)
 models/
+
+# Official BNetzA callsign list PDF — supplied on the Pi, never committed
+rufzeichenliste_afu.pdf
 
 # Title-bar logo (may be a trademarked brand logo — never commit it)
 backend/app/branding/
