@@ -28,7 +28,7 @@ MORSE = {
 INV_MORSE = {v: k for k, v in MORSE.items()}
 
 
-def cw_encode(text: str, wpm: float = 18.0, pitch: float = 700.0,
+def cw_encode(text: str, wpm: float = 18.0, pitch: float = 800.0,
               fs: int = SAMPLE_RATE) -> np.ndarray:
     """Keyed sine (PARIS timing) with 5 ms raised-cosine edges (no clicks)."""
     dot = 1.2 / max(5.0, wpm)                       # seconds per dot
@@ -73,22 +73,68 @@ def cw_encode(text: str, wpm: float = 18.0, pitch: float = 700.0,
 class CWDecoder:
     """Streaming Morse decoder: Goertzel envelope at ``pitch`` + adaptive timing."""
 
-    def __init__(self, fs: int = SAMPLE_RATE, pitch: float = 700.0, wpm: float = 18.0,
+    def __init__(self, fs: int = SAMPLE_RATE, pitch: float = 800.0, wpm: float = 18.0,
                  auto: bool = True):
         self.fs = fs
-        self.auto = auto                              # adapt the dot length to the RX speed
+        self.auto = auto                              # adapt dot length + pitch to the RX
         self.win = max(1, int(fs * 0.005))           # 5 ms non-overlapping windows
         self._t = np.arange(self.win)
-        self._cos = np.cos(2 * np.pi * pitch * self._t / fs)
-        self._sin = np.sin(2 * np.pi * pitch * self._t / fs)
+        self._build_goertzel(pitch)                  # sets self.pitch, self._cos/_sin
+        # auto-pitch: track the dominant CW tone so a fixed 700 Hz doesn't miss a
+        # signal at another sidetone/BFO offset. Estimated over ~0.4 s windows.
+        self._pit_buf = np.zeros(0, dtype=np.float32)
+        self._pit_win = max(self.win, int(fs * 0.4))
         self.buf = np.zeros(0, dtype=np.float32)
         self.noise = 1e-3
         self.peak = 1e-2
         self.state = False
         self.run = 0                                  # windows in current state
-        self.dot = max(1, int((1.2 / wpm) / 0.005))   # dot length in windows
+        # Keep the auto-adapted dot length within a realistic CW range (~5..40 WPM)
+        # so noise (which drives the dot toward 1 window = 240 WPM) can't run it away.
+        wdur = self.win / self.fs                     # seconds per window (~5 ms)
+        self.dot_min = max(1, round((1.2 / 40.0) / wdur))          # ~40 WPM cap
+        self.dot_max = max(self.dot_min + 1, round((1.2 / 5.0) / wdur))  # ~5 WPM floor
+        self.dot_seed = max(1, round((1.2 / 20.0) / wdur))         # 20 WPM re-acquire point
+        self.dot = self._clamp_dot(int((1.2 / wpm) / wdur))        # dot length in windows
+        self._fail = 0                                             # consecutive bad decodes
         self.symbol = ""
         self._space_pending = False
+
+    def _clamp_dot(self, d: int) -> int:
+        return min(self.dot_max, max(self.dot_min, d))
+
+    def _build_goertzel(self, pitch: float) -> None:
+        self.pitch = float(pitch)
+        self._cos = np.cos(2 * np.pi * self.pitch * self._t / self.fs)
+        self._sin = np.sin(2 * np.pi * self.pitch * self._t / self.fs)
+
+    def _estimate_pitch(self, pf: np.ndarray) -> None:
+        """Retune the Goertzel to the dominant CW-band tone (300–1200 Hz) when a
+        clear tone is present. Ignores noise (flat spectrum) so it won't drift."""
+        self._pit_buf = np.concatenate([self._pit_buf, pf])
+        if len(self._pit_buf) < self._pit_win:
+            return
+        seg = self._pit_buf[:self._pit_win]
+        self._pit_buf = self._pit_buf[self._pit_win:]
+        sp = np.abs(np.fft.rfft(seg * np.hanning(len(seg))))
+        fr = np.fft.rfftfreq(len(seg), 1.0 / self.fs)
+        band = (fr >= 300) & (fr <= 1200)
+        if not band.any():
+            return
+        bsp, bfr = sp[band], fr[band]
+        k = int(np.argmax(bsp))
+        if bsp[k] > np.median(bsp) * 8:              # a real tone, not noise
+            newp = 0.5 * self.pitch + 0.5 * float(bfr[k])
+            if abs(newp - self.pitch) >= 5:
+                self._build_goertzel(newp)
+
+    def current_wpm(self) -> float:
+        """Current (auto-adapted) speed in WPM, derived from the dot length."""
+        return 1.2 / (self.dot * self.win / self.fs)
+
+    def current_pitch(self) -> float:
+        """Current (auto-tracked) tone frequency in Hz."""
+        return self.pitch
 
     def _classify_mark(self, length: int) -> None:
         if length <= 0:
@@ -96,21 +142,35 @@ class CWDecoder:
         if length < 2 * self.dot:
             self.symbol += "."
             if self.auto:
-                self.dot = max(1, int(0.7 * self.dot + 0.3 * length))
+                self.dot = self._clamp_dot(int(0.7 * self.dot + 0.3 * length))
         else:
             self.symbol += "-"
             if self.auto:
-                self.dot = max(1, int(0.7 * self.dot + 0.3 * max(1, length // 3)))
+                self.dot = self._clamp_dot(int(0.7 * self.dot + 0.3 * max(1, length // 3)))
 
     def _flush(self) -> str:
         if not self.symbol:
             return ""
         ch = INV_MORSE.get(self.symbol, "")
         self.symbol = ""
+        # Auto-recover: if the timing has drifted so far that several symbols in a
+        # row don't map to a character, re-seed the speed at 20 WPM so the decoder
+        # can re-acquire (otherwise a stuck-fast dot classifies every dot as a dash).
+        if self.auto:
+            if ch:
+                self._fail = 0
+            else:
+                self._fail += 1
+                if self._fail >= 4:
+                    self._fail = 0
+                    self.dot = self._clamp_dot(self.dot_seed)
         return ch
 
     def feed(self, pcm: np.ndarray) -> str:
-        self.buf = np.concatenate([self.buf, pcm.astype(np.float32) / 32768.0])
+        pf = pcm.astype(np.float32) / 32768.0
+        if self.auto:
+            self._estimate_pitch(pf)                 # track the tone frequency
+        self.buf = np.concatenate([self.buf, pf])
         out = []
         while len(self.buf) >= self.win:
             w = self.buf[:self.win]

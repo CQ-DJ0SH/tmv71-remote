@@ -2571,6 +2571,7 @@ function bindDigi() {
     $("#digi-params-rtty").hidden = mode !== "rtty";
     $("#digi-params-pocsag").hidden = mode !== "pocsag";
     const dh = $(".digi-hint-pocsag"); if (dh) dh.hidden = mode !== "pocsag";
+    if (mode === "cw") { const el = $("#digi-text"); if (el) el.value = el.value.toUpperCase(); }
     post({ mode });
   }));
   // range params (value label + fill + server update on release)
@@ -2587,6 +2588,19 @@ function bindDigi() {
   $("#digi-auto")?.addEventListener("change", e => {
     post({ cw_auto: e.target.checked });
     toast(e.target.checked ? "CW auto-WPM on" : "CW auto-WPM off", "ok");
+    const v = $("#digi-wpm-v"), pv = $("#digi-pitch-v");
+    if (e.target.checked) {                    // sliders now show the detected speed + pitch
+      if (v) v.classList.add("auto");
+      if (pv) pv.classList.add("auto");
+    } else {                                    // back to manual: restore the set values
+      if (v) v.classList.remove("auto");
+      if (pv) pv.classList.remove("auto");
+      api("GET", "/api/digi").then(s => {
+        if (!s) return;
+        if (s.cw_wpm != null) reflectDigiWpm(s.cw_wpm);
+        if (s.cw_pitch != null) reflectDigiPitch(s.cw_pitch);
+      });
+    }
   });
   range("#digi-mark", "#digi-mark-v", " Hz", "rtty_mark");
   $("#digi-baud")?.addEventListener("change", e => post({ rtty_baud: Number(e.target.value) }));
@@ -2621,6 +2635,13 @@ function bindDigi() {
   };
   sendBtn?.addEventListener("click", send);
   txt?.addEventListener("keydown", e => { if (e.key === "Enter") send(); });
+  // CW is case-insensitive Morse — force the text input to upper case in CW mode
+  txt?.addEventListener("input", () => {
+    if ($(".digi-mode.active")?.dataset.mode !== "cw") return;
+    const p = txt.selectionStart;
+    txt.value = txt.value.toUpperCase();     // same length -> caret keeps its place
+    if (p != null) txt.setSelectionRange(p, p);
+  });
   // reflect persisted server state
   api("GET", "/api/digi").then(s => {
     if (!s) return;
@@ -2646,8 +2667,31 @@ function bindDigi() {
     if ($("#pocsag-all") && s.pocsag_listen_all != null) $("#pocsag-all").checked = !!s.pocsag_listen_all;
     if ($("#digi-rx")) $("#digi-rx").checked = !!s.rx;
     if ($("#digi-auto")) $("#digi-auto").checked = s.cw_auto !== false;
+    if ($("#digi-wpm-v")) $("#digi-wpm-v").classList.toggle("auto", s.cw_auto !== false);
+    if ($("#digi-pitch-v")) $("#digi-pitch-v").classList.toggle("auto", s.cw_auto !== false);
   }).catch(() => {});
   connectDigiWS(decode);
+}
+
+// reflect a WPM value on the slider (thumb + fill + label) — used for the live
+// auto-detected speed and to restore the manual value when auto is switched off
+function reflectDigiWpm(w) {
+  const sl = $("#digi-wpm"), v = $("#digi-wpm-v");
+  if (!sl) return;
+  const val = Math.min(Number(sl.max), Math.max(Number(sl.min), Math.round(w)));
+  sl.value = val;
+  sl.style.setProperty("--gpct", (val - sl.min) / (sl.max - sl.min) * 100 + "%");
+  if (v) v.textContent = String(val);        // label follows the (clamped) slider
+}
+
+// same for the CW tone (PITCH slider) when auto-pitch tracks the RX
+function reflectDigiPitch(p) {
+  const sl = $("#digi-pitch"), v = $("#digi-pitch-v");
+  if (!sl) return;
+  const val = Math.min(Number(sl.max), Math.max(Number(sl.min), Math.round(p)));
+  sl.value = val;
+  sl.style.setProperty("--gpct", (val - sl.min) / (sl.max - sl.min) * 100 + "%");
+  if (v) v.textContent = val + " Hz";
 }
 
 function connectDigiWS(decode) {
@@ -2655,6 +2699,13 @@ function connectDigiWS(decode) {
   try { ws = new WebSocket(wsUrl("/ws/digi")); } catch { return; }
   ws.onmessage = ev => {
     let m; try { m = JSON.parse(ev.data); } catch { return; }
+    if (m.t === "wpm" && m.wpm != null) {          // live auto-detected CW speed + pitch
+      if ($("#digi-auto")?.checked) {
+        reflectDigiWpm(m.wpm);
+        if (m.pitch != null) reflectDigiPitch(m.pitch);
+      }
+      return;
+    }
     if (m.t === "rx" && m.text) {
       let text = m.text;
       // POCSAG pages arrive as complete lines — prefix each with a timestamp

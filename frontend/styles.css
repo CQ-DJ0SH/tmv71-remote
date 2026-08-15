@@ -743,6 +743,8 @@ body.theme-light .screw::before{
 .digi-params .acg{display:flex; align-items:center; gap:14px;
   font-family:var(--font-ui); font-size:10px; letter-spacing:.16em; color:var(--text-dim)}
 .digi-params input[type=range]{--g-accent:#6fd89a}
+/* WPM / PITCH values shown in the digi accent while reflecting auto-detected values */
+#digi-wpm-v.auto, #digi-pitch-v.auto{color:#6fd89a}
 .digi-params .gv{color:#6fd89a; font-size:11px; letter-spacing:.02em; min-width:46px}
 .digi-auto{display:flex; align-items:center; gap:7px; margin-left:-13px; margin-right:18px;
   font-family:var(--font-ui); font-size:10px; letter-spacing:.14em; color:var(--text-dim)}

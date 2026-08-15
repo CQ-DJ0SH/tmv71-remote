@@ -99,7 +99,7 @@ class DigiService:
         self.audio = audio
         self.mode = "cw"
         self.cw_wpm = 18.0
-        self.cw_pitch = 700.0
+        self.cw_pitch = 800.0
         self.cw_auto = True
         self.rtty_baud = 45.45
         self.rtty_shift = 170.0
@@ -123,6 +123,24 @@ class DigiService:
                 "pocsag_baud": self.pocsag_baud, "pocsag_addr": self.pocsag_addr,
                 "pocsag_func": self.pocsag_func, "pocsag_alpha": self.pocsag_alpha,
                 "pocsag_listen_all": self.pocsag_listen_all}
+
+    def cw_wpm_live(self):
+        """Current auto-detected CW speed (WPM), or None when not applicable."""
+        if self.mode == "cw" and self.cw_auto and self.rx and self._dec is not None:
+            try:
+                return self._dec.current_wpm()
+            except Exception:  # noqa: BLE001
+                return None
+        return None
+
+    def cw_pitch_live(self):
+        """Current auto-tracked CW tone (Hz), or None when not applicable."""
+        if self.mode == "cw" and self.cw_auto and self.rx and self._dec is not None:
+            try:
+                return self._dec.current_pitch()
+            except Exception:  # noqa: BLE001
+                return None
+        return None
 
     def _new_decoder(self):
         if self.mode == "rtty":
@@ -1382,10 +1400,19 @@ async def ws_digi(ws: WebSocket) -> None:
     try:
         await ws.send_json({"t": "status", **digi.status()})
         while True:
+            # while CW auto-speed is running, tick ~1x/s to push the live WPM;
+            # otherwise the 15 s keep-alive is enough.
+            live = digi.cw_wpm_live()
             try:
-                text = await asyncio.wait_for(q.get(), timeout=15)
+                text = await asyncio.wait_for(q.get(), timeout=1.0 if live is not None else 15)
             except asyncio.TimeoutError:
-                await ws.send_json({"t": "idle"})       # keep-alive / detect drop
+                w = digi.cw_wpm_live()
+                if w is not None:
+                    p = digi.cw_pitch_live()
+                    await ws.send_json({"t": "wpm", "wpm": round(w, 1),
+                                        "pitch": round(p) if p is not None else None})
+                else:
+                    await ws.send_json({"t": "idle"})   # keep-alive / detect drop
                 continue
             await ws.send_json({"t": "rx", "text": text})
     except WebSocketDisconnect:
