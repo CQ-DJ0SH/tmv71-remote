@@ -37,8 +37,10 @@ the theme toggle in the header (light is the default).*
   (AFSK) and **POCSAG** paging (512/1200/2400 baud, numeric + alphanumeric, with
   BCH error correction) straight over the FM audio — e.g. monitor **DAPNET**
   (439.9875 MHz) with per-page RIC/FUNC/timestamp output and a "listen all"
-  toggle. A separate **Selcall** panel does classic 5-tone selective calling
-  (ZVEI/CCIR/EEA …), both decode and transmit.
+  toggle. CW **auto mode** locks onto the received **speed and tone pitch**
+  (both shown live on the sliders), and a **REC** button decodes a captured RX
+  buffer off-line. A separate **Selcall** panel does classic 5-tone selective
+  calling (ZVEI/CCIR/EEA …), both decode and transmit.
 - **SDR waterfall (optional, HackRF)** — if a HackRF One is connected, an extra
   panel shows a live spectrum + waterfall: a real-time **panadapter** centred on
   the tuned frequency (auto-following the radio) or a **wideband sweep** across a
@@ -443,6 +445,7 @@ the repository.
 | `POST` | `/api/data-band` | `{band}` which VFO's RX audio you hear |
 | `GET`/`POST` | `/api/power-switch` | GPIO power on/off + auto-power-off status |
 | `GET`/`POST` | `/api/digi` · `/api/digi/config` · `/api/digi/tx` | CW / RTTY / **POCSAG** decode + transmit |
+| `POST` | `/api/digi/decode-recording` | decode the raw RX recorder buffer (current mode) |
 | `POST` | `/api/selcall/config` | 5-tone selcall config + transmit |
 | `GET`/`POST` | `/api/asr/config` | off-air callsign recognition state / enable (Vosk) |
 | `GET` | `/api/hackrf` | SDR waterfall status (optional HackRF) |

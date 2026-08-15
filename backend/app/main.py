@@ -99,7 +99,7 @@ class DigiService:
         self.audio = audio
         self.mode = "cw"
         self.cw_wpm = 18.0
-        self.cw_pitch = 800.0
+        self.cw_pitch = 700.0
         self.cw_auto = True
         self.rtty_baud = 45.45
         self.rtty_shift = 170.0

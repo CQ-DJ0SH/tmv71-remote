@@ -28,7 +28,7 @@ MORSE = {
 INV_MORSE = {v: k for k, v in MORSE.items()}
 
 
-def cw_encode(text: str, wpm: float = 18.0, pitch: float = 800.0,
+def cw_encode(text: str, wpm: float = 18.0, pitch: float = 700.0,
               fs: int = SAMPLE_RATE) -> np.ndarray:
     """Keyed sine (PARIS timing) with 5 ms raised-cosine edges (no clicks)."""
     dot = 1.2 / max(5.0, wpm)                       # seconds per dot
@@ -73,7 +73,7 @@ def cw_encode(text: str, wpm: float = 18.0, pitch: float = 800.0,
 class CWDecoder:
     """Streaming Morse decoder: Goertzel envelope at ``pitch`` + adaptive timing."""
 
-    def __init__(self, fs: int = SAMPLE_RATE, pitch: float = 800.0, wpm: float = 18.0,
+    def __init__(self, fs: int = SAMPLE_RATE, pitch: float = 700.0, wpm: float = 18.0,
                  auto: bool = True):
         self.fs = fs
         self.auto = auto                              # adapt dot length + pitch to the RX
