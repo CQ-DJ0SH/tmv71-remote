@@ -627,6 +627,13 @@ class RadioAudio:
         with self._rec_lock:
             return sum(len(c) for c in self._rec_chunks)
 
+    def rec_pcm(self) -> np.ndarray:
+        """The recorded RX buffer as raw int16 samples (native 48 kHz)."""
+        with self._rec_lock:
+            if not self._rec_chunks:
+                return np.zeros(0, dtype=np.int16)
+            return np.concatenate(self._rec_chunks)
+
     def rec_wav_bytes(self) -> bytes:
         """The recorded RX buffer as a 16-bit mono WAV (native 48 kHz)."""
         with self._rec_lock:

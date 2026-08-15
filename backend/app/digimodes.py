@@ -97,6 +97,8 @@ class CWDecoder:
         self.dot_seed = max(1, round((1.2 / 20.0) / wdur))         # 20 WPM re-acquire point
         self.dot = self._clamp_dot(int((1.2 / wpm) / wdur))        # dot length in windows
         self._fail = 0                                             # consecutive bad decodes
+        self._since_valid = 0                                      # windows since last char
+        self._idle_windows = int(2.0 / wdur)                      # ~2 s -> "not copying"
         self.symbol = ""
         self._space_pending = False
 
@@ -129,8 +131,13 @@ class CWDecoder:
                 self._build_goertzel(newp)
 
     def current_wpm(self) -> float:
-        """Current (auto-adapted) speed in WPM, derived from the dot length."""
-        return 1.2 / (self.dot * self.win / self.fs)
+        """Current speed in WPM. While auto and not actively copying (no decoded
+        character for ~2 s), report the 20 WPM baseline instead of the
+        noise-driven dot length, so the display doesn't sit at the fast cap."""
+        dot = self.dot
+        if self.auto and self._since_valid > self._idle_windows:
+            dot = self.dot_seed
+        return 1.2 / (dot * self.win / self.fs)
 
     def current_pitch(self) -> float:
         """Current (auto-tracked) tone frequency in Hz."""
@@ -153,6 +160,8 @@ class CWDecoder:
             return ""
         ch = INV_MORSE.get(self.symbol, "")
         self.symbol = ""
+        if ch:
+            self._since_valid = 0               # reset the "actively copying" timer
         # Auto-recover: if the timing has drifted so far that several symbols in a
         # row don't map to a character, re-seed the speed at 20 WPM so the decoder
         # can re-acquire (otherwise a stuck-fast dot classifies every dot as a dash).
@@ -175,6 +184,7 @@ class CWDecoder:
         while len(self.buf) >= self.win:
             w = self.buf[:self.win]
             self.buf = self.buf[self.win:]
+            self._since_valid += 1                # windows since the last decoded char
             i = float(np.dot(w, self._cos))
             q = float(np.dot(w, self._sin))
             mag = (i * i + q * q) ** 0.5 / self.win

@@ -2623,6 +2623,17 @@ function bindDigi() {
     toast(e.target.checked ? "Decoder on" : "Decoder off", e.target.checked ? "ok" : "");
   });
   $("#digi-clear")?.addEventListener("click", () => { decode.textContent = ""; });
+  // decode the raw RX recorder buffer with the current mode (result via WS)
+  $("#digi-decode-rec")?.addEventListener("click", async () => {
+    const b = $("#digi-decode-rec");
+    b.disabled = true; const lbl = b.textContent; b.textContent = "…";
+    try {
+      const r = await api("POST", "/api/digi/decode-recording", {});
+      if (r && r.empty) toast("No recording — press ● REC in the audio panel first", "err");
+      else toast(r && r.text ? "Decoded: " + r.text.slice(0, 40) : "Nothing decoded", r && r.text ? "ok" : "");
+    } catch (e) { toast("Decode: " + e.message, "err"); }
+    finally { b.disabled = false; b.textContent = lbl; }
+  });
   // transmit
   const sendBtn = $("#digi-send"), txt = $("#digi-text");
   const send = async () => {

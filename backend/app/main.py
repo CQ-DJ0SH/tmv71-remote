@@ -211,6 +211,24 @@ class DigiService:
             if text:
                 self._broadcast(text)
 
+    async def decode_recording(self) -> dict:
+        """Run the current-mode decoder over the raw RX recorder buffer and push
+        the result to the decode window — lets you decode a captured signal
+        off-line (the live decoder only ever sees the radio's live RX)."""
+        pcm = self.audio.rec_pcm()
+        if pcm is None or len(pcm) == 0:
+            return {"text": "", "empty": True}
+        dec = self._new_decoder()               # fresh decoder, current mode + params
+        step = SAMPLE_RATE // 4                  # 0.25 s chunks
+
+        def run() -> str:
+            out = [dec.feed(pcm[i:i + step]) for i in range(0, len(pcm), step)]
+            return "".join(out).strip()
+
+        text = await asyncio.to_thread(run)
+        self._broadcast("\n[REC %.0fs] %s\n" % (len(pcm) / SAMPLE_RATE, text or "(nothing decoded)"))
+        return {"text": text}
+
     async def transmit(self, text: str, set_ptt) -> dict:
         text = (text or "").strip()
         if not text:
@@ -1391,6 +1409,12 @@ async def digi_transmit(req: DigiTxRequest) -> dict:
     if not settings.audio_enabled:
         raise HTTPException(503, "audio disabled")
     return await digi.transmit(req.text, service.set_ptt)
+
+
+@app.post("/api/digi/decode-recording")
+async def digi_decode_recording() -> dict:
+    """Decode the raw RX recorder buffer with the current-mode decoder."""
+    return await digi.decode_recording()
 
 
 @app.websocket("/ws/digi")
