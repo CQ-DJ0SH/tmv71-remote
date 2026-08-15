@@ -125,9 +125,12 @@ class CWDecoder:
             return
         bsp, bfr = sp[band], fr[band]
         k = int(np.argmax(bsp))
-        if bsp[k] > np.median(bsp) * 8:              # a real tone, not noise
-            newp = 0.5 * self.pitch + 0.5 * float(bfr[k])
-            if abs(newp - self.pitch) >= 5:
+        # Only lock onto a strongly dominant narrowband peak (a CW tone); voice
+        # and noise spread their energy, so their peak barely beats the mean —
+        # hold the current pitch through them instead of chasing.
+        if bsp[k] > np.mean(bsp) * 20:
+            newp = 0.3 * self.pitch + 0.7 * float(bfr[k])
+            if abs(newp - self.pitch) >= 3:
                 self._build_goertzel(newp)
 
     def current_wpm(self) -> float:
@@ -188,14 +191,13 @@ class CWDecoder:
             i = float(np.dot(w, self._cos))
             q = float(np.dot(w, self._sin))
             mag = (i * i + q * q) ** 0.5 / self.win
-            thr = (self.noise + self.peak) / 2
-            tone = mag > thr
-            # adapt the floor / peak trackers
-            if tone:
-                self.peak = 0.9 * self.peak + 0.1 * mag
-            else:
-                self.noise = 0.9 * self.noise + 0.1 * mag
-            self.peak = max(self.peak, self.noise * 4 + 1e-4)
+            rms = (float(np.dot(w, w)) / self.win) ** 0.5
+            # Self-normalising tone gate: a CW tone concentrates its energy at the
+            # pitch (mag/rms ≈ 0.7); voice and broadband noise are spread out (low
+            # ratio). No adaptive level threshold — a loud voice ident (e.g. a
+            # repeater announcement before the CW) would otherwise inflate it and
+            # mask the following CW.
+            tone = rms > 1e-4 and mag > 0.60 * rms
 
             if tone != self.state:
                 if self.state:                         # end of a mark
