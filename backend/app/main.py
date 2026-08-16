@@ -389,7 +389,7 @@ class CallsignService:
         self._task = None
         self._seen: dict = {}                  # callsign -> last-emit monotonic ts
         self._repeat_s = 90.0                  # suppress a repeat of the same call
-        self._valid_calls: set = set()         # assigned callsigns (empty = unverified)
+        self._calls: dict = {}                 # call -> {class,name,city} (empty = unverified)
         self._lock = asyncio.Lock()
 
     def _model_dir(self) -> str:
@@ -422,10 +422,10 @@ class CallsignService:
                     logging.getLogger("tmv71").warning(
                         "callsign ASR: model load failed: %s", exc)
                     raise HTTPException(500, f"Vosk model load failed: {exc}")
-            if on and not self._valid_calls:
-                # verify recognised calls against the official BNetzA list (loads
-                # a pre-built cache; empty on failure -> everything shown, unverified)
-                self._valid_calls = await asyncio.to_thread(
+            if on and not self._calls:
+                # verify + enrich recognised calls from the official BNetzA list
+                # (loads a pre-built cache; empty on failure -> shown, unverified)
+                self._calls = await asyncio.to_thread(
                     callsign_list.load, settings.asr_calllist_pdf, "")
             self.enabled = on
             self.audio.set_asr_rx(on)
@@ -494,6 +494,12 @@ class CallsignService:
                 await self._emit(call, conf)
 
     async def _emit(self, call: str, conf: float) -> None:
+        # A 5-char call followed by extra speech ("...portabel/mobil") can pick up a
+        # spurious 6th letter (DA1XY + "Portabel" -> DA1XYP). If the 6-char isn't an
+        # assigned callsign but its 5-char prefix is, drop the 6th character.
+        if (len(call) == 6 and self._calls
+                and call not in self._calls and call[:5] in self._calls):
+            call = call[:5]
         now = time.monotonic()
         if now - self._seen.get(call, 0.0) < self._repeat_s:
             return
@@ -503,10 +509,15 @@ class CallsignService:
                           if now - v < self._repeat_s}
         # Verify against the assigned-callsign list; a call not in it is flagged
         # VOID (still shown). When no list is loaded we can't verify -> valid.
-        valid = (not self._valid_calls) or (call in self._valid_calls)
-        # QRZ is NOT queried here — only on a manual lookup in the log panel.
-        self._broadcast({"t": "callsign", "call": call,
-                         "conf": round(conf, 2), "valid": valid})
+        info = self._calls.get(call)
+        valid = (not self._calls) or (info is not None)
+        # QRZ is NOT queried here — only on a manual lookup in the log panel. The
+        # name/town/class come from the offline BNetzA list.
+        self._broadcast({"t": "callsign", "call": call, "conf": round(conf, 2),
+                         "valid": valid,
+                         "name": (info or {}).get("name", ""),
+                         "city": (info or {}).get("city", ""),
+                         "klass": (info or {}).get("class", "")})
 
 
 callsign_svc = CallsignService(radio_audio)

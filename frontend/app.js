@@ -1796,10 +1796,14 @@ function updateMemBase(st) {
 }
 
 // ---- quick keys: memory recall (M0-M9 / M50-M59 in air band) + DTMF (D0-D9) -
+const QMEM_COUNT = 17;   // M0–M16 (10 in the left column, 7 in the right)
+const QMEM_LEFT = 10;
+const QDTMF_COUNT = 3;   // DTMF 0–2
+
 function bindQuickKeys() {
-  const mem = $("#quick-mem"), dt = $("#quick-dtmf");
+  const mem = $("#quick-mem"), mem2 = $("#quick-mem2"), dt = $("#quick-dtmf");
   if (!mem || !dt) return;
-  for (let n = 0; n < 10; n++) {
+  for (let n = 0; n < QMEM_COUNT; n++) {
     const m = document.createElement("button");
     m.className = "qbtn qmem empty"; m.dataset.ch = n; m.textContent = "M" + n;
     m.title = `Recall memory ${n} to the CTRL band`;
@@ -1809,8 +1813,9 @@ function bindQuickKeys() {
       try { await api("POST", "/api/recall", { band, channel: ch }); toast(`Memory ${ch} → Band ${band ? "B" : "A"}`, "ok"); }
       catch (e) { toast("M" + ch + ": " + e.message, "err"); }
     });
-    mem.appendChild(m);
-
+    (n < QMEM_LEFT ? mem : (mem2 || mem)).appendChild(m);
+  }
+  for (let n = 0; n < QDTMF_COUNT; n++) {
     const d = document.createElement("button");
     d.className = "qbtn qdtmf"; d.textContent = "DTMF" + n;
     d.title = `Send DTMF memory ${n} (DT, transmitter is keyed briefly)`;
@@ -1834,7 +1839,7 @@ function bindQuickKeys() {
 function highlightActiveMem(st = last) {
   const cb = (st?.bands || []).find(b => b.band === (st?.control_band ?? 0));
   const active = (cb && cb.mode === 1) ? cb.memory_channel : null;
-  $$("#quick-mem .qbtn").forEach(b =>
+  $$(".qbtn.qmem").forEach(b =>
     b.classList.toggle("active", active != null && memBase + Number(b.dataset.ch) === active));
 }
 
@@ -1844,13 +1849,13 @@ function highlightActiveMem(st = last) {
 async function loadQuickMemNames() {
   const base = memBase;          // capture: memBase can change while the fetch is in flight
   let rows;
-  try { rows = await api("GET", `/api/memories?start=${base}&end=${base + 9}`); }
+  try { rows = await api("GET", `/api/memories?start=${base}&end=${base + QMEM_COUNT - 1}`); }
   catch { return; }
   // A newer call for a different bank superseded us (e.g. base 0 fetched at boot
   // resolving after we've switched to the air-band M50 bank) — don't clobber it.
   if (base !== memBase) return;
   const byCh = {}; rows.forEach(r => { byCh[r.channel] = r; });
-  $$("#quick-mem .qbtn").forEach(b => {
+  $$(".qbtn.qmem").forEach(b => {
     const ch = base + Number(b.dataset.ch), m = byCh[ch];
     const name = (m && m.name && m.name.trim()) ? m.name.trim() : "";
     b.textContent = name || ("M" + ch);
@@ -2847,14 +2852,20 @@ function clearRxCall() {
   }
 }
 
+// name · town · licence class from the offline BNetzA list
+function callDetails(m) {
+  return [m.name, m.city, m.klass ? "Kl. " + m.klass : ""].filter(Boolean).join(" · ");
+}
+
 function showRxCall(m) {
   const chip = $("#rx-call");
   if (!chip) return;
   const isVoid = m.valid === false;                  // not in the assigned-callsign list
+  const det = callDetails(m);
   chip.textContent = m.call;                          // always show the recognised call
   chip.classList.toggle("void", isVoid);
   chip.title = (isVoid ? m.call + " — not in the callsign list (VOID)"
-                       : m.call + " (auto-detected)") + " · click to clear";
+                       : m.call + (det ? " — " + det : " (auto-detected)")) + " · click to clear";
   chip.classList.remove("flash"); void chip.offsetWidth; chip.classList.add("flash");   // restart flash
   if (rxCallTimer) clearTimeout(rxCallTimer);
   rxCallTimer = setTimeout(clearRxCall, 30000);      // auto-clear 30 s after a detection
@@ -2886,7 +2897,9 @@ function connectCallsignWS() {
     if (m.t === "callsign" && m.call) {
       showRxCall(m);
       // callsign toast stays longer (7 s) than normal toasts so it can be read
-      toast(m.valid === false ? `📻 ${m.call} · VOID (not in list)` : `📻 ${m.call}`,
+      const det = callDetails(m);
+      toast(m.valid === false ? `📻 ${m.call} · VOID (not in list)`
+                              : `📻 ${m.call}${det ? " · " + det : ""}`,
             m.valid === false ? "err" : "ok", 7000);
     }
   };

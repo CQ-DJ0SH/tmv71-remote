@@ -223,11 +223,13 @@ recognizer is **grammar-constrained** to just the spelling vocabulary — the
 international phonetic alphabet, the German *Buchstabiertafel*, German letter
 names, and German digits — which stays reliable even on weak signals. Recognised
 words are mapped back to letters and a valid German callsign is pulled out. Every
-hit is shown in a framed field in the title bar (coloured to the active RX band),
-announced as a toast enriched with a **QRZ.com** lookup (name/QTH/country), and
-de-duplicated for ~90 s. Your **own callsign is ignored**, and recognition only
-runs while the squelch reports **BUSY** (open). It can also grade the **mic-test**
-audio, so you can try it with your own voice without a signal.
+hit is shown in a framed field in the title bar (coloured to the active RX band)
+and announced as a toast; the toast and the field's tooltip are **enriched from
+the offline BNetzA list** with the holder's **name, town and licence class**
+(A/E/N) — no online lookup (QRZ is only used for a manual lookup in the log
+panel). Hits are de-duplicated for ~90 s, your **own callsign is ignored**, and
+recognition only runs while the squelch reports **BUSY** (open). It can also grade
+the **mic-test** audio, so you can try it with your own voice without a signal.
 
 **ASR audio conditioning.** The recognizer feeds on the *flat*
 discriminator / 9600-baud output (independent of the listening filters) and
@@ -257,13 +259,14 @@ checked against the **BNetzA *Rufzeichenliste*** (the register of assigned Germa
 callsigns) — a call that is actually assigned shows normally (in the RX band's
 colour); one that is **not** in the list is still shown but flagged **·VOID** (in
 red), so mishears stand out at a glance. Supply the current list PDF on the Pi at
-`/opt/rufzeichenliste_afu.pdf` (override with `TMV71_ASR_CALLLIST_PDF`). It is
-parsed **once** (~700 pages, a few minutes) into a gitignored cache at
-`models/rufzeichenliste.txt`; afterwards only the cache is read (~30 ms for ~70k
-calls). If no list is present, verification is skipped (nothing is flagged VOID).
+`/opt/rufzeichenliste_afu.pdf` (override with `TMV71_ASR_CALLLIST_PDF`) and run
+the converter **once** to parse it (~700 pages, a few minutes) into a gitignored
+tab-separated cache at `models/rufzeichenliste.txt` (`CALL⇥CLASS⇥NAME⇥CITY`).
+At runtime only the cache is read (~30 ms for ~70k calls) — it is **never rebuilt
+automatically** (a multi-minute parse must not stall startup). If no cache is
+present, verification is skipped (nothing is flagged VOID).
 
-Refresh the list any time by dropping in a newer PDF — it is re-parsed
-automatically when the PDF is newer than the cache, or force a rebuild:
+Build or refresh the cache manually — run the converter after supplying a newer PDF:
 
 ```bash
 cd backend && .venv/bin/python -m app.callsign_list        # uses the default paths

@@ -235,7 +235,7 @@
   <!-- PTT -->
   <section class="ptt-zone">
     <h2 class="ptt-title">PTT · MEMORY</h2>
-    <div class="quick-col" id="quick-mem" title="Quick recall memory 0–9"></div>
+    <div class="quick-col" id="quick-mem" title="Quick recall memory to the CTRL band"></div>
     <div class="ptt-center">
       <!-- mini VU bars flanking the PTT button (PWA only): RX left, TX right.
            Absolutely placed so they never shift the button. -->
@@ -287,7 +287,10 @@
         <button class="ptt-side" id="btn-1750" type="button" aria-pressed="false" title="Arm the 1750 Hz tone call, then key PTT to transmit it (software-generated)">1.750 kHz</button>
       </div>
     </div>
-    <div class="quick-col" id="quick-dtmf" title="Send DTMF memory 0–9 (DT)"></div>
+    <div class="quick-col quick-right">
+      <div class="quick-sub" id="quick-mem2" title="Quick recall memory to the CTRL band"></div>
+      <div class="quick-sub" id="quick-dtmf" title="Send DTMF memory (DT)"></div>
+    </div>
   </section>
 
   <!-- AUDIO (WebRTC/Opus) -->

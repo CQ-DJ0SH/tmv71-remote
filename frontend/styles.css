@@ -1140,6 +1140,8 @@ body.theme-light .sm-seg.peak-tx{background:#8b99a2; box-shadow:none}
 .ptt-center{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; flex:1 1 auto; min-width:0}
 /* quick-access columns: memory recall (left) + DTMF send (right) */
 .quick-col{display:flex; flex-direction:column; gap:5px; flex:0 0 auto}
+/* right column: memory sub-group (M10–M16) directly above the DTMF sub-group */
+.quick-sub{display:flex; flex-direction:column; gap:5px}
 .qbtn{
   width:78px; padding:6px 6px; line-height:1; cursor:pointer; transition:.14s;
   font-family:var(--font-mono); font-size:11px; font-weight:600; letter-spacing:.03em;
@@ -1149,7 +1151,8 @@ body.theme-light .sm-seg.peak-tx{background:#8b99a2; box-shadow:none}
 /* memory keys keep the base red border, matching the DTMF keys */
 .qbtn.qmem.empty{color:#566472; opacity:.7; font-weight:500}   /* placeholder */
 .qbtn:hover{opacity:1}
-.qbtn.qdtmf:hover{color:var(--tx)}              /* DTMF keys: red on hover */
+.qbtn.qdtmf{color:#9e2f26}                      /* DTMF keys: dark red text */
+.qbtn.qdtmf:hover{color:var(--tx)}              /* …brighter red on hover */
 .qbtn.qmem:hover{color:var(--amber)}            /* memory keys: control-band colour (A) */
 body.ctrl-b .qbtn.qmem:hover{color:var(--cyan)} /* …or cyan when control band = B */
 .qbtn:active{transform:translateY(1px)}
@@ -1160,10 +1163,10 @@ body.ctrl-b .qbtn.qmem.active{color:var(--cyan); text-shadow:0 0 9px var(--cyan-
 /* --- air band = receive-only: M-keys (M50–M59) use the Band A amber border as a
    bank cue, but (like normal mode) only the loaded memory's text glows; every TX
    control (PTT, lock/roger/1750, DTMF column) is disabled. --- */
-body.airband #quick-mem .qbtn{border-color:var(--amber)}
-body.airband #quick-mem .qbtn.empty{color:#566472; opacity:.6}
-body.airband #quick-mem .qbtn:hover{color:var(--amber)}
-body.airband #quick-mem .qbtn.active{color:var(--amber); text-shadow:0 0 9px var(--amber-glow)}
+body.airband .qbtn.qmem{border-color:var(--amber)}
+body.airband .qbtn.qmem.empty{color:#566472; opacity:.6}
+body.airband .qbtn.qmem:hover{color:var(--amber)}
+body.airband .qbtn.qmem.active{color:var(--amber); text-shadow:0 0 9px var(--amber-glow)}
 body.airband .ptt,
 body.airband .ptt-lock-row,
 body.airband #quick-dtmf{ opacity:.28; pointer-events:none; filter:grayscale(.7); }
