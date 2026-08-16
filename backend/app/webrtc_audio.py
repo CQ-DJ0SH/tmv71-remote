@@ -66,6 +66,12 @@ class _FIRLowpass:
 # discriminator / 9600-baud data output (which has no de-emphasis).
 DEEMPH_TAU_US = 75.0
 
+# RX listen-path high-pass corner (−6 dB). The flat discriminator/9600 output
+# passes the CTCSS/PL sub-audible tone (67–254 Hz) plus DC, which de-emphasis
+# lifts further — audible as a low hum in the speaker. A ~180 Hz high-pass drops
+# it while leaving voice (≳300 Hz) untouched.
+RX_HP_CUTOFF_HZ = 180.0
+
 # Software-squelch hang time: keep audio open this long after BUSY drops, so the
 # ~60 ms BUSY poll gaps and short speech pauses don't chop the audio.
 SQ_HANG_S = 0.060
@@ -79,6 +85,36 @@ class _DeEmphasis:
         a = 1.0 - np.exp(-1.0 / (tau_us * 1e-6 * fs))
         h = a * (1.0 - a) ** np.arange(ntaps)
         self.h = (h / h.sum()).astype(np.float64)   # unity DC gain
+        self._tail = np.zeros(ntaps - 1, dtype=np.float64)
+
+    def process(self, pcm: np.ndarray) -> np.ndarray:
+        x = np.concatenate([self._tail, pcm.astype(np.float64)])
+        y = np.convolve(x, self.h, mode="valid")
+        self._tail = x[-(self.h.size - 1):]
+        return np.clip(y, -32768, 32767).astype(np.int16)
+
+    def reset(self) -> None:
+        self._tail[:] = 0.0
+
+
+class _HighPass:
+    """Linear-phase FIR high-pass for the RX listen path — removes the CTCSS/PL
+    sub-audible tone (67–254 Hz) and DC/mains hum that the flat 9600/discriminator
+    output passes and that de-emphasis further lifts. Windowed-sinc low-pass,
+    spectrally inverted; Blackman window for a deep stopband (~−58 dB) so the
+    sub-audio is gone while voice (≳300 Hz) is untouched. Stateful via overlap-save,
+    same loop-free block processing as the other filters."""
+
+    def __init__(self, fc: float, fs: float, ntaps: int = 2001):
+        if ntaps % 2 == 0:
+            ntaps += 1                       # odd -> integer group delay, exact centre
+        m = (ntaps - 1) / 2.0
+        k = np.arange(ntaps) - m
+        lp = np.sinc(2.0 * fc / fs * k) * np.blackman(ntaps)
+        lp /= lp.sum()
+        hp = -lp
+        hp[int(m)] += 1.0                    # spectral inversion: δ − lowpass
+        self.h = hp.astype(np.float64)
         self._tail = np.zeros(ntaps - 1, dtype=np.float64)
 
     def process(self, pcm: np.ndarray) -> np.ndarray:
@@ -120,6 +156,9 @@ class RadioAudio:
         self.rx_deemph = rx_deemph
         self.rx_deemph_us = rx_deemph_us
         self._rx_deemph = _DeEmphasis(rx_deemph_us, SAMPLE_RATE)
+        # Sub-audio/CTCSS + DC hum removal on the listen path (always on — the flat
+        # RX feed always carries it; the decoder taps upstream keep the raw signal).
+        self._rx_hp = _HighPass(RX_HP_CUTOFF_HZ, SAMPLE_RATE)
         # Software squelch gated by the radio's BUSY status (for the always-open
         # discriminator/9600 output). rx_busy is updated by a fast CAT poller;
         # audio is muted once BUSY has been closed for longer than the hang time.
@@ -345,6 +384,7 @@ class RadioAudio:
         # live listen path only (after the decoder taps, which want the flat,
         # un-squelched signal); off for the echo replay / mic-test mute.
         if live:
+            pub = self._rx_hp.process(pub)      # drop CTCSS/sub-audio + DC hum
             if self.rx_deemph:
                 pub = self._rx_deemph.process(pub)
             if self.rx_squelch:                 # gate on the radio's BUSY status

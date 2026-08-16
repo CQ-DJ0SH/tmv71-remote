@@ -497,12 +497,19 @@ class CallsignService:
                 await self._emit(call, conf)
 
     async def _emit(self, call: str, conf: float) -> None:
-        # A 5-char call followed by extra speech ("...portabel/mobil") can pick up a
-        # spurious 6th letter (DA1XY + "Portabel" -> DA1XYP). If the 6-char isn't an
-        # assigned callsign but its 5-char prefix is, drop the 6th character.
-        if (len(call) == 6 and self._calls
-                and call not in self._calls and call[:5] in self._calls):
-            call = call[:5]
+        # A 6-char hit that isn't an assigned callsign but is one spurious letter
+        # away from one is corrected: first try dropping the last character (a
+        # trailing mishear or extra speech, DA1XY + "Portabel" -> DA1XYP), else a
+        # *unique* single-letter deletion within the suffix (an inserted letter,
+        # e.g. DO1XO heard as DO1XRO from "X-ray"). Prefix D+region+digit is kept.
+        if len(call) == 6 and self._calls and call not in self._calls:
+            if call[:5] in self._calls:
+                call = call[:5]
+            else:
+                alts = {call[:i] + call[i + 1:] for i in range(3, 6)}
+                assigned = [a for a in alts if a in self._calls]
+                if len(assigned) == 1:
+                    call = assigned[0]
         now = time.monotonic()
         if now - self._seen.get(call, 0.0) < self._repeat_s:
             return

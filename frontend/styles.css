@@ -332,8 +332,20 @@ body.theme-light .rx-call.band-b{--rxc:#0c7b71}
 .rx-call:hover{background:rgba(255,255,255,0.09)}
 body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}
 .rx-call:empty::before{content:"REMOTE-CS"; color:var(--text-dim); font-weight:600; font-size:13px; letter-spacing:.12em; opacity:.6}
-.rx-call.flash{animation:rxCallFlash .6s ease}
-@keyframes rxCallFlash{from{text-shadow:0 0 10px var(--rxc)} to{text-shadow:none}}
+/* short glow (halo + text) in the band colour on each update */
+.rx-call.flash{animation:rxCallFlash .7s ease}
+@keyframes rxCallFlash{
+  from{box-shadow:0 0 13px 1px var(--rxc); text-shadow:0 0 10px var(--rxc)}
+  to{box-shadow:0 0 0 0 transparent; text-shadow:none}}
+/* small borderless play icon next to the field — send the detected call to the
+   logbook; grey by default, green (log-panel colour) on hover. */
+.rx-call-log{margin-left:-9px; width:22px; height:32px; box-sizing:border-box;
+  padding:0; cursor:pointer; display:inline-flex; align-items:center;
+  justify-content:center; line-height:1; transition:.15s;
+  font-family:var(--font-mono); font-size:13px; font-weight:700;
+  color:var(--text-dim); background:transparent; border:none}
+.rx-call-log:hover{color:#3ec98a}
+.rx-call-log[hidden]{display:none}
 
 /* "ASR active" indicator next to the field — same font/size/LED as the CAT
    status; visible only while detection is on */
@@ -384,6 +396,7 @@ body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}
 .console{
   position:relative; z-index:4;
   max-width:1220px; margin:0 auto; padding:clamp(16px,3vw,32px);
+  padding-top:clamp(8px,1.5vw,16px);   /* half the gap below the title separator */
   display:grid; gap:22px;
   --row-h:377px;                      /* band-panel height; keeps the grid square */
   grid-template-columns:1fr 1fr;
@@ -490,7 +503,7 @@ body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}
   .brand .brand-mark, .brand .brand-logo{display:none}
   .brand .callsign{writing-mode:vertical-rl; transform:rotate(180deg);
     font-size:17px; letter-spacing:.12em; max-height:none; overflow:visible;
-    align-self:center; margin-bottom:18px}
+    align-self:center; margin-bottom:10px}
   /* ASR indicator + detected-call field read vertically (rotated 90° left) like
      the callsign so they fit the narrow strip. */
   /* PWA: keep only the LED dot, drop the "ASR" label (no room in the strip) */
@@ -1180,6 +1193,7 @@ body.airband #quick-dtmf{ opacity:.28; pointer-events:none; filter:grayscale(.7)
   .ptt-hint{display:none}
   .ptt-busy{display:inline-flex}
   .asr-live{display:none}          /* ASR shown in the PTT status line instead */
+  .rx-call-log{display:none}       /* no log/play button in the PWA strip */
 }
 /* RX/TX gain readout beside the busy lamps (audio-panel colours) */
 .pb-gain{display:inline-flex; align-items:center; gap:9px;

@@ -36,6 +36,10 @@ WORD_MAP = {
     "romeo": "R", "sierra": "S", "tango": "T", "uniform": "U", "victor": "V",
     "viktor": "V", "whiskey": "W", "whisky": "W", "x": "X", "yankee": "Y",
     "zulu": "Z",
+    # "X-ray" is spoken as two syllables; give the "-ray" tail a home so it isn't
+    # mis-heard as another letter or swallowing the next word. It maps to X and is
+    # merged into a preceding "x" in _extract (so "x ray" = one X, not XX).
+    "ray": "X",
     # digits (spoken German)
     "null": "0", "eins": "1", "zwei": "2", "drei": "3", "vier": "4",
     "fünf": "5", "sechs": "6", "sieben": "7", "acht": "8", "neun": "9",
@@ -45,9 +49,13 @@ WORD_MAP = {
 # word. ensure_ascii=False keeps "fünf"/"québec" as real UTF-8 (Vosk needs it).
 GRAMMAR = json.dumps(list(WORD_MAP) + ["[unk]"], ensure_ascii=False)
 
-# German amateur callsign: D + [A-R] + one digit + 1..3 letter suffix — never
-# longer than 6 characters.
-CALL_RE = re.compile(r"D[A-R][0-9][A-Z]{1,3}")
+# German amateur callsign, restricted to the BNetzA allocation blocks. Always
+# 5–6 characters (never 4): D + prefix-block + a 2..3-letter suffix. Valid blocks:
+#   DA 0,1,2,4-8    DB-DD 0-9    DF-DO 0-9    DK/DL/DM 0-9
+#   DP 0,1,2,8      DR 1-6       (no DE, DI, DQ; no DA3/DA9)
+# Pinning the exact blocks kills a large class of ASR false matches (e.g. DE*/DI*,
+# DA3, DP7, DR9) and the too-short 4-char reads.
+CALL_RE = re.compile(r"D(?:A[0-24-8]|[BCDFGHJKLMNO][0-9]|P[0-28]|R[1-6])[A-Z]{2,3}")
 
 # A callsign is spelled as one contiguous group. Recognised letters carry no word
 # boundary, so a call read out twice ("DN6YI DN6YI") would run together into
@@ -148,7 +156,7 @@ class CallsignRecognizer:
             if i in memo:
                 return memo[i]
             res = None
-            for k in (6, 5, 4):                # longest first; 4 = shortest legal
+            for k in (6, 5):                   # longest first; 5 = shortest legal
                 if i + k <= end and CALL_RE.fullmatch(s[i:i + k]):
                     rest = solve(i + k)
                     if rest is not None:
@@ -163,10 +171,15 @@ class CallsignRecognizer:
         # (letter, confidence, start, end) for every word that maps to a letter/digit
         items = []
         for w in result.get("result") or []:
-            ch = WORD_MAP.get(w.get("word", ""))
-            if ch:
-                items.append((ch, float(w.get("conf", 1.0)),
-                              float(w.get("start", 0.0)), float(w.get("end", 0.0))))
+            word = w.get("word", "")
+            ch = WORD_MAP.get(word)
+            if not ch:
+                continue
+            # merge the "-ray" of "X-ray" into a preceding "x" -> one X (not XX)
+            if word == "ray" and items and items[-1][0] == "X":
+                continue
+            items.append((ch, float(w.get("conf", 1.0)),
+                          float(w.get("start", 0.0)), float(w.get("end", 0.0))))
         # group contiguous spelling; a pause starts a new group (see GROUP_GAP_S)
         groups: List[list] = []
         for it in items:

@@ -2833,6 +2833,7 @@ function reflectAsr(s) {
   if (tgl) { tgl.checked = !!s.enabled; tgl.disabled = !s.available; }
   const rc = $("#rx-call");            // field + ASR-active tag only while detection is on
   if (rc) { rc.hidden = !s.enabled; if (!s.enabled) rc.textContent = ""; }
+  const lg = $("#rx-call-log"); if (lg) lg.hidden = !s.enabled;
   const live = $("#asr-live");
   if (live) live.hidden = !s.enabled;
   $("#pb-asr")?.classList.toggle("on", !!s.enabled);        // PTT status-line ASR lamp
@@ -2871,9 +2872,21 @@ function showRxCall(m) {
   rxCallTimer = setTimeout(clearRxCall, 30000);      // auto-clear 30 s after a detection
 }
 
+// send the detected callsign to the logbook — no QRZ lookup, just log the call
+async function logRxCall() {
+  const call = ($("#rx-call")?.textContent || "").trim();
+  if (!call) { toast("No callsign detected", "err"); return; }
+  const inp = $("#log-call"); if (inp) inp.value = call;
+  // clear any stale details so the bare call (+ auto band/freq/mode) is logged
+  ["#log-name", "#log-grid", "#log-comment"].forEach(s => { const el = $(s); if (el) el.value = ""; });
+  toast("📖 Logging " + call + "…", "ok");
+  try { await logQso(); } catch (e) { toast("Log: " + e.message, "err"); }
+}
+
 function bindCallsign() {
   const chip = $("#rx-call");
   if (chip) chip.addEventListener("click", clearRxCall);
+  $("#rx-call-log")?.addEventListener("click", logRxCall);
   const tgl = $("#set-asr-callsign");
   if (tgl) tgl.addEventListener("change", async e => {
     const on = e.target.checked;
@@ -3081,12 +3094,8 @@ async function logQso() {
   if (!call) { toast("Enter a callsign", "err"); return; }
   const btn = $("#log-save"); btn.disabled = true;
   try {
-    // make sure the lookup for this callsign has finished (a click on LOG QSO
-    // can fire before the blur-triggered lookup resolved) so name/grid/extras
-    // are actually captured in the logged entry
-    if (!lastLookup || lastLookup.call !== call) {
-      try { await logLookup(); } catch {}
-    }
+    // no automatic QRZ lookup on logging — use details only if the operator
+    // explicitly ran the QRZ LOOKUP button for this callsign beforehand.
     const lk = (lastLookup && lastLookup.call === call) ? lastLookup : {};
     const r = await api("POST", "/api/log/qso", {
       callsign: call,
@@ -3181,9 +3190,7 @@ function bindLogbook() {
   $("#log-save")?.addEventListener("click", logQso);
   const call = $("#log-call");
   call?.addEventListener("change", () => { call.value = call.value.trim().toUpperCase(); });
-  call?.addEventListener("blur", () => {
-    if (call.value.trim() && !$("#log-name").value.trim()) logLookup();
-  });
+  // no auto QRZ lookup on blur — QRZ is only queried via the QRZ LOOKUP button
   call?.addEventListener("keydown", e => { if (e.key === "Enter") logQso(); });
   $("#log-recent")?.addEventListener("click", e => {
     const btn = e.target.closest(".li-del");
