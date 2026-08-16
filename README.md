@@ -52,10 +52,9 @@ the theme toggle in the header (light is the default).*
   QTH, e-mail and country. A "worked before" check and the latest contacts/totals
   are shown inline; recent entries are kept locally so they survive restarts.
 - **Off-air callsign recognition (optional, Vosk)** — a speech-recognition pass on
-  the RX audio that reads out spoken **German callsigns** — international *and*
-  German phonetic alphabets plus German letter names ("Delta Bravo null Sierra
-  Papa", "Dora Berta null Samuel Paula" or "de-be-null-es-pe"). A
-  grammar-constrained [Vosk](https://alphacephei.com/vosk/) model keeps
+  the RX audio that reads out spoken **German callsigns** spelled in the
+  **ITU/NATO phonetic alphabet** with German digits ("Delta Bravo null Sierra
+  Papa"). A grammar-constrained [Vosk](https://alphacephei.com/vosk/) model keeps
   recognition usable on noisy FM voice; each hit shows in the title bar (in the
   active RX band's colour) and as a toast. Recognised calls are verified against
   the official **BNetzA callsign list** — one that isn't assigned is flagged
@@ -220,9 +219,11 @@ enable **Callsign detect** in *Settings → Audio*.
 **How it works.** Callsigns are read out letter-by-letter over the air, so free
 dictation would be hopeless on noisy FM. Instead a [Vosk](https://alphacephei.com/vosk/)
 recognizer is **grammar-constrained** to just the spelling vocabulary — the
-international phonetic alphabet, the German *Buchstabiertafel*, German letter
-names, and German digits — which stays reliable even on weak signals. Recognised
-words are mapped back to letters and a valid German callsign is pulled out. Every
+**ITU/NATO phonetic alphabet** (Alfa…Zulu) plus German digits — which stays
+reliable even on weak signals (the German spelling alphabet and letter names were
+dropped: their short, homophone-prone words caused most false matches).
+Recognised words are mapped back to letters and a valid German callsign is pulled
+out. Every
 hit is shown in a framed field in the title bar (coloured to the active RX band)
 and announced as a toast; the toast and the field's tooltip are **enriched from
 the offline BNetzA list** with the holder's **name, town and licence class**
