@@ -238,21 +238,26 @@ it is otherwise too bright for the acoustic model) and a **~250 Hz high-pass**
 (drops CTCSS/sub-audio + DC) — before decoding at 16 kHz. This is the single
 biggest factor for good accuracy from a data-port feed.
 
-**Setup.** Install the dependency and the small German model on the Pi:
+**Setup.** From the repo root on the Pi:
 
 ```bash
-# in the backend venv
-pip install vosk
-
-# download the model into ./models (gitignored, ~90 MB)
+# 1) speech model — dependency + small German model into ./models (gitignored, ~90 MB)
+backend/.venv/bin/pip install vosk
 mkdir -p models && cd models
 curl -LO https://alphacephei.com/vosk/models/vosk-model-small-de-0.15.zip
-unzip vosk-model-small-de-0.15.zip && rm vosk-model-small-de-0.15.zip
+unzip vosk-model-small-de-0.15.zip && rm vosk-model-small-de-0.15.zip && cd ..
+
+# 2) callsign list (optional — enables name/town/class + VOID verification)
+backend/.venv/bin/pip install pypdf
+# place the current BNetzA Rufzeichenliste PDF at /opt/rufzeichenliste_afu.pdf, then
+# run the converter once to build the cache (~700 pages, a few minutes):
+cd backend && .venv/bin/python -m app.callsign_list && cd ..   # -> models/rufzeichenliste.txt
 ```
 
-The backend expects it at `models/vosk-model-small-de-0.15` (override with
+The backend expects the model at `models/vosk-model-small-de-0.15` (override with
 `TMV71_ASR_MODEL_DIR`). On a Raspberry Pi 4 the model loads in ~1–2 s and runs
-comfortably in real time on one core (only while enabled).
+comfortably in real time on one core (only while enabled). The callsign list is
+optional: without it, detection still works but nothing is verified/flagged VOID.
 
 **Verification against the official callsign list.** Every recognised call is
 checked against the **BNetzA *Rufzeichenliste*** (the register of assigned German
@@ -266,12 +271,9 @@ At runtime only the cache is read (~30 ms for ~70k calls) — it is **never rebu
 automatically** (a multi-minute parse must not stall startup). If no cache is
 present, verification is skipped (nothing is flagged VOID).
 
-Build or refresh the cache manually — run the converter after supplying a newer PDF:
-
-```bash
-cd backend && .venv/bin/python -m app.callsign_list        # uses the default paths
-# or: .venv/bin/python -m app.callsign_list <PDF> <CACHE>
-```
+To **refresh** the list later, drop in a newer PDF and re-run the converter from
+step 2 above (`python -m app.callsign_list`; custom paths:
+`python -m app.callsign_list <PDF> <CACHE>`), then restart the service.
 
 > Best-effort assist on voice — expect the occasional miss; the strict callsign
 > pattern plus the assigned-list check filter most noise. **QRZ.com is not queried
