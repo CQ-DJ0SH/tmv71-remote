@@ -22,29 +22,21 @@ import numpy as np
 # spelling we use an in-vocabulary alternate that sounds the same: foxtrot→foxtrott,
 # xray→x, quebec→québec, juliett→julia/julius. All entries verified present in the
 # model's lexicon (grammar build reports zero out-of-vocabulary words).
+# ITU/NATO phonetic alphabet only (plus German digits). The German
+# Buchstabiertafel and the short German letter names were dropped: their short,
+# homophone-prone words (es/er, single vowels …) caused most false matches.
+# The small DE model lacks the canonical spellings of Foxtrot/Juliet/Quebec/
+# X-Ray, so the closest in-vocabulary lexemes stand in (foxtrott, julia/julius,
+# québec, x); victor/viktor and whiskey/whisky are the same sound either way.
 WORD_MAP = {
-    "alpha": "A", "bravo": "B", "charlie": "C", "delta": "D", "echo": "E",
-    "foxtrott": "F", "fox": "F", "golf": "G", "hotel": "H", "india": "I",
-    "julia": "J", "julius": "J", "kilo": "K", "lima": "L", "mike": "M",
-    "november": "N", "oscar": "O", "papa": "P", "québec": "Q", "romeo": "R",
-    "sierra": "S", "tango": "T", "uniform": "U", "victor": "V", "viktor": "V",
-    "whiskey": "W", "whisky": "W", "x": "X", "yankee": "Y", "zulu": "Z",
-    # German spelling alphabet (Buchstabiertafel) as a fallback — hams mix both.
-    # All verified present in the model except "xanthippe" (xaver covers X).
-    "anton": "A", "berta": "B", "cäsar": "C", "caesar": "C", "dora": "D",
-    "emil": "E", "friedrich": "F", "gustav": "G", "heinrich": "H", "ida": "I",
-    "kaufmann": "K", "konrad": "K", "ludwig": "L", "martha": "M", "nordpol": "N",
-    "otto": "O", "paula": "P", "quelle": "Q", "richard": "R", "samuel": "S",
-    "siegfried": "S", "theodor": "T", "ulrich": "U", "wilhelm": "W", "xaver": "X",
-    "ypsilon": "Y", "zacharias": "Z", "zeppelin": "Z",
-    # German letter NAMES ("DB0SP" = de-be-null-es-pe). Least reliable layer —
-    # short words, some homophones of common speech — but very common on FM.
-    # F/V/X names ("ef/vau/iks") aren't in the model; phonetic/Buchstabier cover them.
-    "a": "A", "be": "B", "ce": "C", "de": "D", "e": "E", "ge": "G", "ha": "H",
-    "i": "I", "jot": "J", "ka": "K", "el": "L", "ell": "L", "em": "M", "emm": "M",
-    "en": "N", "enn": "N", "o": "O", "pe": "P", "ku": "Q", "kuh": "Q", "er": "R",
-    "err": "R", "es": "S", "te": "T", "u": "U", "we": "W", "weh": "W", "zett": "Z",
-    # digits (German)
+    "alpha": "A", "alfa": "A", "bravo": "B", "charlie": "C", "delta": "D",
+    "echo": "E", "foxtrott": "F", "fox": "F", "golf": "G", "hotel": "H",
+    "india": "I", "julia": "J", "julius": "J", "kilo": "K", "lima": "L",
+    "mike": "M", "november": "N", "oscar": "O", "papa": "P", "québec": "Q",
+    "romeo": "R", "sierra": "S", "tango": "T", "uniform": "U", "victor": "V",
+    "viktor": "V", "whiskey": "W", "whisky": "W", "x": "X", "yankee": "Y",
+    "zulu": "Z",
+    # digits (spoken German)
     "null": "0", "eins": "1", "zwei": "2", "drei": "3", "vier": "4",
     "fünf": "5", "sechs": "6", "sieben": "7", "acht": "8", "neun": "9",
 }

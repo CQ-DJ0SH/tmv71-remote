@@ -465,7 +465,10 @@ class CallsignService:
     async def _decode_loop(self) -> None:
         tail = 0
         while True:
-            await asyncio.sleep(0.12)
+            # ~0.25 s chunks give Vosk more context per step than 0.12 s did,
+            # which measurably improves callsign recognition (fewer streaming-
+            # boundary errors); the added latency is irrelevant here.
+            await asyncio.sleep(0.25)
             if not self.enabled or self._rec is None:
                 self.audio.pop_asr_rx()              # keep the tap drained
                 tail = 0
