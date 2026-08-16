@@ -166,16 +166,21 @@ API_AUDIO = (
     "GET  /api/audio/status      RX/TX levels, flags\n"
     "GET  /api/audio/devices     list sound devices\n"
     "POST /api/audio/device      pick device\n"
-    "POST /api/audio/gain        rx_gain / tx_gain\n"
+    "POST /api/audio/gain        rx/tx gain + TX AGC\n"
     "POST /api/audio/buffer      tx buffer / ptt tail\n"
-    "POST /api/audio/tones       roger/test/lowpass/mic-test\n"
+    "POST /api/audio/tones       roger/test/mic/lowpass/de-emph/squelch\n"
+    "POST /api/audio/record[/clear]  raw RX recorder\n"
+    "GET  /api/audio/record.wav  download recording (WAV)\n"
     "GET/POST /api/audio/mixer   USB card mixer\n"
 )
 API_DIGI = (
-    "GET  /api/digi              CW/RTTY status\n"
+    "GET  /api/digi              CW/RTTY/POCSAG status\n"
     "POST /api/digi/config       mode + parameters\n"
     "POST /api/digi/tx           encode + transmit\n"
+    "POST /api/digi/decode-recording  decode the RX buffer\n"
     "WS   /ws/digi               decoded text stream\n"
+    "GET/POST /api/asr/config    callsign recognition (Vosk)\n"
+    "WS   /ws/callsign           recognised-callsign events\n"
     "GET  /api/selcall           5-tone status\n"
     "POST /api/selcall/config    standard / tone / own\n"
     "POST /api/selcall/tx        send a 5-tone call\n"
@@ -243,6 +248,7 @@ ENVV = (
     "TMV71_HOST=0.0.0.0               TMV71_PORT=8443\n"
     "TMV71_AUDIO_DEVICE=NAD           TMV71_AUDIO_ENABLED=true\n"
     "TMV71_GPIO_POWER_PIN=17          TMV71_CALLSIGN=DJ0SH\n"
+    "TMV71_ASR_MODEL_DIR=...          TMV71_ASR_CALLLIST_PDF=...\n"
     "TMV71_SSL_CERTFILE=...  TMV71_SSL_KEYFILE=...\n"
 )
 
@@ -253,9 +259,10 @@ EN = [
           "Kenwood TM-V71(A/E) dual-band FM transceiver, built around a direct "
           "serial driver. It gives full radio control in the browser, two-way "
           "browser audio over WebRTC/Opus, complete memory-channel management, an "
-          "optional HackRF panadapter, classic 5-tone selective calling, and a "
-          "CW/RTTY digimodes decoder/encoder. It installs as a Progressive Web "
-          "App (PWA) and is designed to run on a Raspberry Pi."),
+          "optional HackRF panadapter, classic 5-tone selective calling, a "
+          "CW/RTTY/POCSAG digimodes decoder/encoder, a raw RX recorder, and "
+          "optional off-air callsign recognition (Vosk). It installs as a "
+          "Progressive Web App (PWA) and is designed to run on a Raspberry Pi."),
     ("p", "Unlike hamlib, whose TM-V71 backends are unreliable, this project speaks "
           "the radio's documented PC command set directly and exposes the radio's "
           "full feature set, including per-channel memory programming."),
@@ -272,7 +279,16 @@ EN = [
         "tuned frequency) or a wideband sweep.",
         "Classic 5-tone selective calling (ZVEI-1/2, CCIR, EEA): call, decode, and "
         "mute RX until your own ID is received.",
-        "CW (Morse) and RTTY (Baudot/AFSK) decode + encode, over the FM audio path.",
+        "CW (Morse), RTTY (Baudot/AFSK) and POCSAG paging (512/1200/2400 baud, "
+        "numeric + alphanumeric, BCH FEC) decode + encode over the FM audio path; "
+        "CW auto mode tracks the received speed and tone pitch, plus a button to "
+        "decode a captured RX buffer off-line.",
+        "Audio processing: RX de-emphasis (for a flat 9600/discriminator feed), "
+        "BUSY-gated software squelch, TX AGC, and voice low-pass filters.",
+        "Raw RX recorder with WAV download (e.g. to build ASR training data).",
+        "Off-air callsign recognition (optional, Vosk): detects spoken German "
+        "callsigns, verifies them against the BNetzA list (name/town/class, or "
+        "VOID if unassigned), shown in the title bar and a toast.",
         "Installable PWA with a mobile landscape swipe-deck layout.",
         "Resilient operation: the phone screen is kept awake, browser audio "
         "auto-reconnects after a network glitch, and a backend watchdog releases "
@@ -295,6 +311,8 @@ EN = [
         "full-duplex.",
         "System packages: portaudio19-dev, swig + liblgpio-dev (optional GPIO).",
         "Optional: a HackRF One plus the hackrf host tools for the waterfall.",
+        "Optional: vosk + the small German model (offline callsign recognition), "
+        "and pypdf + the BNetzA Rufzeichenliste PDF (name/town/class + VOID check).",
     ]),
     ("h1", "5  Installation"),
     ("code", INSTALL),
@@ -325,19 +343,31 @@ EN = [
           "(1000/1750 Hz) beep on "
           "release; while transmitting the button shows a count-up timer (MM:SS). "
           "The 1750 Hz button "
-          "arms a tone-call. The left column recalls memory channels 0–9 (the "
-          "loaded channel's key glows); the right column sends DTMF memories. On "
-          "mobile, mini RX/TX VU bars with peak-hold flank the button."),
+          "arms a tone-call. Memory quick keys recall channels 0–16 (M0–M9 in the "
+          "left column, M10–M16 in the right; the loaded channel's key glows); "
+          "below them the right column sends three DTMF memories (0–2). A status "
+          "line shows per-band BUSY, the ASR state and the live RX/TX gain (in the "
+          "PWA; the desktop shows the transmit hint). On mobile, mini RX/TX VU "
+          "bars with peak-hold flank the button."),
     ("h2", "Audio (WebRTC/Opus)"),
-    ("p", "Open the AUDIO panel, pick the audio band, click CONNECT and allow the "
-          "microphone. RX and mic levels are shown live. Controls: RX/TX gain, a "
-          "MIC TEST switch (meter the mic without keying — it records while on and "
-          "replays your audio over RX when switched off, so you can hear how you "
-          "sound, with no RF; the radio's RX is muted during the test), "
-          "switchable TX and RX voice low-pass filters "
-          "(≤ 3.5 kHz), a two-tone test, and TX timing (buffer / trail). The USB "
-          "card mixer is in Settings > Audio. The audio link auto-reconnects after "
-          "a network glitch and is restored automatically on the next launch."),
+    ("p", "Open the AUDIO panel, pick the RX band with the RX-A/RX-B switch, click "
+          "CONNECT and allow the microphone. RX and mic levels are shown live, with "
+          "the WebRTC RX/TX data rate in the graph corner. Controls: RX/TX gain "
+          "(with a recommended-default tick), MIC (mic test — meters the mic "
+          "without keying, records while on and replays your audio over RX when "
+          "switched off; RX is muted during the test), AGC (automatic TX level), "
+          "and a small recorder — ● REC / ▶ PLAY plus a WAV download of the raw, "
+          "un-squelched RX feed (up to 60 min; e.g. to build ASR training data). "
+          "TX timing (buffer / trail) and the USB card mixer are in Settings > "
+          "Audio. The link auto-reconnects after a network glitch and is restored "
+          "on the next launch."),
+    ("p", "RX conditioning (Settings > Audio): a RX de-emphasis (adjustable time "
+          "constant, on by default) restores natural voice tone when the audio "
+          "comes from a flat discriminator / 9600-baud data output; a BUSY-gated "
+          "software squelch re-applies muting from the radio's own busy status for "
+          "that always-open output; and TX/RX voice low-pass filters (≤ 3.5 kHz) "
+          "tame hiss. The decoders always receive the un-squelched, un-filtered "
+          "signal."),
     ("p", "Bluetooth headsets: transmit audio is captured from the phone's "
           "built-in microphone (not the headset's), so the headset stays on the "
           "A2DP profile and receive audio keeps coming through in good quality. "
@@ -353,12 +383,33 @@ EN = [
           "5-digit CALL code and press CALL (keys PTT). Enter your own ID and press "
           "MUTE to silence RX until your ID is received — then it un-mutes "
           "automatically. Over FM this is AFSK; use a dummy load when setting up."),
-    ("h2", "Digimodes (CW / RTTY)"),
-    ("p", "Switch between CW (Morse) and RTTY (Baudot/AFSK). DECODE shows received "
-          "text; type into the field and SEND to transmit (keys PTT). Parameters: "
-          "CW WPM/pitch — with an optional AUTO mode that tracks the received "
-          "speed — and RTTY baud/shift/mark. Over the FM radio this is MCW / "
-          "AFSK — not native HF CW/RTTY."),
+    ("h2", "Digimodes (CW / RTTY / POCSAG)"),
+    ("p", "Switch between CW (Morse), RTTY (Baudot/AFSK) and POCSAG paging. DECODE "
+          "shows received text; type into the field and SEND to transmit (keys "
+          "PTT); the CW text input is forced upper case. Parameters: CW WPM/pitch "
+          "— with an AUTO mode that tracks both the received speed and tone pitch "
+          "(shown live on the sliders) and rejects voice/noise so it locks onto "
+          "the CW even after a spoken ident; RTTY baud/shift/mark; and POCSAG baud "
+          "(512/1200/2400), RIC, function and numeric/alphanumeric (auto-detected "
+          "on RX) — e.g. monitor DAPNET on 439.9875 MHz with per-page "
+          "RIC/FUNC/timestamp output. The REC button decodes the raw RX recorder "
+          "buffer off-line in the current mode. Over the FM radio this is MCW / "
+          "AFSK / FSK — not native HF modes."),
+    ("h2", "Callsign recognition (Vosk)"),
+    ("p", "An optional, offline speech-recognition pass on the RX audio that "
+          "detects spoken German callsigns; enable it in Settings > Audio. A "
+          "grammar-constrained Vosk model (international + German phonetic "
+          "alphabets, German letter names and German digits) stays usable on noisy "
+          "FM voice; the recognised letters are assembled into a callsign and "
+          "verified against the BNetzA Rufzeichenliste. A hit appears in a framed "
+          "field in the title bar (coloured to the RX band) and as a toast, "
+          "enriched from the offline list with the holder's name, town and licence "
+          "class (A/E/N); a call that is not assigned is still shown but flagged "
+          "VOID. Your own callsign is ignored, it runs only while the squelch is "
+          "open, and it can also grade the mic-test audio. The callsign list is "
+          "built once from the PDF with a converter (python -m app.callsign_list); "
+          "QRZ.com is used only for a manual lookup in the logbook, never by the "
+          "ASR."),
     ("h2", "Band scan"),
     ("p", "Sweep a VHF/UHF range or the memory bank and see an occupancy "
           "spectrum + waterfall. Double-click a channel to tune the control VFO "
@@ -452,9 +503,11 @@ DE = [
           "Kenwood TM-V71(A/E) Dualband-FM-Transceiver, aufgebaut auf einem "
           "direkten seriellen Treiber. Sie bietet volle Gerätesteuerung im Browser, "
           "Zwei-Wege-Audio über WebRTC/Opus, vollständige Speicherkanal-Verwaltung, "
-          "einen optionalen HackRF-Panadapter, klassischen 5-Ton-Selektivruf sowie "
-          "einen CW/RTTY-Decoder/Encoder. Sie lässt sich als Progressive Web App "
-          "(PWA) installieren und ist für den Raspberry Pi ausgelegt."),
+          "einen optionalen HackRF-Panadapter, klassischen 5-Ton-Selektivruf, "
+          "einen CW/RTTY/POCSAG-Decoder/Encoder, einen Roh-RX-Rekorder sowie "
+          "optionale Offline-Rufzeichenerkennung (Vosk). Sie lässt sich als "
+          "Progressive Web App (PWA) installieren und ist für den Raspberry Pi "
+          "ausgelegt."),
     ("p", "Anders als hamlib (dessen TM-V71-Backends unzuverlässig sind) spricht "
           "dieses Projekt den dokumentierten PC-Befehlssatz des Geräts direkt an "
           "und erschließt den vollen Funktionsumfang, inklusive der "
@@ -472,7 +525,17 @@ DE = [
         "Frequenz) oder Breitband-Sweep.",
         "Klassischer 5-Ton-Selektivruf (ZVEI-1/2, CCIR, EEA): rufen, dekodieren "
         "und RX stummschalten bis zum eigenen Ruf.",
-        "CW (Morse) und RTTY (Baudot/AFSK) dekodieren + senden über den FM-Audioweg.",
+        "CW (Morse), RTTY (Baudot/AFSK) und POCSAG-Paging (512/1200/2400 Baud, "
+        "numerisch + alphanumerisch, BCH-FEC) dekodieren + senden über den "
+        "FM-Audioweg; der CW-Auto-Modus führt Geschwindigkeit und Tonhöhe nach, "
+        "plus eine Taste zum Offline-Dekodieren eines aufgenommenen RX-Puffers.",
+        "Audioaufbereitung: RX-De-emphasis (für flachen 9600-/Diskriminator-"
+        "Ausgang), BUSY-gesteuerte Software-Rauschsperre, TX-AGC und "
+        "Sprach-Tiefpässe.",
+        "Roh-RX-Rekorder mit WAV-Download (z. B. für ASR-Trainingsdaten).",
+        "Offline-Rufzeichenerkennung (optional, Vosk): erkennt gesprochene deutsche "
+        "Rufzeichen, prüft sie gegen die BNetzA-Liste (Name/Ort/Klasse bzw. VOID, "
+        "wenn nicht zugeteilt), Anzeige in der Titelzeile und als Toast.",
         "Installierbare PWA mit mobilem Querformat-Swipe-Deck.",
         "Robuster Betrieb: der Handy-Bildschirm bleibt an, das Browser-Audio "
         "verbindet sich nach einer Netzstörung automatisch neu, und ein "
@@ -497,6 +560,9 @@ DE = [
         "Mic/Speaker), vollduplex.",
         "Systempakete: portaudio19-dev, swig + liblgpio-dev (optional GPIO).",
         "Optional: ein HackRF One plus die hackrf-Hosttools für den Wasserfall.",
+        "Optional: vosk + das kleine deutsche Modell (Offline-Rufzeichen-"
+        "erkennung) sowie pypdf + die BNetzA-Rufzeichenliste-PDF (Name/Ort/Klasse "
+        "+ VOID-Prüfung).",
     ]),
     ("h1", "5  Installation"),
     ("code", INSTALL),
@@ -527,21 +593,31 @@ DE = [
           "ROGER fügt beim Loslassen einen "
           "Zweiton-Piep (1000/1750 Hz) hinzu; während des Sendens zeigt der Knopf "
           "einen aufwärts laufenden Timer (MM:SS). Die 1750-Hz-Taste schärft einen "
-          "Tonruf. Die linke Spalte ruft "
-          "die Speicherkanäle 0–9 ab (die Taste des geladenen Kanals leuchtet); "
-          "die rechte Spalte sendet DTMF-Speicher. Auf dem Handy flankieren "
-          "Mini-RX/TX-VU-Bars mit Peak-Hold den Knopf."),
+          "Tonruf. Die Speicher-Schnelltasten rufen die Kanäle 0–16 ab (M0–M9 in "
+          "der linken, M10–M16 in der rechten Spalte; die Taste des geladenen "
+          "Kanals leuchtet); darunter sendet die rechte Spalte drei DTMF-Speicher "
+          "(0–2). Eine Statuszeile zeigt BUSY je Band, den ASR-Zustand und den "
+          "Live-RX/TX-Gain (in der PWA; am Desktop steht dort der Sende-Hinweis). "
+          "Auf dem Handy flankieren Mini-RX/TX-VU-Bars mit Peak-Hold den Knopf."),
     ("h2", "Audio (WebRTC/Opus)"),
-    ("p", "Das AUDIO-Panel öffnen, das Audio-Band wählen, CONNECT klicken und das "
-          "Mikrofon erlauben. RX- und Mic-Pegel werden live angezeigt. "
-          "Bedienelemente: RX/TX-Gain, ein MIC-TEST-Schalter (Mic messen ohne zu "
-          "tasten — nimmt im Betrieb auf und spielt die Aufnahme beim Ausschalten "
-          "über RX zurück, sodass man sich selbst hört, ganz ohne HF; das "
-          "RX-Rauschen des Funkgeräts ist während des Tests stumm), zuschaltbare "
-          "TX- und RX-Sprachtiefpässe (≤ 3,5 kHz), ein Zweiton-Test sowie TX-Timing "
-          "(Buffer/Trail). Der USB-Mixer liegt unter Einstellungen > Audio. Die "
-          "Audioverbindung verbindet sich nach einer Netzstörung automatisch neu "
-          "und wird beim nächsten Start wiederhergestellt."),
+    ("p", "Das AUDIO-Panel öffnen, mit dem RX-A/RX-B-Schalter das Empfangsband "
+          "wählen, CONNECT klicken und das Mikrofon erlauben. RX- und Mic-Pegel "
+          "werden live angezeigt, dazu die WebRTC-RX/TX-Datenrate in der Graph-Ecke. "
+          "Bedienelemente: RX/TX-Gain (mit Default-Markierung), MIC (Mic-Test — "
+          "misst ohne zu tasten, nimmt im Betrieb auf und spielt beim Ausschalten "
+          "über RX zurück; RX ist dabei stumm), AGC (automatischer TX-Pegel) sowie "
+          "ein kleiner Rekorder — ● REC / ▶ PLAY plus WAV-Download des rohen, "
+          "un-gesquelchten RX-Signals (bis 60 min; z. B. für ASR-Trainingsdaten). "
+          "TX-Timing (Buffer/Trail) und der USB-Mixer liegen unter Einstellungen > "
+          "Audio. Die Verbindung verbindet sich nach einer Netzstörung automatisch "
+          "neu und wird beim nächsten Start wiederhergestellt."),
+    ("p", "RX-Aufbereitung (Einstellungen > Audio): eine RX-De-emphasis "
+          "(einstellbare Zeitkonstante, standardmäßig an) stellt den natürlichen "
+          "Klang her, wenn das Audio vom flachen Diskriminator-/9600-Baud-Ausgang "
+          "kommt; eine BUSY-gesteuerte Software-Rauschsperre übernimmt für diesen "
+          "daueroffenen Ausgang die Stummschaltung aus dem Busy-Status des Geräts; "
+          "TX/RX-Sprachtiefpässe (≤ 3,5 kHz) zähmen Rauschen. Die Decoder erhalten "
+          "stets das un-gesquelchte, ungefilterte Signal."),
     ("p", "Bluetooth-Headsets: Das Sende-Audio wird vom eingebauten Telefon-"
           "Mikrofon aufgenommen (nicht vom Headset-Mikro), damit das Headset im "
           "A2DP-Profil bleibt und der Empfang in guter Qualität durchkommt. Das "
@@ -559,12 +635,34 @@ DE = [
           "eigenen Code (MY ID) eingeben und MUTE drücken, um RX stumm zu schalten, "
           "bis der eigene Ruf empfangen wird — dann wird automatisch entstummt. "
           "Über FM ist das AFSK; zum Einstellen einen Dummy-Load verwenden."),
-    ("h2", "Digimodes (CW / RTTY)"),
-    ("p", "Umschalten zwischen CW (Morse) und RTTY (Baudot/AFSK). DECODE zeigt den "
-          "empfangenen Text; in das Feld tippen und mit SEND senden (tastet PTT). "
-          "Parameter: CW WpM/Tonhöhe — mit optionalem AUTO-Modus, der die "
-          "empfangene Geschwindigkeit nachführt — sowie RTTY Baud/Shift/Mark. Über "
-          "das FM-Gerät ist das MCW / AFSK — kein echtes HF-CW/RTTY."),
+    ("h2", "Digimodes (CW / RTTY / POCSAG)"),
+    ("p", "Umschalten zwischen CW (Morse), RTTY (Baudot/AFSK) und POCSAG-Paging. "
+          "DECODE zeigt den empfangenen Text; in das Feld tippen und mit SEND "
+          "senden (tastet PTT); die CW-Eingabe wird in Großbuchstaben erzwungen. "
+          "Parameter: CW WpM/Tonhöhe — mit AUTO-Modus, der Geschwindigkeit und "
+          "Tonhöhe nachführt (live auf den Slidern) und Sprache/Rauschen "
+          "verwirft, sodass er auch nach einer Sprachansage auf das CW einrastet; "
+          "RTTY Baud/Shift/Mark; sowie POCSAG-Baud (512/1200/2400), RIC, Funktion "
+          "und numerisch/alphanumerisch (RX auto-erkannt) — z. B. DAPNET auf "
+          "439,9875 MHz mit RIC/FUNC/Zeitstempel pro Meldung. Die REC-Taste "
+          "dekodiert den Roh-RX-Puffer offline im aktuellen Modus. Über das "
+          "FM-Gerät ist das MCW / AFSK / FSK — keine echten HF-Modes."),
+    ("h2", "Rufzeichenerkennung (Vosk)"),
+    ("p", "Eine optionale, Offline-Spracherkennung auf dem RX-Audio, die "
+          "gesprochene deutsche Rufzeichen erkennt; einzuschalten unter "
+          "Einstellungen > Audio. Ein grammatik-beschränktes Vosk-Modell "
+          "(internationales + deutsches Buchstabieralphabet, deutsche "
+          "Buchstabennamen und Ziffern) bleibt auf verrauschter FM-Sprache "
+          "brauchbar; die erkannten Zeichen werden zu einem Rufzeichen gefügt und "
+          "gegen die BNetzA-Rufzeichenliste geprüft. Ein Treffer erscheint in "
+          "einem umrahmten Feld in der Titelzeile (in Bandfarbe) und als Toast, "
+          "angereichert aus der Offline-Liste mit Name, Ort und Klasse (A/E/N); "
+          "ein nicht zugeteiltes Rufzeichen wird dennoch angezeigt, aber als VOID "
+          "markiert. Das eigene Rufzeichen wird ignoriert, es läuft nur bei "
+          "offener Rauschsperre und kann auch das Mic-Test-Audio auswerten. Die "
+          "Rufzeichenliste wird einmalig per Converter aus der PDF erzeugt "
+          "(python -m app.callsign_list); QRZ.com wird nur bei der manuellen "
+          "Abfrage im Logbuch genutzt, nie von der ASR."),
     ("h2", "Bandscan"),
     ("p", "Einen VHF/UHF-Bereich oder die Speicherbank absuchen und ein "
           "Belegungs-Spektrum + Wasserfall sehen. Ein Doppelklick auf einen Kanal "
