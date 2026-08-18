@@ -577,6 +577,17 @@
     </div>
   </section>
 
+  <section class="debug-zone collapsed" id="debug-zone">
+    <div class="panel-head">
+      <h2>DEBUG · ASR LOG</h2>
+      <button class="scan-clear" id="asr-log-clear" type="button" title="Clear the ASR log view">CLEAR</button>
+      <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="debug-body" title="Show / hide the ASR debug log">▲</button>
+    </div>
+    <div class="panel-body" id="debug-body">
+      <div class="asr-log" id="asr-log" aria-live="polite" role="log"></div>
+    </div>
+  </section>
+
   <footer class="console-foot">
     <h2 class="foot-title">App &amp; Browser</h2>
     <div class="foot-links">
@@ -599,6 +610,7 @@
   <button class="ptab" data-target=".selcall-zone"><span class="ptab-ico">☎</span><span class="ptab-lbl">SELCALL</span></button>
   <button class="ptab" data-target=".digi-zone"><span class="ptab-ico">⠿</span><span class="ptab-lbl">DIGI</span></button>
   <button class="ptab" data-target=".log-zone"><span class="ptab-ico">✎</span><span class="ptab-lbl">LOG</span></button>
+  <button class="ptab" data-target=".debug-zone"><span class="ptab-ico">🐞</span><span class="ptab-lbl">DEBUG</span></button>
 </nav>
 
 <!-- Memory channel editor -->

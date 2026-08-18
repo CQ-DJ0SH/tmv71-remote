@@ -2928,12 +2928,36 @@ function bindCallsign() {
   connectCallsignWS();
 }
 
+// ---- ASR debug log (debug panel under band scan) --------------------------
+function asrLog(e) {
+  const box = $("#asr-log");
+  if (!box || !e || !e.line) return;
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 24;
+  const row = document.createElement("div");
+  row.className = "asr-log-row";
+  const t = document.createElement("span"); t.className = "al-time"; t.textContent = e.time || "";
+  const msg = document.createElement("span"); msg.className = "al-msg"; msg.textContent = e.line;
+  row.append(t, msg);
+  box.appendChild(row);
+  while (box.childElementCount > 300) box.removeChild(box.firstChild);
+  if (atBottom) box.scrollTop = box.scrollHeight;   // follow tail unless scrolled up
+}
+$("#asr-log-clear")?.addEventListener("click", () => {
+  const box = $("#asr-log"); if (box) box.textContent = "";
+});
+
 function connectCallsignWS() {
   let ws;
   try { ws = new WebSocket(wsUrl("/ws/callsign")); } catch { return; }
   ws.onmessage = ev => {
     let m; try { m = JSON.parse(ev.data); } catch { return; }
     if (m.t === "status") { reflectAsr(m); return; }
+    if (m.t === "asrlog") { asrLog(m); return; }
+    if (m.t === "asrloghist") {
+      const box = $("#asr-log"); if (box) box.textContent = "";
+      (m.lines || []).forEach(asrLog);
+      return;
+    }
     if (m.t === "callsign" && m.call) {
       showRxCall(m);
       // callsign toast stays longer (7 s) than normal toasts so it can be read
@@ -3331,7 +3355,7 @@ if (localStorage.getItem("tmv71.audioOn") === "1") {
 
 // decorative aircraft-panel corner screws (one set of four per panel)
 function addPanelScrews() {
-  document.querySelectorAll(".band, .ptt-zone, .audio, .scan-zone, .hackrf-zone, .selcall-zone, .digi-zone, .log-zone").forEach(p => {
+  document.querySelectorAll(".band, .ptt-zone, .audio, .scan-zone, .hackrf-zone, .selcall-zone, .digi-zone, .log-zone, .debug-zone").forEach(p => {
     if (p.querySelector(".screw")) return;
     ["tl", "tr", "bl", "br"].forEach(pos => {
       const s = document.createElement("span");

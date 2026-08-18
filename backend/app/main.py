@@ -394,6 +394,7 @@ class CallsignService:
         self._seen: dict = {}                  # callsign -> last-emit monotonic ts
         self._repeat_s = 90.0                  # suppress a repeat of the same call
         self._recent: list = []                # (ts, call) for repetition voting
+        self._log: list = []                   # ASR debug log (ring buffer of last N)
         self._calls: dict = {}                 # call -> {class,name,city} (empty = unverified)
         self._lock = asyncio.Lock()
 
@@ -436,8 +437,12 @@ class CallsignService:
                 # let N-best rescoring prefer an assigned callsign (reads the
                 # current dict, so a later reload is picked up)
                 self._rec.set_validator(lambda c: c in self._calls)
+            was = self.enabled
             self.enabled = on
             self.audio.set_asr_rx(on)
+            if on != was:
+                self._add_log("ASR enabled — listening while squelch open"
+                              if on else "ASR disabled")
             if not on:
                 self._seen.clear()
             if settings.asr_callsign_enabled != on:
@@ -463,6 +468,18 @@ class CallsignService:
                 q.put_nowait(msg)
             except Exception:  # noqa: BLE001
                 pass
+
+    def _add_log(self, line: str) -> None:
+        """Append a line to the ASR debug log (ring buffer for the debug panel) and
+        push it live to subscribers."""
+        entry = {"time": time.strftime("%H:%M:%S"), "line": line}
+        self._log.append(entry)
+        if len(self._log) > 200:
+            del self._log[:-200]
+        self._broadcast({"t": "asrlog", **entry})
+
+    def log_history(self) -> list:
+        return list(self._log)
 
     async def start(self) -> None:
         self._task = asyncio.create_task(self._decode_loop())
@@ -511,6 +528,7 @@ class CallsignService:
         # trailing mishear or extra speech, DA1XY + "Portabel" -> DA1XYP), else a
         # *unique* single-letter deletion within the suffix (an inserted letter,
         # e.g. DO1XO heard as DO1XRO from "X-ray"). Prefix D+region+digit is kept.
+        heard = call
         if len(call) == 6 and self._calls and call not in self._calls:
             if call[:5] in self._calls:
                 call = call[:5]
@@ -523,6 +541,8 @@ class CallsignService:
         # VOID (still shown). When no list is loaded we can't verify -> valid.
         info = self._calls.get(call)
         valid = (not self._calls) or (info is not None)
+        pfx = f"{heard}→{call} " if call != heard else ""   # note any correction
+        tag = "" if valid else "VOID "
         now = time.monotonic()
         # Repetition voting: OMs send their call 2-3x. A list-valid call is trusted
         # at once; an unlisted (VOID) hit must be heard >=VOID_MIN_VOTES times in
@@ -531,9 +551,13 @@ class CallsignService:
         self._recent.append((now, call))
         self._recent = [(t, c) for (t, c) in self._recent
                         if now - t <= VOTE_WINDOW_S]
-        if not valid and sum(1 for _t, c in self._recent if c == call) < VOID_MIN_VOTES:
-            return
+        if not valid:
+            votes = sum(1 for _t, c in self._recent if c == call)
+            if votes < VOID_MIN_VOTES:
+                self._add_log(f"{pfx}{call}  {conf:.2f}  {tag}· held {votes}/{VOID_MIN_VOTES}")
+                return
         if now - self._seen.get(call, 0.0) < self._repeat_s:
+            self._add_log(f"{pfx}{call}  {conf:.2f}  {tag}· repeat, muted")
             return
         self._seen[call] = now
         if len(self._seen) > 64:                      # prune stale entries
@@ -541,6 +565,9 @@ class CallsignService:
                           if now - v < self._repeat_s}
         # QRZ is NOT queried here — only on a manual lookup in the log panel. The
         # name/town/class come from the offline BNetzA list.
+        det = " · ".join(x for x in ((info or {}).get("name", ""),
+                                     (info or {}).get("city", "")) if x)
+        self._add_log(f"{pfx}{call}  {conf:.2f}  · {tag}shown{(' · ' + det) if det else ''}")
         self._broadcast({"t": "callsign", "call": call, "conf": round(conf, 2),
                          "valid": valid,
                          "name": (info or {}).get("name", ""),
@@ -1547,6 +1574,7 @@ async def ws_callsign(ws: WebSocket) -> None:
     q = callsign_svc.subscribe()
     try:
         await ws.send_json({"t": "status", **callsign_svc.status()})
+        await ws.send_json({"t": "asrloghist", "lines": callsign_svc.log_history()})
         while True:
             try:
                 msg = await asyncio.wait_for(q.get(), timeout=15)

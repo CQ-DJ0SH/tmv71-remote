@@ -400,8 +400,8 @@ body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}
   display:grid; gap:22px;
   --row-h:377px;                      /* band-panel height; keeps the grid square */
   grid-template-columns:1fr 1fr;
-  grid-template-rows:auto var(--row-h) auto auto auto auto auto auto;
-  grid-template-areas: "bands bands" "ptt audio" "hackrf hackrf" "sel sel" "digi digi" "log log" "scan scan" "foot foot";
+  grid-template-rows:auto var(--row-h) auto auto auto auto auto auto auto;
+  grid-template-areas: "bands bands" "ptt audio" "hackrf hackrf" "sel sel" "digi digi" "log log" "scan scan" "debug debug" "foot foot";
 }
 .bands{grid-area:bands; display:grid; grid-template-columns:1fr 1fr; gap:22px}
 .ptt-zone{grid-area:ptt}
@@ -411,6 +411,19 @@ body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}
 .digi-zone{grid-area:digi}
 .log-zone{grid-area:log}
 .scan-zone{grid-area:scan}
+.debug-zone{grid-area:debug}
+/* ASR debug log: monospace, scrollable, fixed height */
+.asr-log{
+  font-family:var(--font-mono); font-size:11.5px; line-height:1.5;
+  height:200px; overflow-y:auto; overflow-x:hidden;
+  padding:8px 10px; border-radius:6px;
+  background:#05080a; border:1px solid #0c151b; color:var(--text-dim);
+}
+body.theme-light .asr-log{background:#eef2f5; border-color:#d3dce2; color:#3a4a54}
+.asr-log-row{display:flex; gap:8px; white-space:pre-wrap; word-break:break-word}
+.asr-log-row .al-time{color:var(--text-dim); opacity:.55; flex:0 0 auto}
+.asr-log-row .al-msg{flex:1 1 auto; color:var(--text)}
+.asr-log:empty::before{content:"(no ASR activity yet)"; opacity:.5}
 /* source link + version, below the last panel, right-aligned */
 .console-foot{
   grid-area:foot; display:flex; justify-content:flex-end; align-items:center; gap:8px;
@@ -486,6 +499,11 @@ body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}
   .ptab[data-target=".digi-zone"]{--tab:#6fd89a}
   .ptab[data-target=".log-zone"]{--tab:#1fb6a6}
   .ptab[data-target=".scan-zone"]{--tab:#9fb0bd}
+  .ptab[data-target=".debug-zone"]{--tab:#454a4f}
+  /* the ASR log fills the deck page height in the landscape strip */
+  .debug-zone .asr-log{height:auto; flex:1 1 auto; min-height:0}
+  .console .debug-zone{display:flex; flex-direction:column}
+  .console .debug-zone .panel-body{display:flex; flex-direction:column; flex:1 1 auto; min-height:0}
   .ptab.active{color:var(--tab); border-left-color:var(--tab);
     text-shadow:0 0 8px color-mix(in srgb, var(--tab) 55%, transparent);
     background:color-mix(in srgb, var(--tab) 9%, transparent)}
@@ -544,7 +562,7 @@ body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}
   /* unwrap the two-band wrapper so VFO A and VFO B are their own deck pages */
   .bands{display:contents}
   #band-0, #band-1,
-  .ptt-zone, .audio, .hackrf-zone, .selcall-zone, .digi-zone, .log-zone, .scan-zone{
+  .ptt-zone, .audio, .hackrf-zone, .selcall-zone, .digi-zone, .log-zone, .scan-zone, .debug-zone{
     flex:0 0 auto; width:100%; height:100%; min-height:0;
     scroll-snap-align:start; scroll-snap-stop:always;
     overflow-y:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;
@@ -558,7 +576,7 @@ body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}
   #band-0::-webkit-scrollbar, #band-1::-webkit-scrollbar,
   .ptt-zone::-webkit-scrollbar, .audio::-webkit-scrollbar, .hackrf-zone::-webkit-scrollbar,
   .selcall-zone::-webkit-scrollbar, .digi-zone::-webkit-scrollbar, .log-zone::-webkit-scrollbar,
-  .scan-zone::-webkit-scrollbar{display:none}
+  .scan-zone::-webkit-scrollbar, .debug-zone::-webkit-scrollbar{display:none}
   /* the footer becomes the final deck page: app version + browser info */
   .console-foot{display:flex; flex-direction:column; align-items:stretch;
     justify-content:flex-start; gap:12px;
@@ -678,7 +696,7 @@ body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}
 }
 
 /* panel base — beveled aircraft instrument plate */
-.band, .ptt-zone, .audio, .scan-zone, .hackrf-zone, .digi-zone, .selcall-zone, .log-zone{
+.band, .ptt-zone, .audio, .scan-zone, .hackrf-zone, .digi-zone, .selcall-zone, .log-zone, .debug-zone{
   background:
     linear-gradient(180deg,var(--panel-2),var(--panel));
   border:1px solid var(--edge);
@@ -733,7 +751,8 @@ body.theme-light .screw::before{
   box-shadow:inset 0 1px 1px #00000045;
 }
 .band::before, .ptt-zone::before, .audio::before, .scan-zone::before,
-.hackrf-zone::before, .digi-zone::before, .selcall-zone::before, .log-zone::before{ /* color rail */
+.hackrf-zone::before, .digi-zone::before, .selcall-zone::before, .log-zone::before,
+.debug-zone::before{ /* color rail */
   content:""; position:absolute; left:0; top:14px; bottom:14px; width:3px;
   border-radius:3px; background:var(--accent); box-shadow:0 0 12px var(--accent-glow);
 }
@@ -751,6 +770,8 @@ body.theme-light .screw::before{
 .digi-zone{padding:22px 26px}
 .log-zone{--accent:#1fb6a6; --accent-glow:#1fb6a6}   /* logbook = wavelog teal */
 .log-zone::before{box-shadow:0 0 9px -2px var(--accent-glow)}
+.debug-zone{--accent:#454a4f; --accent-glow:#454a4f; padding:22px 26px}  /* debug = dark grey */
+.debug-zone::before{box-shadow:0 0 9px -2px var(--accent-glow)}
 .digi-modes{display:inline-flex; border:1px solid var(--accent); border-radius:7px; overflow:hidden}
 .digi-mode{font-family:var(--font-ui); font-size:11px; letter-spacing:.12em; padding:5px 12px;
   color:var(--text-dim); background:var(--ctrl-bg); border:none; cursor:pointer; transition:.15s}
