@@ -998,6 +998,14 @@ body.radio-off .hackrf-zone{opacity:.32; filter:grayscale(.6) brightness(.78)}
 .sm-seg.peak-tx{background:#c79a93; box-shadow:none}
 body.theme-light .sm-seg.peak,
 body.theme-light .sm-seg.peak-tx{background:#8b99a2; box-shadow:none}
+/* S0-9 quieting bar (real signal estimate) — in the active band's colour, sits
+   under the S-scale above the AF bar; slimmer so the two readings stay distinct */
+.sm-sbar{height:8px}
+.sm-seg.son{background:var(--accent); box-shadow:0 0 5px -1px var(--accent-glow)}
+.sm-seg.speak{background:#9fb4c2; box-shadow:none}
+body.theme-light #band-0 .sm-seg.son{background:#c8770f; box-shadow:none}
+body.theme-light #band-1 .sm-seg.son{background:#0c7b71; box-shadow:none}
+body.theme-light .sm-seg.speak{background:#8b99a2; box-shadow:none}
 /* the Po (watt) scale is reference only — power isn't shown in the bar */
 .smeter .sm-po{opacity:.45}
 /* TX bar (mic/modulation level) glows red via .sm-seg.on-tx */

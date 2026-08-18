@@ -269,16 +269,40 @@ const VU_FLOOR = -54;     // dBFS at the bottom of a level bar
 // ---- S-meter — RX: receive-audio level / TX: mic (modulation) level -------
 const SM_SEGMENTS = 30;
 const SM_PEAK_HOLD = 1000;                        // hold the peak marker (ms)
-let lastRxDb = null, lastTxDb = null;             // Pi-measured RX / mic levels
-const smPeak = [{ seg: 0, t: 0 }, { seg: 0, t: 0 }];  // per-band peak-hold state
+// The S-bar shares the top S-scale (S 1 3 5 7 9 +20 +40 +60); the "9" tick sits
+// at ~0.61 of the bar width. The quieting meter saturates at S9, so a full-scale
+// signal fills to there — it cannot drive the +20/+40/+60 region.
+const S9_POS = 0.61;
+let lastRxDb = null, lastTxDb = null, lastRxS = null;  // Pi-measured RX/mic/S
+const smPeak = [{ seg: 0, t: 0 }, { seg: 0, t: 0 }];   // AF-bar peak-hold state
+const sPeak = [{ seg: 0, t: 0 }, { seg: 0, t: 0 }];    // S-bar peak-hold state
 
 function buildSmeter(band) {
-  const el = document.getElementById(`sm-bar-${band}`);
-  if (!el || el.childElementCount) return;
-  for (let i = 0; i < SM_SEGMENTS; i++) {
-    const s = document.createElement("span");
-    s.className = "sm-seg";
-    el.appendChild(s);
+  [`sm-bar-${band}`, `sm-sbar-${band}`].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el || el.childElementCount) return;
+    for (let i = 0; i < SM_SEGMENTS; i++) {
+      const s = document.createElement("span");
+      s.className = "sm-seg";
+      el.appendChild(s);
+    }
+  });
+}
+// S0-9 quieting bar (real signal estimate), driven by the Pi's rx_s.
+function renderSbar(band, sval) {
+  const bar = document.getElementById(`sm-sbar-${band}`);
+  if (!bar) return;
+  const frac = Math.max(0, Math.min(9, sval || 0)) / 9 * S9_POS;
+  const lit = Math.round(frac * SM_SEGMENTS);
+  const pk = sPeak[band], now = Date.now();
+  if (lit >= pk.seg) { pk.seg = lit; pk.t = now; }
+  else if (now - pk.t > SM_PEAK_HOLD) pk.seg = Math.max(lit, pk.seg - 1);
+  const peakIdx = pk.seg - 1;
+  const segs = bar.children;
+  for (let i = 0; i < segs.length; i++) {
+    let cls = "sm-seg" + (i < lit ? " son" : "");
+    if (i === peakIdx && pk.seg > 0) cls += " speak";
+    segs[i].className = cls;
   }
 }
 function renderSmeter(band, frac, tx) {
@@ -304,9 +328,10 @@ function updateSmeters() {
   if (!last || !last.bands) return;
   last.bands.forEach(b => {
     if (last.transmitting && last.ptt_band === b.band) {
-      // TX: show the live mic (modulation) level
+      // TX: show the live mic (modulation) level; no S-meter while transmitting
       const f = (lastTxDb != null) ? (lastTxDb - VU_FLOOR) / (0 - VU_FLOOR) : 0;
       renderSmeter(b.band, f, true);
+      renderSbar(b.band, 0);
     } else {
       // RX: Pi audio comes from the data band's RX side only, so show the
       // measured AF level on that band; the other band stays empty. Driven by
@@ -316,6 +341,8 @@ function updateSmeters() {
       const f = (onAudio && lastRxDb != null)
         ? Math.max(0, (lastRxDb - VU_FLOOR) / (0 - VU_FLOOR)) : 0;
       renderSmeter(b.band, f, false);
+      // real S-meter (FM quieting) on the audio band only
+      renderSbar(b.band, (onAudio && lastRxS != null) ? lastRxS : 0);
     }
   });
 }
@@ -348,7 +375,7 @@ async function refreshAudio() {
         : "USB Audio";
     }
     // feed the in-display S-meter with the live RX / mic audio levels
-    lastRxDb = a.rx_db; lastTxDb = a.tx_db;
+    lastRxDb = a.rx_db; lastTxDb = a.tx_db; lastRxS = a.rx_s;
     updateSmeters();
     // mini VU bars flanking the PTT button (PWA): RX left, TX right, with 1 s
     // peak-hold. The mask covers the empty (top) part → fills upward from bottom.

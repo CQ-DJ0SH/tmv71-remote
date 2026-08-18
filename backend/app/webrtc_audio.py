@@ -72,6 +72,28 @@ DEEMPH_TAU_US = 75.0
 # it while leaving voice (≳300 Hz) untouched.
 RX_HP_CUTOFF_HZ = 180.0
 
+# S-meter from FM quieting. On the flat discriminator output the high-band noise
+# is INVERSE to signal strength: loud HF hiss = no signal (S0), full quieting =
+# strong signal (S9). We measure a high-pass noise band (above the voice) and
+# auto-range it between the two references. Measured on this radio: ~-19 dBFS
+# open-squelch → ~-42 dBFS fully quieted (≈23 dB span). It is a relative quieting
+# proxy — accurate up to full quieting, then it saturates (cannot tell S9 from
+# S9+40 dB); the TM-V71 gives no numeric RSSI over CAT, only binary BUSY.
+SM_HP_CUTOFF_HZ = 6000.0     # noise band: above the voice, rich in FM noise
+SM_OPEN_DBFS = -18.5         # initial S0 reference (no signal / open squelch)
+# FM quieting is steep and nonlinear: a readable signal is already well quieted,
+# so map S9 to a modest quieting depth below the open-noise reference (a strong
+# local signal quiets ~20+ dB and simply saturates at S9). ~14 dB puts a moderate
+# but readable signal (≈9 dB quieting) around S5-6, not S1.
+SM_S9_SPAN_DB = 14.0
+SM_HI_DECAY = 0.005          # open-ref down-drift per block (pre-gain noise is ~fixed)
+SM_FLOOR_RMS = 30.0          # below this broadband RMS the input is dead, not S9
+# Display smoothing (per ~20 ms block): low = sluggish/calm needle. Asymmetric so
+# it still rises promptly on a new signal but settles slowly (no jitter on voice).
+SM_ATTACK = 0.20             # weight toward a rising reading
+SM_RELEASE = 0.07            # weight toward a falling reading (slower = more inert)
+SM_DROP = 0.6                # fast release on carrier loss (noise floor returns)
+
 # Software-squelch hang time: keep audio open this long after BUSY drops, so the
 # ~60 ms BUSY poll gaps and short speech pauses don't chop the audio.
 SQ_HANG_S = 0.060
@@ -159,6 +181,11 @@ class RadioAudio:
         # Sub-audio/CTCSS + DC hum removal on the listen path (always on — the flat
         # RX feed always carries it; the decoder taps upstream keep the raw signal).
         self._rx_hp = _HighPass(RX_HP_CUTOFF_HZ, SAMPLE_RATE)
+        # FM-quieting S-meter (see SM_* constants): high-band noise auto-ranged
+        # between open-squelch noise (S0) and full quieting (S9).
+        self._sm_hp = _HighPass(SM_HP_CUTOFF_HZ, SAMPLE_RATE, ntaps=127)
+        self._sm_hi = SM_OPEN_DBFS       # adaptive S0 reference (open-squelch noise)
+        self.rx_s: float = 0.0           # 0..9 displayed S value
         # Software squelch gated by the radio's BUSY status (for the always-open
         # discriminator/9600 output). rx_busy is updated by a fast CAT poller;
         # audio is muted once BUSY has been closed for longer than the hang time.
@@ -324,12 +351,44 @@ class RadioAudio:
         self.connected = False
         self._stop_stream()
 
+    def _update_smeter(self, raw: np.ndarray) -> None:
+        """FM-quieting S-meter: high-band noise inversely tracks signal strength,
+        auto-ranged between open-squelch noise (S0) and full quieting (S9). Fed the
+        raw, pre-gain RX so it reflects the signal, not the AF volume setting."""
+        y = self._sm_hp.process(raw).astype(np.float64)     # keep filter continuous
+        bb = float(np.sqrt(np.mean(raw.astype(np.float64) ** 2))) if raw.size else 0.0
+        if bb < SM_FLOOR_RMS:                    # dead/near-silent input is not "S9"
+            self.rx_s = round(self.rx_s * 0.7, 2)
+            return
+        rms = float(np.sqrt(np.mean(y ** 2)))
+        cur = 20.0 * np.log10(max(rms, 1.0) / 32768.0)      # high-band level, dBFS
+        # open-squelch noise reference (S0): snap up to any louder noise (that IS
+        # the no-signal level), drift down only very slowly. Quieting depth below
+        # it maps linearly to S0..S9 over SM_S9_SPAN_DB, saturating at full quieting.
+        if cur > self._sm_hi:
+            self._sm_hi = cur
+        else:
+            self._sm_hi = max(self._sm_hi - SM_HI_DECAY, SM_OPEN_DBFS - 12.0)
+        inst = 9.0 * (self._sm_hi - cur) / SM_S9_SPAN_DB
+        inst = min(9.0, max(0.0, inst))
+        # Sluggish needle for normal fluctuations, but snap down on carrier loss:
+        # when the high-band noise floor returns, inst collapses to ~S0 from a real
+        # reading -> drop fast; small dips (voice) keep the slow, inert release.
+        if inst > self.rx_s:
+            a = SM_ATTACK
+        elif inst < 0.7 and self.rx_s > 2.0:      # carrier lost -> back to noise
+            a = SM_DROP
+        else:
+            a = SM_RELEASE
+        self.rx_s = round(a * inst + (1.0 - a) * self.rx_s, 2)
+
     # -- PortAudio callback (runs in PortAudio thread) ---------------------
     def _callback(self, indata, outdata, frames, time_info, status):
         if status:
             log.debug("audio status: %s", status)
         # RX: radio capture (mono ch0) -> WebRTC subscribers
         samples = indata[:, 0].copy()
+        self._update_smeter(samples)            # FM-quieting S-meter (pre-gain, raw)
         if self.rx_gain != 1.0:
             samples = np.clip(samples.astype(np.float32) * self.rx_gain,
                               -32768, 32767).astype(np.int16)
@@ -691,7 +750,7 @@ class RadioAudio:
     def status(self) -> dict:
         return {"enabled": True, "connected": self.connected, "error": self.error,
                 "rx_frames": self.rx_frames, "ptt_open": self._ptt_open,
-                "rx_db": self.rx_db, "tx_db": self.tx_db,
+                "rx_db": self.rx_db, "tx_db": self.tx_db, "rx_s": self.rx_s,
                 "rx_gain": self.rx_gain, "tx_gain": self.tx_gain,
                 "tx_auto_gain": self.tx_auto_gain,
                 "agc_gain": round(self._agc_gain, 2),   # live AGC factor (display)
