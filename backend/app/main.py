@@ -372,6 +372,10 @@ class SelcallService:
 sel = SelcallService(radio_audio)
 
 
+VOTE_WINDOW_S = 12.0     # repetition-voting window (an over's repeats fall inside)
+VOID_MIN_VOTES = 2       # an unlisted (VOID) hit must repeat this often to be shown
+
+
 class CallsignService:
     """Off-air callsign recognition via grammar-constrained Vosk ASR.
 
@@ -389,6 +393,7 @@ class CallsignService:
         self._task = None
         self._seen: dict = {}                  # callsign -> last-emit monotonic ts
         self._repeat_s = 90.0                  # suppress a repeat of the same call
+        self._recent: list = []                # (ts, call) for repetition voting
         self._calls: dict = {}                 # call -> {class,name,city} (empty = unverified)
         self._lock = asyncio.Lock()
 
@@ -427,6 +432,10 @@ class CallsignService:
                 # (loads a pre-built cache; empty on failure -> shown, unverified)
                 self._calls = await asyncio.to_thread(
                     callsign_list.load, settings.asr_calllist_pdf, "")
+            if self._rec is not None:
+                # let N-best rescoring prefer an assigned callsign (reads the
+                # current dict, so a later reload is picked up)
+                self._rec.set_validator(lambda c: c in self._calls)
             self.enabled = on
             self.audio.set_asr_rx(on)
             if not on:
@@ -510,17 +519,26 @@ class CallsignService:
                 assigned = [a for a in alts if a in self._calls]
                 if len(assigned) == 1:
                     call = assigned[0]
+        # Verify against the assigned-callsign list; a call not in it is flagged
+        # VOID (still shown). When no list is loaded we can't verify -> valid.
+        info = self._calls.get(call)
+        valid = (not self._calls) or (info is not None)
         now = time.monotonic()
+        # Repetition voting: OMs send their call 2-3x. A list-valid call is trusted
+        # at once; an unlisted (VOID) hit must be heard >=VOID_MIN_VOTES times in
+        # the window before it is shown, which suppresses one-off mishears (e.g. a
+        # garbled DG4FJ) while still surfacing a genuinely repeated unlisted call.
+        self._recent.append((now, call))
+        self._recent = [(t, c) for (t, c) in self._recent
+                        if now - t <= VOTE_WINDOW_S]
+        if not valid and sum(1 for _t, c in self._recent if c == call) < VOID_MIN_VOTES:
+            return
         if now - self._seen.get(call, 0.0) < self._repeat_s:
             return
         self._seen[call] = now
         if len(self._seen) > 64:                      # prune stale entries
             self._seen = {k: v for k, v in self._seen.items()
                           if now - v < self._repeat_s}
-        # Verify against the assigned-callsign list; a call not in it is flagged
-        # VOID (still shown). When no list is loaded we can't verify -> valid.
-        info = self._calls.get(call)
-        valid = (not self._calls) or (info is not None)
         # QRZ is NOT queried here — only on a manual lookup in the log panel. The
         # name/town/class come from the offline BNetzA list.
         self._broadcast({"t": "callsign", "call": call, "conf": round(conf, 2),

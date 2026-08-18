@@ -64,6 +64,11 @@ CALL_RE = re.compile(r"D(?:A[0-24-8]|[BCDFGHJKLMNO][0-9]|P[0-28]|R[1-6])[A-Z]{2,
 # whereas two calls running together are resolved by _tile() anyway.
 GROUP_GAP_S = 0.9
 
+# N-best rescoring: ask Vosk for this many alternative hypotheses per utterance
+# and pick the best callsign across all of them (preferring an assigned one). The
+# correct call is often not the top-1 text but is present in the alternatives.
+N_ALTERNATIVES = 10
+
 TARGET_SR = 16000
 _DECIM = 3               # 48 kHz radio audio -> 16 kHz for Vosk
 
@@ -129,18 +134,27 @@ class CallsignRecognizer:
     utterance (call at end of an over). Both return ``[(callsign, confidence)]``.
     """
 
-    def __init__(self, model_dir: str, own_call: str = "", min_conf: float = 0.55):
+    def __init__(self, model_dir: str, own_call: str = "", min_conf: float = 0.55,
+                 is_valid=None):
         from vosk import Model, KaldiRecognizer, SetLogLevel  # lazy dependency
         SetLogLevel(-1)                       # silence per-frame + grammar logs
         self._model = Model(model_dir)
         self._rec = KaldiRecognizer(self._model, TARGET_SR, GRAMMAR)
         self._rec.SetWords(True)              # per-word confidence for gating
+        self._rec.SetMaxAlternatives(N_ALTERNATIVES)   # N-best for rescoring
         self.own = normalize_call(own_call)
         self.min_conf = min_conf
+        self._is_valid = is_valid             # optional call->bool (assigned-list)
         self._fir_hist = np.zeros(len(_ASR_FIR) - 1, dtype=np.float32)   # overlap-save
 
     def set_own(self, own_call: str) -> None:
         self.own = normalize_call(own_call)
+
+    def set_validator(self, is_valid) -> None:
+        """Provide a callsign-validity predicate (assigned-list membership) so
+        N-best rescoring can prefer a real callsign over a higher-ranked garbage
+        hypothesis. Optional; without it, ranking falls back to confidence."""
+        self._is_valid = is_valid
 
     @staticmethod
     def _tile(s: str):
@@ -168,9 +182,31 @@ class CallsignRecognizer:
         return solve(0)
 
     def _extract(self, result: dict) -> List[Tuple[str, float]]:
+        """N-best rescoring: collect callsign candidates across every alternative
+        hypothesis, then return the single best one for this utterance. Preference:
+        an assigned (list-valid) callsign first, then higher word-confidence, then
+        the earlier (more likely) alternative. Collapsing to one call per utterance
+        also dedupes a call spoken twice in a single breath."""
+        alts = result.get("alternatives")
+        if alts is None:                          # no n-best (safety) -> single hyp
+            alts = [result]
+        pool: dict = {}                           # call -> (conf, rank, valid)
+        for rank, alt in enumerate(alts):
+            for call, conf in self._extract_one(alt):
+                valid = bool(self._is_valid(call)) if self._is_valid else False
+                prev = pool.get(call)
+                if prev is None or conf > prev[0]:
+                    pool[call] = (conf, rank, valid)
+        if not pool:
+            return []
+        call, (conf, _rank, _valid) = max(
+            pool.items(), key=lambda kv: (kv[1][2], kv[1][0], -kv[1][1]))
+        return [(call, conf)]
+
+    def _extract_one(self, hyp: dict) -> List[Tuple[str, float]]:
         # (letter, confidence, start, end) for every word that maps to a letter/digit
         items = []
-        for w in result.get("result") or []:
+        for w in hyp.get("result") or []:
             word = w.get("word", "")
             ch = WORD_MAP.get(word)
             if not ch:
