@@ -612,10 +612,18 @@ body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}
      so the outer gaps match and the slack lands in the middle */
   /* centred with a larger, symmetric top/bottom padding so the whole stack sits
      a touch lower and is vertically balanced */
-  #band-0, #band-1{display:flex; flex-direction:column; justify-content:safe center; padding-top:28px; padding-bottom:28px}
+  #band-0, #band-1{display:flex; flex-direction:column; justify-content:safe center; padding-top:12px; padding-bottom:14px}
   .band .band-head{margin-bottom:4px; padding:0 22px}
-  .band .display{margin:5px 0 7px; padding:10px 14px 9px}
-  .band .smeter{margin-top:6px}
+  /* the S-meter lives inside the display; the reclaimed bottom margin is added as
+     breathing room under the level bar (extra display bottom padding) to declutter */
+  .band .display{margin:5px 0 7px; padding:10px 14px 16px}
+  .band .smeter{margin-top:8px; margin-bottom:6px}
+  /* PWA: show only the real S-meter — hide the AF level bar and its Po scale, and
+     make the S-bar taller now that it stands alone (mic/RX level is on the PTT VU
+     bars). The header row is lifted (smaller panel top padding) to free the room. */
+  .band .smeter .sm-bar:not(.sm-sbar){display:none}
+  .band .smeter .sm-po{display:none}
+  .band .sm-sbar{height:14px; margin-top:3px}
   .band .sql-row{margin:0 0 7px}
   /* more room above (to the SQL slider), tight below (to the frequency entry);
      the whole stack is vertically centred via the column's justify-content */
