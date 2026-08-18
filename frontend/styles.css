@@ -499,11 +499,12 @@ body.theme-light .asr-log{background:#eef2f5; border-color:#d3dce2; color:#3a4a5
   .ptab[data-target=".digi-zone"]{--tab:#6fd89a}
   .ptab[data-target=".log-zone"]{--tab:#1fb6a6}
   .ptab[data-target=".scan-zone"]{--tab:#9fb0bd}
-  .ptab[data-target=".debug-zone"]{--tab:#454a4f}
-  /* the ASR log fills the deck page height in the landscape strip */
-  .debug-zone .asr-log{height:auto; flex:1 1 auto; min-height:0}
+  /* PWA: the ASR log fills the debug panel's full height (fixed) and scrolls
+     inside, even with a single line — not grow-with-content. The #debug-body id
+     beats ".console .collapsed .panel-body{display:block}" so the flex chain holds. */
   .console .debug-zone{display:flex; flex-direction:column}
-  .console .debug-zone .panel-body{display:flex; flex-direction:column; flex:1 1 auto; min-height:0}
+  .console #debug-body{display:flex; flex-direction:column; flex:1 1 auto; min-height:0}
+  .debug-zone .asr-log{height:auto; flex:1 1 auto; min-height:0}
   .ptab.active{color:var(--tab); border-left-color:var(--tab);
     text-shadow:0 0 8px color-mix(in srgb, var(--tab) 55%, transparent);
     background:color-mix(in srgb, var(--tab) 9%, transparent)}
