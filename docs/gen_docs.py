@@ -436,6 +436,16 @@ EN = [
     ("p", "Sweep a VHF/UHF range or the memory bank and see an occupancy "
           "spectrum + waterfall. Double-click a channel to tune the control VFO "
           "to it."),
+    ("h2", "Debug (ASR log)"),
+    ("p", "A panel below the band scan that streams a live log of the callsign "
+          "recognition, so you can see what the ASR heard and why a call was or "
+          "was not shown. Each line carries a timestamp and the decision: a call "
+          "shown (with name/town), a VOID hit held by repetition voting (n/2 votes "
+          "so far), a repeat muted by the de-dupe window, any 5/6-character "
+          "correction (heard→shown), and ASR enable/disable. The last 200 lines are "
+          "kept on the Pi and sent when the panel opens; the view holds 300 lines "
+          "and follows the tail unless you scroll up. CLEAR empties the view. In the "
+          "mobile deck the panel has no tab — swipe to it past the band scan."),
     ("h2", "Logbook (Wavelog + QRZ.com)"),
     ("p", "Logs QSOs to a locally installed Wavelog instance. Enter just the "
           "callsign (and optionally a name) — frequency, band, mode, date/time and "
@@ -713,6 +723,18 @@ DE = [
     ("p", "Einen VHF/UHF-Bereich oder die Speicherbank absuchen und ein "
           "Belegungs-Spektrum + Wasserfall sehen. Ein Doppelklick auf einen Kanal "
           "stimmt den Steuer-VFO darauf ab."),
+    ("h2", "Debug (ASR-Log)"),
+    ("p", "Ein Panel unter dem Bandscan, das ein Live-Protokoll der Rufzeichen"
+          "erkennung ausgibt — so ist nachvollziehbar, was die ASR gehört hat und "
+          "warum ein Rufzeichen angezeigt wurde oder nicht. Jede Zeile trägt einen "
+          "Zeitstempel und die Entscheidung: angezeigt (mit Name/Ort), ein per "
+          "Wiederholungs-Voting zurückgehaltenes VOID (n/2 Stimmen bisher), eine "
+          "durch das Dedupe-Fenster stummgeschaltete Wiederholung, jede 5/6-Zeichen-"
+          "Korrektur (gehört→angezeigt) sowie ASR an/aus. Die letzten 200 Zeilen "
+          "werden auf dem Pi gehalten und beim Öffnen des Panels gesendet; die "
+          "Ansicht fasst 300 Zeilen und folgt dem Ende, sofern man nicht nach oben "
+          "scrollt. CLEAR leert die Ansicht. Im mobilen Deck hat das Panel keinen "
+          "Tab — dorthin hinter dem Bandscan wischen."),
     ("h2", "Logbuch (Wavelog + QRZ.com)"),
     ("p", "Protokolliert QSOs in eine lokal installierte Wavelog-Instanz. Es "
           "genügt, das Rufzeichen (und optional einen Namen) einzugeben — Frequenz, "
