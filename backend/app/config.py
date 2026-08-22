@@ -64,6 +64,7 @@ class Settings(BaseSettings):
 
     # Play a short beep on the radio mic at the end of each transmission.
     roger_beep_enabled: bool = False
+    roger_beep_level: float = 0.01   # roger-beep amplitude (0..1 of full scale)
 
     # Band-limit the transmitted (mic) audio with a low-pass filter so only the
     # voice range goes out — tames hiss/high-frequency content on TX.
@@ -134,7 +135,7 @@ _RUNTIME_KEYS = ("serial_port", "serial_baud", "gpio_power_pin",
                  "squelch_a", "squelch_b",
                  "tx_buffer_ms", "ptt_tail_ms",
                  "auto_power_off_enabled", "auto_power_off_seconds",
-                 "callsign", "roger_beep_enabled", "theme",
+                 "callsign", "roger_beep_enabled", "roger_beep_level", "theme",
                  "tx_lowpass_enabled", "rx_lowpass_enabled", "rx_deemph_enabled",
                  "rx_deemph_us", "rx_squelch_enabled", "asr_callsign_enabled",
                  "wavelog_url", "wavelog_key", "wavelog_station_id",

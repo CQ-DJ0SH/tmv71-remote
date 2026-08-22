@@ -275,7 +275,6 @@ const SM_PEAK_HOLD = 1000;                        // hold the peak marker (ms)
 const S9_POS = 0.61;
 let lastRxDb = null, lastTxDb = null, lastRxS = null;  // Pi-measured RX/mic/S
 const smPeak = [{ seg: 0, t: 0 }, { seg: 0, t: 0 }];   // AF-bar peak-hold state
-const sPeak = [{ seg: 0, t: 0 }, { seg: 0, t: 0 }];    // S-bar peak-hold state
 
 function buildSmeter(band) {
   [`sm-bar-${band}`, `sm-sbar-${band}`].forEach(id => {
@@ -294,15 +293,9 @@ function renderSbar(band, sval) {
   if (!bar) return;
   const frac = Math.max(0, Math.min(9, sval || 0)) / 9 * S9_POS;
   const lit = Math.round(frac * SM_SEGMENTS);
-  const pk = sPeak[band], now = Date.now();
-  if (lit >= pk.seg) { pk.seg = lit; pk.t = now; }
-  else if (now - pk.t > SM_PEAK_HOLD) pk.seg = Math.max(lit, pk.seg - 1);
-  const peakIdx = pk.seg - 1;
-  const segs = bar.children;
+  const segs = bar.children;                       // no peak-hold on the S-meter
   for (let i = 0; i < segs.length; i++) {
-    let cls = "sm-seg" + (i < lit ? " son" : "");
-    if (i === peakIdx && pk.seg > 0) cls += " speak";
-    segs[i].className = cls;
+    segs[i].className = "sm-seg" + (i < lit ? " son" : "");
   }
 }
 function renderSmeter(band, frac, tx) {
@@ -384,6 +377,7 @@ async function refreshAudio() {
     // ROGER toggle button in the PTT panel reflects the roger-beep state
     const rb = $("#btn-roger");
     if (rb) { rb.classList.toggle("on", !!a.roger_beep); rb.setAttribute("aria-pressed", String(!!a.roger_beep)); }
+    const rbs = $("#set-roger"); if (rbs) rbs.checked = !!a.roger_beep;   // audio-panel switch
     // two-tone test active -> warning triangle in the PTT panel + reflect switch
     const warn = $("#ptt-warn"); if (warn) warn.hidden = !a.test_tone;
     const tt = $("#set-testtone"); if (tt && document.activeElement !== tt) tt.checked = !!a.test_tone;
@@ -792,6 +786,7 @@ function bindControls() {
     const on = !rogerBtn.classList.contains("on");
     rogerBtn.classList.toggle("on", on);                 // optimistic
     rogerBtn.setAttribute("aria-pressed", String(on));
+    const rbs = $("#set-roger"); if (rbs) rbs.checked = on;
     try { await api("POST", "/api/audio/tones", { roger_beep: on }); }
     catch (e) { rogerBtn.classList.toggle("on", !on); toast("Roger beep: " + e.message, "err"); }
   });
@@ -1253,12 +1248,14 @@ async function loadTones() {
     // ROGER toggle lives in the PTT panel; reflect its persisted state
     const rb = $("#btn-roger");
     if (rb) { rb.classList.toggle("on", !!s.roger_beep); rb.setAttribute("aria-pressed", String(!!s.roger_beep)); }
+    const rbs = $("#set-roger"); if (rbs) rbs.checked = !!s.roger_beep;
     const tt = $("#set-testtone"); if (tt) tt.checked = !!s.test_tone;
     const lp = $("#set-tx-lowpass"); if (lp) lp.checked = !!s.tx_lowpass;
     const rlp = $("#set-rx-lowpass"); if (rlp) rlp.checked = !!s.rx_lowpass;
     const rde = $("#set-rx-deemph"); if (rde) rde.checked = !!s.rx_deemph;
     const rsq = $("#set-rx-squelch"); if (rsq) rsq.checked = !!s.rx_squelch;
     if (s.rx_deemph_us != null) { const sl = $("#deemph-us"); if (sl) { sl.value = s.rx_deemph_us; setDeemphUi(s.rx_deemph_us); } }
+    if (s.roger_beep_level != null) { const sl = $("#roger-level"); if (sl) { const v = Math.round(s.roger_beep_level * 1000); sl.value = v; setRogerUi(v); } }
     if (s.tx_buffer_ms != null) { const sl = $("#tx-buffer"); if (sl) sl.value = s.tx_buffer_ms; setMsUi("tx-buffer", s.tx_buffer_ms); }
     if (s.ptt_tail_ms != null) { const sl = $("#ptt-tail"); if (sl) sl.value = s.ptt_tail_ms; setMsUi("ptt-tail", s.ptt_tail_ms); }
   } catch { /* leave as-is */ }
@@ -1383,10 +1380,30 @@ function bindAudio() {
       catch (e) { toast("De-emphasis: " + e.message, "err"); }
     });
   }
+  const rl = $("#roger-level");
+  if (rl) {
+    rl.addEventListener("input", () => setRogerUi(rl.value));
+    rl.addEventListener("change", async () => {
+      try { await api("POST", "/api/audio/tones", { roger_beep_level: Number(rl.value) / 1000 }); }
+      catch (e) { toast("Roger level: " + e.message, "err"); }
+    });
+  }
+  $("#set-roger")?.addEventListener("change", async e => {
+    const on = e.target.checked;
+    const rb = $("#btn-roger");
+    if (rb) { rb.classList.toggle("on", on); rb.setAttribute("aria-pressed", String(on)); }
+    try { await api("POST", "/api/audio/tones", { roger_beep: on }); }
+    catch (err) { toast("Roger beep: " + err.message, "err"); e.target.checked = !on; }
+  });
 }
 function setDeemphUi(val) {
   const el = $("#deemph-us-val"); if (el) el.textContent = Math.round(val) + " µs";
   const sl = $("#deemph-us");
+  if (sl) sl.style.setProperty("--gpct", (sl.value - sl.min) / (sl.max - sl.min) * 100 + "%");
+}
+function setRogerUi(v) {                            // v = amplitude in per-mille (0..1000)
+  const el = $("#roger-level-val"); if (el) el.textContent = (v / 10).toFixed(1) + " %";
+  const sl = $("#roger-level");
   if (sl) sl.style.setProperty("--gpct", (sl.value - sl.min) / (sl.max - sl.min) * 100 + "%");
 }
 

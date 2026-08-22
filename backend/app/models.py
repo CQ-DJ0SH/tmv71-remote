@@ -173,6 +173,7 @@ class TonesRequest(BaseModel):
     """Toggle the roger beep, the two-tone (700/1900 Hz) mic test, and/or the
     voice low-pass on the TX path."""
     roger_beep: Optional[bool] = None
+    roger_beep_level: Optional[float] = Field(default=None, ge=0, le=1)
     test_tone: Optional[bool] = None
     tx_lowpass: Optional[bool] = None
     rx_lowpass: Optional[bool] = None

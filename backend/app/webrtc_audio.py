@@ -34,6 +34,7 @@ DEF_TX_BUFFER_MS = 250    # default mic backlog cap — bounds TX latency vs jit
 DEF_PTT_TAIL_MS = 250     # default post-release transmit tail (drain settle)
 TX_LP_CUTOFF = 3500.0     # voice low-pass cutoff (Hz) for the TX mic path
 RX_LP_CUTOFF = 3500.0     # voice low-pass cutoff (Hz) for the RX path (de-hiss)
+ROGER_BEEP_AMP = 0.28     # roger-beep tone amplitude (fraction of full scale)
 
 
 class _FIRLowpass:
@@ -224,6 +225,7 @@ class RadioAudio:
         self.test_tone = False        # continuous 700+1900 Hz two-tone while keyed
         self.tone_1750 = False        # 1750 Hz repeater tone-call while keyed
         self.roger_beep = False       # short beep on un-key (preference)
+        self.roger_beep_level = ROGER_BEEP_AMP   # beep amplitude (0..1), settable
         self.mic_test = False         # meter the browser mic without keying the radio
         # mic-test echo: record the mic while MIC TEST is on, then replay it over
         # the RX path once it's switched off (no RF, no keying).
@@ -487,7 +489,7 @@ class RadioAudio:
                         self._beep_phase = 0
                         self._beep_second = True
                     freq = 1750.0
-                mono[:k] = self._gen_tone(k, (freq,), 0.5, "_beep_phase")
+                mono[:k] = self._gen_tone(k, (freq,), self.roger_beep_level, "_beep_phase")
                 self._beep_left -= k
             else:
                 with self._pb_lock:
@@ -757,7 +759,9 @@ class RadioAudio:
                 "tx_buffer_ms": self.tx_buffer_ms, "ptt_tail_ms": self.ptt_tail_ms,
                 "device": self.device, "peers": self.peers,
                 "test_tone": self.test_tone, "tone_1750": self.tone_1750,
-                "roger_beep": self.roger_beep, "tx_lowpass": self.tx_lowpass,
+                "roger_beep": self.roger_beep,
+                "roger_beep_level": round(self.roger_beep_level, 2),
+                "tx_lowpass": self.tx_lowpass,
                 "rx_lowpass": self.rx_lowpass, "rx_deemph": self.rx_deemph,
                 "rx_deemph_us": self.rx_deemph_us,
                 "rx_squelch": self.rx_squelch, "mic_test": self.mic_test,

@@ -793,6 +793,7 @@ async def lifespan(app: FastAPI):
                 await asyncio.sleep(0.27)        # let the 250 ms beep finish before un-key
 
         radio_audio.roger_beep = settings.roger_beep_enabled
+        radio_audio.roger_beep_level = settings.roger_beep_level
         service.on_ptt = _couple_ptt
         service.on_unkey = _roger_beep
         # 1750 Hz tone call is generated on the mic path, not by the radio
@@ -1427,6 +1428,10 @@ async def set_audio_tones(req: TonesRequest) -> dict:
         radio_audio.roger_beep = req.roger_beep
         settings.roger_beep_enabled = req.roger_beep
         save_runtime(roger_beep_enabled=req.roger_beep)
+    if req.roger_beep_level is not None:
+        radio_audio.roger_beep_level = req.roger_beep_level
+        settings.roger_beep_level = req.roger_beep_level
+        save_runtime(roger_beep_level=req.roger_beep_level)
     if req.test_tone is not None:
         radio_audio.test_tone = req.test_tone
     if req.mic_test is not None:

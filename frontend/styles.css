@@ -1436,6 +1436,10 @@ body.theme-light #audio-toggle.connected:hover{
 
 /* audio controls: device select + RX/MIC gain */
 .audio-ctl{display:flex; flex-wrap:wrap; align-items:center; gap:16px; margin:4px 0 12px}
+/* toggle (left) + slider (right) on one row */
+.acg-row{display:flex; flex-wrap:wrap; align-items:center; gap:10px 22px; margin:8px 0 10px}
+.acg-row .switch-label{margin:0}
+.acg-row .audio-ctl{margin:0}
 /* MIC TEST / MIC DSP: text snug to the switch, never wrapping */
 .audio-conn .mictest-toggle, .audio-conn .audio-agc{flex:0 0 auto; gap:6px; white-space:nowrap;
   font-family:var(--font-ui); font-size:10px; letter-spacing:.16em; color:var(--text-dim)}
@@ -1506,8 +1510,8 @@ body.theme-light #audio-toggle.connected:hover{
 #tx-gain{--g-accent:#cf6159}   /* MIC gain slider: muted red */
 /* TX timing sliders: muted cyan — without --g-accent the gradient is invalid
    and the browser falls back to a glaring default track */
-#tx-buffer, #ptt-tail, #deemph-us{--g-accent:#3fa6b3}
-#tx-buffer-val, #ptt-tail-val, #deemph-us-val{color:#5cc3cf}
+#tx-buffer, #ptt-tail, #deemph-us, #roger-level{--g-accent:#3fa6b3}
+#tx-buffer-val, #ptt-tail-val, #deemph-us-val, #roger-level-val{color:#5cc3cf}
 .audio-ctl .gv{font-family:var(--font-mono); font-size:11px; color:var(--cyan); width:40px; text-align:right}
 /* RX value: audio-panel violet; shrink to content + left-align so the short
    whole-number value sits snug to the slider instead of a wide right-aligned box */

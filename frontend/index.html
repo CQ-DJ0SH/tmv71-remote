@@ -730,14 +730,25 @@
       </div>
       <div class="mixer-field">
         <span class="logo-label">RX de-emphasis</span>
-        <label class="switch-label">
-          <input type="checkbox" id="set-rx-deemph" class="switch" checked>
-          <span>De-emphasis (6 dB/oct)</span>
-        </label>
-        <div class="audio-ctl">
-          <label class="acg">τ<input type="range" id="deemph-us" min="30" max="300" step="5" value="75" style="--def-pct:16.67%"><span class="gv" id="deemph-us-val">75 µs</span></label>
+        <div class="acg-row">
+          <label class="switch-label">
+            <input type="checkbox" id="set-rx-deemph" class="switch" checked>
+            <span>De-emphasis (6 dB/oct)</span>
+          </label>
+          <div class="audio-ctl"><label class="acg">τ<input type="range" id="deemph-us" min="30" max="300" step="5" value="75" style="--def-pct:16.67%"><span class="gv" id="deemph-us-val">75 µs</span></label></div>
         </div>
         <p class="pane-hint">Restores natural voice tone when the RX audio comes from a flat discriminator / 9600-baud data output (no built-in de-emphasis). τ = time constant: higher = more treble roll-off (50 µs Europe, 75 µs US are FM standards). Leave off when feeding the normal speaker output. Applies only to what you hear, not to the digimode/selcall decoders.</p>
+      </div>
+      <div class="mixer-field">
+        <span class="logo-label">Roger beep</span>
+        <div class="acg-row">
+          <label class="switch-label">
+            <input type="checkbox" id="set-roger" class="switch">
+            <span>Roger beep on release</span>
+          </label>
+          <div class="audio-ctl"><label class="acg">Lvl<input type="range" id="roger-level" min="1" max="150" step="1" value="10" style="--def-pct:6%"><span class="gv" id="roger-level-val">1.0 %</span></label></div>
+        </div>
+        <p class="pane-hint">Two-tone beep on the radio mic when PTT is released (also toggled by the ROGER button in the PTT panel). Level: lower = quieter. Saved persistently.</p>
       </div>
       <div class="mixer-field">
         <span class="logo-label">RX squelch</span>
