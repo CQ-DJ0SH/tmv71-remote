@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="W mark">
+  <!-- rounded tile so the mark reads on any browser-tab colour -->
+  <rect x="2" y="2" width="60" height="60" rx="13" fill="#17201f"/>
+  <!-- small red accent triangle above the W (Kenwood-style mark) -->
+  <path d="M32 9 L38 19 L26 19 Z" fill="#ed1c24"/>
+  <!-- bold W -->
+  <path d="M13 27 L22 51 L32 35 L42 51 L51 27"
+        fill="none" stroke="#f2f5f7" stroke-width="7.5"
+        stroke-linejoin="round" stroke-linecap="round"/>
+</svg>
