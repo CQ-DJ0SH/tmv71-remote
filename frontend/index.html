@@ -579,12 +579,13 @@
 
   <section class="debug-zone collapsed" id="debug-zone">
     <div class="panel-head">
-      <h2>DEBUG · ASR LOG</h2>
-      <button class="scan-clear" id="asr-log-clear" type="button" title="Clear the ASR log view">CLEAR</button>
-      <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="debug-body" title="Show / hide the ASR debug log">▲</button>
+      <h2>ASR · KONTAKTE</h2>
+      <button class="scan-clear" id="asr-log-clear" type="button" title="Clear the contact cards">CLEAR</button>
+      <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="debug-body" title="Show / hide the recognised contacts">▲</button>
     </div>
     <div class="panel-body" id="debug-body">
-      <div class="asr-log" id="asr-log" aria-live="polite" role="log"></div>
+      <div class="asr-cards" id="asr-log" aria-live="polite" role="log"
+           data-empty="(noch keine erkannten Rufzeichen)"></div>
     </div>
   </section>
 

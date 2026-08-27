@@ -180,6 +180,7 @@ API_DIGI = (
     "POST /api/digi/decode-recording  decode the RX buffer\n"
     "WS   /ws/digi               decoded text stream\n"
     "GET/POST /api/asr/config    callsign recognition (Vosk)\n"
+    "DELETE /api/asr/log/{call}  drop a misrecognised contact\n"
     "WS   /ws/callsign           recognised-callsign events\n"
     "GET  /api/selcall           5-tone status\n"
     "POST /api/selcall/config    standard / tone / own\n"
@@ -436,38 +437,50 @@ EN = [
     ("p", "Sweep a VHF/UHF range or the memory bank and see an occupancy "
           "spectrum + waterfall. Double-click a channel to tune the control VFO "
           "to it."),
-    ("h2", "Debug (ASR log)"),
-    ("p", "A panel below the band scan that streams a live log of the callsign "
-          "recognition, so you can see what the ASR heard and why a call was or "
-          "was not shown. Each line carries a timestamp and the decision: a call "
-          "shown (with name/town), a VOID hit held by repetition voting (n/2 votes "
-          "so far), a repeat muted by the de-dupe window, any 5/6-character "
-          "correction (heard→shown), and ASR enable/disable. The last 200 lines are "
-          "kept on the Pi and sent when the panel opens; the view holds 300 lines "
-          "and follows the tail unless you scroll up. CLEAR empties the view. In the "
-          "mobile deck the panel has no tab — swipe to it past the band scan."),
-    ("p", "A line for a recognised callsign is broken into fields, left to right:"),
+    ("h2", "ASR contacts"),
+    ("p", "A panel below the band scan that collects every recognised station as "
+          "an index card, so the last overs are readable at a glance instead of "
+          "as a scrolling log. Cards sit in a tray of empty slots, newest first. "
+          "The last 200 entries are kept on the Pi and restored when the panel "
+          "opens; CLEAR empties the view. In the mobile deck the panel has no "
+          "tab — swipe to it past the band scan."),
+    ("p", "Each card carries:"),
     ("ul", [
-        "Timestamp, then the callsign itself — bold and green, the eye-catcher of "
-        "the row. A row for an unassigned call is drawn in red throughout.",
-        "The licence class from the BNetzA list (Kl. A/E/N), or the badge VOID "
-        "when the call is not in the list at all.",
-        "Name and town of the holder, again from the offline list — never from "
+        "The callsign, in the largest and boldest type on the card — it is the "
+        "identity of the contact. A zero is drawn slashed (DJØSH) so it cannot "
+        "be misread as the letter O; that is display only, everything sent to "
+        "the logbook keeps the plain 0.",
+        "An avatar whose letters and colour are derived from the callsign "
+        "itself (the characters after the region digit, plus a hue hashed from "
+        "the whole call), so a station looks the same in every session without "
+        "anything being stored.",
+        "All three German licence classes A / E / N, with the holder's own one "
+        "lit and the other two dimmed. If none is lit, the call is not in the "
+        "BNetzA list.",
+        "Name and town of the holder from the offline BNetzA list — never from "
         "QRZ.com, which the ASR does not query.",
-        "The recogniser's word confidence, 0.00–1.00. It is the mean confidence "
-        "of the individual spelled letters, so 1.00 means Vosk was certain about "
-        "every letter of that call — a statement about the acoustics, not about "
-        "whether the callsign is real (that is what VOID reports).",
-        "The S-value measured at the moment of detection and the receiving band "
-        "with its frequency, e.g. »S7  B 145.5000« — this shows at a glance "
-        "whether a miss was down to a weak signal.",
-        "The raw words Vosk actually heard, in guillemets and italics, e.g. "
-        "»delta lima sieben papa tango tango«. Compare this with the callsign to "
-        "tell a mishearing apart from a correction.",
-        "Any further N-best candidates after »⇄«, in yellow. The recogniser "
-        "evaluates ten hypotheses per utterance and picks the best one; this "
-        "field shows the runners-up it rejected.",
+        "Date and time of the last time the station was heard, pinned to the "
+        "bottom edge of the card.",
     ]),
+    ("p", "A station heard again does not get a second card. The existing one "
+          "flashes, is marked, and counts up (×2, ×3 …) — but it stays where it "
+          "is, so the tray does not reshuffle under you on every over. Exactly "
+          "one card carries the red border at a time: the most recently heard. "
+          "The ordering therefore follows first contact, not last mention."),
+    ("p", "Hovering a card shows the recogniser detail that used to fill the log "
+          "lines: word confidence (0.00–1.00, the mean over the individual "
+          "spelled letters — a statement about the acoustics, not about whether "
+          "the callsign is real), the S-value and receiving band at the moment "
+          "of detection, the raw words Vosk actually heard, the rejected N-best "
+          "candidates, and any 5/6-character correction that was applied."),
+    ("p", "Two buttons per card: the play symbol logs the QSO straight to "
+          "Wavelog with the name from the BNetzA list pre-filled, and turns teal "
+          "once it has gone through so nothing is sent twice. The cross removes a "
+          "misrecognised contact. That deletion happens on the Pi, not just in "
+          "the browser: the card is dropped from the log buffer (otherwise it "
+          "would return the next time the panel opens), every connected client "
+          "loses it at once, and the callsign is released from the 90-second "
+          "de-dupe window so a corrected reading can be reported immediately."),
     ("h2", "Logbook (Wavelog + QRZ.com)"),
     ("p", "Logs QSOs to a locally installed Wavelog instance. Enter just the "
           "callsign (and optionally a name) — frequency, band, mode, date/time and "
@@ -745,43 +758,55 @@ DE = [
     ("p", "Einen VHF/UHF-Bereich oder die Speicherbank absuchen und ein "
           "Belegungs-Spektrum + Wasserfall sehen. Ein Doppelklick auf einen Kanal "
           "stimmt den Steuer-VFO darauf ab."),
-    ("h2", "Debug (ASR-Log)"),
-    ("p", "Ein Panel unter dem Bandscan, das ein Live-Protokoll der Rufzeichen"
-          "erkennung ausgibt — so ist nachvollziehbar, was die ASR gehört hat und "
-          "warum ein Rufzeichen angezeigt wurde oder nicht. Jede Zeile trägt einen "
-          "Zeitstempel und die Entscheidung: angezeigt (mit Name/Ort), ein per "
-          "Wiederholungs-Voting zurückgehaltenes VOID (n/2 Stimmen bisher), eine "
-          "durch das Dedupe-Fenster stummgeschaltete Wiederholung, jede 5/6-Zeichen-"
-          "Korrektur (gehört→angezeigt) sowie ASR an/aus. Die letzten 200 Zeilen "
-          "werden auf dem Pi gehalten und beim Öffnen des Panels gesendet; die "
-          "Ansicht fasst 300 Zeilen und folgt dem Ende, sofern man nicht nach oben "
-          "scrollt. CLEAR leert die Ansicht. Im mobilen Deck hat das Panel keinen "
+    ("h2", "ASR-Kontakte"),
+    ("p", "Ein Panel unter dem Bandscan, das jede erkannte Station als "
+          "Karteikarte sammelt — die letzten Durchgänge sind so auf einen Blick "
+          "lesbar statt als durchlaufendes Protokoll. Die Karten liegen in einem "
+          "Kartenkasten aus leeren Fächern, die neueste vorn. Die letzten 200 "
+          "Einträge hält der Pi und stellt sie beim Öffnen des Panels wieder "
+          "her; CLEAR leert die Ansicht. Im mobilen Deck hat das Panel keinen "
           "Tab — dorthin hinter dem Bandscan wischen."),
-    ("p", "Eine Zeile zu einem erkannten Rufzeichen ist von links nach rechts in "
-          "Felder gegliedert:"),
+    ("p", "Jede Karte trägt:"),
     ("ul", [
-        "Zeitstempel, dann das Rufzeichen selbst — fett und grün, der Blickfang "
-        "der Zeile. Eine Zeile zu einem nicht zugeteilten Rufzeichen ist "
-        "durchgehend rot dargestellt.",
-        "Die Lizenzklasse aus der BNetzA-Liste (Kl. A/E/N) oder die Kennzeichnung "
-        "VOID, wenn das Rufzeichen gar nicht in der Liste steht.",
-        "Name und Ort des Inhabers, ebenfalls aus der Offline-Liste — nie von "
+        "Das Rufzeichen, in der größten und fettesten Schrift der Karte — es "
+        "ist die Identität des Kontakts. Die Null wird durchgestrichen "
+        "dargestellt (DJØSH), damit sie nicht als Buchstabe O gelesen wird; das "
+        "gilt nur für die Anzeige, ins Logbuch geht weiterhin die schlichte 0.",
+        "Einen Avatar, dessen Buchstaben und Farbe aus dem Rufzeichen selbst "
+        "abgeleitet sind (die Zeichen nach der Regionalziffer, dazu ein Farbton "
+        "aus einem Hash des ganzen Rufzeichens). Eine Station sieht damit in "
+        "jeder Sitzung gleich aus, ohne dass etwas gespeichert wird.",
+        "Alle drei deutschen Lizenzklassen A / E / N, wobei nur die des "
+        "Inhabers leuchtet und die beiden anderen gedimmt bleiben. Leuchtet "
+        "keine, steht das Rufzeichen nicht in der BNetzA-Liste.",
+        "Name und Ort des Inhabers aus der Offline-Liste der BNetzA — nie von "
         "QRZ.com, das die ASR nicht abfragt.",
-        "Die Wort-Konfidenz des Erkenners, 0.00–1.00. Sie ist der Mittelwert über "
-        "die einzeln buchstabierten Zeichen; 1.00 heißt also, dass Vosk sich bei "
-        "jedem Buchstaben dieses Rufzeichens sicher war — eine Aussage über die "
-        "Akustik, nicht darüber, ob es das Rufzeichen wirklich gibt (das meldet "
-        "VOID).",
-        "Der zum Zeitpunkt der Erkennung gemessene S-Wert und das Empfangsband "
-        "mit Frequenz, z. B. »S7  B 145.5000« — daran ist sofort ablesbar, ob "
-        "eine Fehlerkennung an einem schwachen Signal lag.",
-        "Der von Vosk tatsächlich gehörte Rohtext, kursiv in Guillemets, z. B. "
-        "»delta lima sieben papa tango tango«. Im Vergleich mit dem Rufzeichen "
-        "lässt sich ein Verhören von einer Korrektur unterscheiden.",
-        "Weitere N-Best-Kandidaten hinter »⇄«, in Gelb. Der Erkenner bewertet "
-        "zehn Hypothesen je Äußerung und wählt die beste aus; dieses Feld zeigt "
-        "die verworfenen Zweitplatzierten.",
+        "Datum und Uhrzeit der letzten Nennung, fest an der Unterkante der "
+        "Karte.",
     ]),
+    ("p", "Eine erneut gehörte Station bekommt keine zweite Karte. Die "
+          "vorhandene leuchtet auf, wird markiert und zählt hoch (×2, ×3 …) — "
+          "sie bleibt aber an ihrem Platz, damit sich der Kartenkasten nicht bei "
+          "jedem Durchgang unter dem Blick umsortiert. Genau eine Karte trägt "
+          "die rote Umrandung: die zuletzt gehörte. Die Reihenfolge richtet sich "
+          "damit nach dem Erstkontakt, nicht nach der letzten Nennung."),
+    ("p", "Beim Überfahren einer Karte erscheinen die Erkennerdetails, die "
+          "früher die Protokollzeilen füllten: die Wort-Konfidenz (0.00–1.00, "
+          "Mittelwert über die einzeln buchstabierten Zeichen — eine Aussage "
+          "über die Akustik, nicht darüber, ob es das Rufzeichen wirklich gibt), "
+          "S-Wert und Empfangsband zum Zeitpunkt der Erkennung, der von Vosk "
+          "tatsächlich gehörte Rohtext, die verworfenen N-Best-Kandidaten sowie "
+          "eine gegebenenfalls angewandte 5/6-Zeichen-Korrektur."),
+    ("p", "Zwei Knöpfe je Karte: Das Wiedergabesymbol trägt das QSO direkt ins "
+          "Wavelog ein, mit dem Namen aus der BNetzA-Liste vorbelegt, und färbt "
+          "sich nach erfolgreicher Übertragung türkis, damit nichts zweimal "
+          "gesendet wird. Das Kreuz entfernt einen falsch erkannten Kontakt. "
+          "Diese Löschung geschieht auf dem Pi, nicht nur im Browser: Die Karte "
+          "fällt aus dem Protokollpuffer (sonst käme sie beim nächsten Öffnen "
+          "des Panels zurück), alle verbundenen Clients verlieren sie "
+          "gleichzeitig, und das Rufzeichen wird aus dem 90-Sekunden-"
+          "Dedupe-Fenster entlassen, damit eine korrigierte Erkennung sofort "
+          "wieder gemeldet werden darf."),
     ("h2", "Logbuch (Wavelog + QRZ.com)"),
     ("p", "Protokolliert QSOs in eine lokal installierte Wavelog-Instanz. Es "
           "genügt, das Rufzeichen (und optional einen Namen) einzugeben — Frequenz, "

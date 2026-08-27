@@ -4,6 +4,15 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
+// Ham convention: show the zero in a callsign slashed, so DJ0SH cannot be misread
+// as DJOSH. Purely presentational -- the real "0" stays in the data, because the
+// logbook, QRZ and the BNetzA list would all reject a U+00D8. Everything that
+// *uses* a callsign must therefore read it from a data attribute, never from the
+// rendered text. (Done as a character swap rather than the OpenType `zero`
+// feature: the self-hosted fonts are Google-Fonts subsets, which usually drop it.)
+const callDisp = c => (c || "").replace(/0/g, "Ø");
+
+
 let last = null;          // last RadioStatus
 let memBase = 0;          // quick-key channel offset: 0 normally, 50 in the air band
 let airbandRx = false;    // Band A in the air band → receive-only, TX blocked
@@ -296,7 +305,8 @@ function renderSbar(band, sval) {
   const lit = Math.round(frac * SM_SEGMENTS);
   const segs = bar.children;                       // no peak-hold on the S-meter
   for (let i = 0; i < segs.length; i++) {
-    segs[i].className = "sm-seg" + (i < lit ? " son" : "");
+    const cls = "sm-seg" + (i < lit ? " son" : "");
+    if (segs[i].className !== cls) segs[i].className = cls;   // skip no-op writes
   }
 }
 function renderSmeter(band, frac, tx) {
@@ -315,7 +325,7 @@ function renderSmeter(band, frac, tx) {
   for (let i = 0; i < segs.length; i++) {
     let cls = "sm-seg" + (i < lit ? (tx ? " on-tx" : " on") : "");
     if (i === peakIdx) cls += tx ? " peak-tx" : " peak";
-    segs[i].className = cls;
+    if (segs[i].className !== cls) segs[i].className = cls;   // skip no-op writes
   }
 }
 function updateSmeters() {
@@ -350,9 +360,13 @@ function vuUpdate(key, lvl, maskId, pkId) {
   const p = vuPeak[key], now = Date.now();
   if (lvl >= p.v) { p.v = lvl; p.t = now; }
   else if (now - p.t > VU_HOLD) p.v = Math.max(lvl, p.v - 0.05);   // decay after hold
-  mask.style.height = (100 - lvl * 100) + "%";
+  const h = (100 - lvl * 100).toFixed(1) + "%";
+  if (mask.style.height !== h) mask.style.height = h;
   const pk = $(pkId);
-  if (pk) pk.style.bottom = Math.max(0, Math.min(1, p.v)) * 100 + "%";
+  if (pk) {
+    const b = (Math.max(0, Math.min(1, p.v)) * 100).toFixed(1) + "%";
+    if (pk.style.bottom !== b) pk.style.bottom = b;
+  }
 }
 
 async function refreshAudio() {
@@ -1489,14 +1503,14 @@ function bindVfoParams() {
 function renderCallsign() {
   // render the cached value instantly, then refresh from the server (the
   // callsign is persisted server-side so it survives across browsers/devices).
-  $("#callsign").textContent = localStorage.getItem("tmv71.callsign") || "";
+  $("#callsign").textContent = callDisp(localStorage.getItem("tmv71.callsign") || "");
 }
 
 async function syncCallsign() {
   try {
     const cs = (await api("GET", "/api/callsign")).callsign || "";
     localStorage.setItem("tmv71.callsign", cs);
-    $("#callsign").textContent = cs;
+    $("#callsign").textContent = callDisp(cs);
   } catch { /* keep cached value if backend unreachable */ }
 }
 
@@ -2893,7 +2907,8 @@ function clearRxCall() {
   if (rxCallTimer) { clearTimeout(rxCallTimer); rxCallTimer = null; }
   const chip = $("#rx-call");
   if (chip) {
-    chip.textContent = ""; chip.classList.remove("flash", "void");
+    chip.textContent = ""; delete chip.dataset.call;
+    chip.classList.remove("flash", "void");
     chip.title = "Auto-detected callsign (none yet)";
   }
 }
@@ -2908,7 +2923,8 @@ function showRxCall(m) {
   if (!chip) return;
   const isVoid = m.valid === false;                  // not in the assigned-callsign list
   const det = callDetails(m);
-  chip.textContent = m.call;                          // always show the recognised call
+  chip.textContent = callDisp(m.call);                // always show the recognised call
+  chip.dataset.call = m.call;                         // real value for the logbook
   chip.classList.toggle("void", isVoid);
   chip.title = (isVoid ? m.call + " — not in the callsign list (VOID)"
                        : m.call + (det ? " — " + det : " (auto-detected)")) + " · click to clear";
@@ -2917,15 +2933,23 @@ function showRxCall(m) {
   rxCallTimer = setTimeout(clearRxCall, 30000);      // auto-clear 30 s after a detection
 }
 
+// Fill the logbook form and submit it. Used by the title-bar LOG button and by
+// the per-card button; no QRZ lookup, the name comes from the offline list.
+async function logCallDirect(call, name) {
+  if (!call) { toast("No callsign detected", "err"); return false; }
+  const inp = $("#log-call"); if (inp) inp.value = call;
+  const nm = $("#log-name"); if (nm) nm.value = name || "";
+  // clear any stale details so the bare call (+ auto band/freq/mode) is logged
+  ["#log-grid", "#log-comment"].forEach(s => { const el = $(s); if (el) el.value = ""; });
+  toast("📖 Logging " + call + "…", "ok");
+  try { return await logQso(); }
+  catch (e) { toast("Log: " + e.message, "err"); return false; }
+}
+
 // send the detected callsign to the logbook — no QRZ lookup, just log the call
 async function logRxCall() {
-  const call = ($("#rx-call")?.textContent || "").trim();
-  if (!call) { toast("No callsign detected", "err"); return; }
-  const inp = $("#log-call"); if (inp) inp.value = call;
-  // clear any stale details so the bare call (+ auto band/freq/mode) is logged
-  ["#log-name", "#log-grid", "#log-comment"].forEach(s => { const el = $(s); if (el) el.value = ""; });
-  toast("📖 Logging " + call + "…", "ok");
-  try { await logQso(); } catch (e) { toast("Log: " + e.message, "err"); }
+  const call = ($("#rx-call")?.dataset.call || "").trim();   // NOT textContent: that is slashed
+  await logCallDirect(call, "");
 }
 
 function bindCallsign() {
@@ -2946,35 +2970,221 @@ function bindCallsign() {
   connectCallsignWS();
 }
 
-// ---- ASR debug log (debug panel under band scan) --------------------------
-function asrLog(e) {
-  const box = $("#asr-log");
-  if (!box || !e) return;
-  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 24;
-  const row = document.createElement("div");
-  const isVoid = e.valid === false;
-  row.className = "asr-log-row" + (isVoid ? " void" : "");
-  const add = (cls, txt) => { const s = document.createElement("span"); s.className = cls; s.textContent = txt; row.appendChild(s); };
-  add("al-time", e.time || "");
-  if (e.call) {
-    add("al-call", e.call);                          // prominent callsign
-    if (e.klass) add("al-klass", "Kl." + e.klass);   // licence class A/E/N
-    else if (isVoid) add("al-void", "VOID");         // not assigned -> red badge
-    if (e.line) add("al-msg", e.line);               // name · town — next to the class
-    if (e.conf != null) add("al-conf", Number(e.conf).toFixed(2));
-    if (e.s) add("al-s", e.s);                        // signal S-value at detection
-    if (e.band) add("al-band", e.band);              // RX band + frequency
-  } else if (e.line) {
-    add("al-msg", e.line);
+// ---- ASR contact cards (debug panel under band scan) ----------------------
+// Every recognised contact becomes one index card, newest first. A call heard
+// again does NOT add a second card: the existing one is refreshed, moved back to
+// the front, flashed and marked. The raw recogniser detail (confidence, signal,
+// band, what Vosk actually heard, the rejected N-best candidates) lives in the
+// hover tooltip so the card itself stays readable.
+const asrCards = new Map();                          // callsign -> card element
+
+// Avatar: derived from the CALLSIGN, which is what tells two contacts apart.
+// The letters after the region digit are the distinguishing part (DL7AF -> AF),
+// and the hue is a stable hash of the whole call, so a station always looks the
+// same across sessions without storing anything.
+function asrAvatar(call) {
+  const suffix = (call.match(/\d(\w+)$/) || [, call.slice(-2)])[1];
+  let h = 0;
+  for (let i = 0; i < call.length; i++) h = (h * 31 + call.charCodeAt(i)) >>> 0;
+  return { text: suffix.slice(0, 2), hue: h % 360 };
+}
+
+const KLASSEN = ["A", "E", "N"];                      // German licence classes
+function asrSetKlass(card, klass) {
+  const on = (klass || "").toUpperCase();
+  card.querySelectorAll(".ac-klass .ack").forEach(
+    el => el.classList.toggle("on", el.textContent === on));
+}
+
+function asrCardBuild(e) {
+  const card = document.createElement("div");
+  card.className = "asr-card";
+  const av = asrAvatar(e.call);
+  const mk = (tag, cls, txt) => {
+    const n = document.createElement(tag); n.className = cls;
+    if (txt != null) n.textContent = txt;
+    return n;
+  };
+  const avatar = mk("span", "ac-avatar", av.text);
+  card.style.setProperty("--ac-hue", av.hue);        // avatar AND card tint
+  const head = mk("div", "ac-head");
+  head.append(avatar, mk("span", "ac-call", callDisp(e.call)));
+  // all three licence classes are shown; the holder's own one is lit
+  const kl = mk("span", "ac-klass");
+  for (const k of KLASSEN) kl.appendChild(mk("i", "ack", k));
+  head.appendChild(kl);
+  card.appendChild(head);
+  asrSetKlass(card, e.klass);
+  card.appendChild(mk("div", "ac-name", e.name || ""));
+  card.appendChild(mk("div", "ac-city", e.city || ""));
+  const foot = mk("div", "ac-foot");
+  foot.append(mk("span", "ac-date"), mk("span", "ac-time"));
+  card.appendChild(foot);
+  // log this contact to Wavelog — same path as the title-bar LOG button, but
+  // with the name from the BNetzA list pre-filled
+  const log = mk("button", "ac-log", "▶");
+  log.type = "button";
+  log.title = "QSO mit " + e.call + " ins Wavelog eintragen";
+  log.setAttribute("aria-label", "QSO mit " + e.call + " loggen");
+  log.addEventListener("click", async ev => {
+    ev.stopPropagation();
+    if (log.disabled) return;
+    log.disabled = true;
+    const ok = await logCallDirect(e.call, e.name || "");
+    log.disabled = false;
+    card.classList.toggle("logged", !!ok);           // marks it as already logged
+  });
+  // bottom row: date · time … [count] [log]; .ac-count carries margin-left:auto,
+  // so it and the button that follows it are pushed to the right edge
+  foot.append(mk("span", "ac-count"), log);
+  // remove a misrecognised contact — server-side, so it cannot come back from
+  // the history when the panel is reopened
+  const del = mk("button", "ac-del", "✕");
+  del.type = "button";
+  del.title = "Falsch erkannt — Karte entfernen";
+  del.setAttribute("aria-label", "Karte " + e.call + " entfernen");
+  del.addEventListener("click", ev => {
+    ev.stopPropagation();
+    asrDropCall(e.call);
+  });
+  card.appendChild(del);
+  return card;
+}
+
+// the hover tooltip is a single shared, fixed-positioned node: inside the
+// scrolling card grid an absolutely positioned one would be clipped
+let asrTip = null;
+function asrTipShow(card) {
+  const txt = card.dataset.dbg;
+  if (!txt) return;
+  if (!asrTip) {
+    asrTip = document.createElement("div");
+    asrTip.className = "asr-tip";
+    document.body.appendChild(asrTip);
   }
-  if (e.text) add("al-raw", "«" + e.text + "»");     // raw words Vosk heard
-  if (e.nbest && e.nbest.length) add("al-nbest", "⇄ " + e.nbest.join(" "));
-  box.appendChild(row);
-  while (box.childElementCount > 300) box.removeChild(box.firstChild);
-  if (atBottom) box.scrollTop = box.scrollHeight;   // follow tail unless scrolled up
+  asrTip.textContent = txt;
+  asrTip.hidden = false;
+  const r = card.getBoundingClientRect(), t = asrTip.getBoundingClientRect();
+  let top = r.top - t.height - 8;
+  if (top < 4) top = r.bottom + 8;                   // no room above -> below
+  asrTip.style.top = top + "px";
+  asrTip.style.left =
+    Math.max(4, Math.min(innerWidth - t.width - 4, r.left + r.width / 2 - t.width / 2)) + "px";
+}
+function asrTipHide() { if (asrTip) asrTip.hidden = true; }
+
+function asrCardDebug(e) {
+  const bits = [];
+  if (e.conf != null) bits.push("Konfidenz " + Number(e.conf).toFixed(2));
+  if (e.s) bits.push("Signal " + e.s);
+  if (e.band) bits.push("Band " + e.band);
+  const head = bits.join("  ·  ");
+  const more = [];
+  if (e.text) more.push("gehört: «" + e.text + "»");
+  if (e.nbest && e.nbest.length) more.push("N-Best: " + e.nbest.join(" "));
+  if (e.line && /⟵/.test(e.line)) more.push("korrigiert: " + e.line.trim());
+  return [head, ...more].filter(Boolean).join("\n");
+}
+
+// Top up the tray with empty slots so it always reads as a card rack: fill the
+// visible area, and always complete the last row. Slots are plain grid items, so
+// they need no alignment maths -- unlike a background raster.
+function asrFillSlots() {
+  const box = $("#asr-log");
+  if (!box) return;
+  const cs = getComputedStyle(box);
+  const px = v => parseFloat(cs.getPropertyValue(v)) || 0;
+  const w = px("--ac-w"), h = px("--ac-h"), gap = px("--ac-gap");
+  if (!w || !h) return;
+  const inner = box.clientWidth - px("padding-left") - px("padding-right");
+  const cols = Math.max(1, Math.floor((inner + gap) / (w + gap)));
+  const rows = Math.max(1, Math.ceil((box.clientHeight + gap) / (h + gap)));
+  const cards = box.querySelectorAll(".asr-card").length;
+  // enough to fill the view, but never leave a half-finished row
+  const want = Math.max(cols * rows, Math.ceil(cards / cols) * cols);
+  const slots = box.querySelectorAll(".asr-slot");
+  let have = slots.length;
+  for (let i = have; i < want - cards; i++) {
+    const s = document.createElement("div");
+    s.className = "asr-slot";
+    s.setAttribute("aria-hidden", "true");
+    box.appendChild(s);                              // slots always trail the cards
+  }
+  for (let i = have - 1; i >= want - cards; i--) slots[i].remove();
+  box.classList.toggle("no-cards", cards === 0);
+}
+addEventListener("resize", asrFillSlots);
+// the debug panel starts collapsed (clientHeight 0), so a plain resize listener
+// would never see it open: observe the tray itself
+try { new ResizeObserver(asrFillSlots).observe($("#asr-log")); } catch {}
+asrFillSlots();
+
+// Delete a card. The backend drops the call from its log ring buffer and pushes
+// an "asrdrop" to every client, so all open panels lose it at once; asrCardDrop
+// does the local removal (also used when another client deletes it).
+function asrCardDrop(call) {
+  const card = asrCards.get(call);
+  if (!card) return;
+  asrCards.delete(call);
+  card.remove();
+  asrTipHide();
+  asrFillSlots();
+}
+async function asrDropCall(call) {
+  asrCardDrop(call);                                 // remove at once, no wait
+  try { await api("DELETE", "/api/asr/log/" + encodeURIComponent(call)); }
+  catch (err) { toast("Karte: " + err.message, "err"); }
+}
+
+function asrLog(e, fresh = true) {
+  const box = $("#asr-log");
+  // only real contacts become cards: "shown" is a first sighting, "muted" the
+  // same call inside the de-dupe window. held/VOID and status lines are skipped.
+  if (!box || !e || !e.call || (e.event !== "shown" && e.event !== "muted")) return;
+
+  let card = asrCards.get(e.call);
+  const isNew = !card;
+  if (isNew) {
+    card = asrCardBuild(e);
+    card.dataset.count = "0";
+    asrCards.set(e.call, card);
+    card.addEventListener("mouseenter", () => asrTipShow(card));
+    card.addEventListener("mouseleave", asrTipHide);
+  } else if (e.name && !card.querySelector(".ac-name").textContent) {
+    card.querySelector(".ac-name").textContent = e.name;      // late list data
+    card.querySelector(".ac-city").textContent = e.city || "";
+  }
+  if (e.klass) asrSetKlass(card, e.klass);
+  const n = Number(card.dataset.count) + 1;
+  card.dataset.count = String(n);
+  card.querySelector(".ac-date").textContent = e.date || "";
+  card.querySelector(".ac-time").textContent = e.time || "";
+  const cnt = card.querySelector(".ac-count");
+  cnt.textContent = n > 1 ? "×" + n : "";              // repeat marker
+  card.dataset.dbg = asrCardDebug(e);
+  card.title = "";                                     // custom tooltip only
+
+  // Only a first sighting takes the front slot. A repeat stays where it is --
+  // moving it would reshuffle the tray under the reader's eyes on every over.
+  if (isNew) box.insertBefore(card, box.firstChild);
+  if (fresh) {
+    box.querySelectorAll(".asr-card.marked").forEach(c => c.classList.remove("marked"));
+    card.classList.add("marked");                      // exactly one current card
+    card.classList.remove("flash");
+    void card.offsetWidth;                             // restart the animation
+    card.classList.add("flash");
+    if (box.scrollTop < 24) box.scrollTop = 0;
+  }
+  while (box.childElementCount > 120) {                // drop the oldest card
+    const last = box.lastElementChild;
+    asrCards.forEach((c, k) => { if (c === last) asrCards.delete(k); });
+    box.removeChild(last);
+  }
+  if (fresh) asrFillSlots();       // history tops up once, after the whole batch
 }
 $("#asr-log-clear")?.addEventListener("click", () => {
   const box = $("#asr-log"); if (box) box.textContent = "";
+  asrCards.clear(); asrTipHide(); asrFillSlots();
 });
 
 function connectCallsignWS() {
@@ -2984,9 +3194,16 @@ function connectCallsignWS() {
     let m; try { m = JSON.parse(ev.data); } catch { return; }
     if (m.t === "status") { reflectAsr(m); return; }
     if (m.t === "asrlog") { asrLog(m); return; }
+    if (m.t === "asrdrop" && m.call) { asrCardDrop(m.call); return; }
     if (m.t === "asrloghist") {
       const box = $("#asr-log"); if (box) box.textContent = "";
-      (m.lines || []).forEach(asrLog);
+      asrCards.clear();                              // rebuild the card set
+      // history arrives oldest-first; each entry is inserted at the front, so
+      // the newest ends up on top and repeat counts add up on the way
+      (m.lines || []).forEach(l => asrLog(l, false));
+      // mark the most recent contact of the restored history
+      box?.firstElementChild?.classList.add("marked");
+      asrFillSlots();
       return;
     }
     if (m.t === "callsign" && m.call) {
@@ -3175,6 +3392,7 @@ async function logQso() {
   const call = $("#log-call").value.trim().toUpperCase();
   if (!call) { toast("Enter a callsign", "err"); return; }
   const btn = $("#log-save"); btn.disabled = true;
+  let ok = false;                       // reported back so callers can reflect it
   try {
     // no automatic QRZ lookup on logging — use details only if the operator
     // explicitly ran the QRZ LOOKUP button for this callsign beforehand.
@@ -3189,6 +3407,7 @@ async function logQso() {
       email: lk.email || "", qth: lk.qth || "", country: lk.country || "",
     });
     if (r.ok) {
+      ok = true;
       toast(`Logged ${call}`, "ok");
       lastLookup = null;
       ["#log-call", "#log-name", "#log-grid", "#log-comment"].forEach(s => ($(s).value = ""));
@@ -3200,6 +3419,7 @@ async function logQso() {
     loadLogRecent();
   } catch (e) { toast("Log: " + e.message, "err"); }
   finally { btn.disabled = false; }
+  return ok;
 }
 
 function logStatus(sel, msg, kind) {
@@ -3372,7 +3592,29 @@ screen.orientation?.addEventListener?.("change", fillEnv);
 sizeLevelGraph();
 window.addEventListener("resize", sizeLevelGraph);
 refreshAudio();
-setInterval(refreshAudio, 200);   // fast enough for a responsive VU meter
+// Adaptive audio poll. 200 ms keeps the VU meters responsive, but that cadence
+// is only worth its DOM churn while someone is actually watching a live meter:
+// pause entirely on a hidden tab, and back off to 1 s when no audio is running
+// (nothing but static LEDs changes then). Re-armed on visibilitychange so the
+// meters are live again the moment the tab comes back.
+const AUDIO_POLL_FAST = 200, AUDIO_POLL_IDLE = 1000;
+let audioPollIv = null, audioPollMs = 0;
+function audioPollRate() {
+  if (document.hidden) return 0;
+  return audioConnected() ? AUDIO_POLL_FAST : AUDIO_POLL_IDLE;
+}
+function armAudioPoll() {
+  const ms = audioPollRate();
+  if (ms === audioPollMs) return;                 // cadence unchanged -> keep timer
+  if (audioPollIv != null) { clearInterval(audioPollIv); audioPollIv = null; }
+  audioPollMs = ms;
+  if (ms) audioPollIv = setInterval(() => { refreshAudio(); armAudioPoll(); }, ms);
+}
+armAudioPoll();
+document.addEventListener("visibilitychange", () => {
+  armAudioPoll();
+  if (!document.hidden) refreshAudio();            // refresh at once on return
+});
 tickClock(); setInterval(tickClock, 1000);
 
 // Persistent audio: auto-reconnect if it was on last session. RX playback may

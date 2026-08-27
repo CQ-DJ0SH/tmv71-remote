@@ -471,12 +471,23 @@ class CallsignService:
 
     def _add_log(self, line: str, call: str = None, valid: bool = None,
                  klass: str = None, conf: float = None, s: str = None,
-                 band: str = None, text: str = None, nbest: list = None) -> None:
-        """Append a line to the ASR debug log (ring buffer for the debug panel) and
-        push it live to subscribers. Optional structured fields (call/valid/klass/
-        conf/s/band/text/nbest) let the panel render the callsign prominently, flag
-        VOID in red, and show signal S-value, band, raw words and N-best candidates."""
-        entry = {"time": time.strftime("%H:%M:%S"), "line": line}
+                 band: str = None, text: str = None, nbest: list = None,
+                 name: str = None, city: str = None, event: str = None) -> None:
+        """Append an entry to the ASR log (ring buffer for the debug panel) and push
+        it live to subscribers. The panel renders each contact as a card, so the
+        holder's name and town travel as their own fields rather than pre-joined
+        into ``line``, and ``event`` says what the entry is: "shown" (a contact to
+        card), "muted" (the same call heard again -> flash the existing card),
+        "held" (unlisted, still collecting votes) or None (plain status line).
+        conf/s/band/text/nbest feed the card's hover tooltip."""
+        entry = {"time": time.strftime("%H:%M:%S"),
+                 "date": time.strftime("%Y-%m-%d"), "line": line}
+        if event:
+            entry["event"] = event
+        if name:
+            entry["name"] = name
+        if city:
+            entry["city"] = city
         if call is not None:
             entry["call"] = call
         if valid is not None:
@@ -500,6 +511,21 @@ class CallsignService:
 
     def log_history(self) -> list:
         return list(self._log)
+
+    def drop_call(self, call: str) -> int:
+        """Forget a misrecognised callsign: drop its entries from the log ring
+        buffer and let it be reported again straight away. Without touching the
+        server side, a card deleted in the browser would simply reappear from the
+        history the next time the panel is opened."""
+        call = (call or "").strip().upper()
+        if not call:
+            return 0
+        before = len(self._log)
+        self._log = [e for e in self._log if e.get("call") != call]
+        self._seen.pop(call, None)                 # allow an immediate re-report
+        self._recent = [(t, c) for (t, c) in self._recent if c != call]
+        self._broadcast({"t": "asrdrop", "call": call})
+        return before - len(self._log)
 
     @staticmethod
     def _s_label(s: float) -> str:
@@ -613,12 +639,17 @@ class CallsignService:
             if votes < VOID_MIN_VOTES:
                 self._add_log(f"held {votes}/{VOID_MIN_VOTES}{corr}",
                               call=call, valid=valid, klass=klass, conf=conf,
-                              s=s_lbl, band=band_lbl, text=text, nbest=nbest)
+                              s=s_lbl, band=band_lbl, text=text, nbest=nbest,
+                              event="held")
                 return
         if now - self._seen.get(call, 0.0) < self._repeat_s:
+            # the same call again inside the de-dupe window: no new card, but the
+            # panel flashes and re-marks the one that is already there
             self._add_log(f"repeat, muted{corr}",
                           call=call, valid=valid, klass=klass, conf=conf,
-                          s=s_lbl, band=band_lbl, text=text, nbest=nbest)
+                          s=s_lbl, band=band_lbl, text=text, nbest=nbest,
+                          name=(info or {}).get("name", ""),
+                          city=(info or {}).get("city", ""), event="muted")
             return
         self._seen[call] = now
         if len(self._seen) > 64:                      # prune stale entries
@@ -630,7 +661,9 @@ class CallsignService:
                                      (info or {}).get("city", "")) if x)
         self._add_log((det + corr) if det else ("shown" + corr),
                       call=call, valid=valid, klass=klass, conf=conf,
-                      s=s_lbl, band=band_lbl, text=text, nbest=nbest)
+                      s=s_lbl, band=band_lbl, text=text, nbest=nbest,
+                      name=(info or {}).get("name", ""),
+                      city=(info or {}).get("city", ""), event="shown")
         self._broadcast({"t": "callsign", "call": call, "conf": round(conf, 2),
                          "valid": valid,
                          "name": (info or {}).get("name", ""),
@@ -1634,6 +1667,12 @@ async def asr_config_set(req: AsrConfigRequest) -> dict:
     if req.enabled is not None:
         return await callsign_svc.set_enabled(req.enabled)
     return callsign_svc.status()
+
+
+@app.delete("/api/asr/log/{call}")
+async def asr_log_drop(call: str) -> dict:
+    """Remove a misrecognised callsign from the contact log (all clients)."""
+    return {"removed": callsign_svc.drop_call(call)}
 
 
 @app.websocket("/ws/callsign")

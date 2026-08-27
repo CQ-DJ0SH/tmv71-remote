@@ -118,7 +118,12 @@ body.theme-light .mem-table tbody tr:hover{background:#d2ece8}
 body.theme-light .mem-table td{border-bottom-color:#cae7e2}
 
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
+/* Only <html> is pinned to the viewport. <body> must be free to grow with its
+   content: with height:100% its box ends after one viewport, and .topbar --
+   being sticky -- cannot travel past the bottom of that box, so it is left
+   behind as soon as you scroll further. min-height:100vh below keeps a short
+   page full-height. (The mobile deck sets its own fixed heights.) */
+html{height:100%}
 body{
   font-family:var(--font-ui);
   color:var(--text);
@@ -129,8 +134,13 @@ body{
   background-attachment:fixed;
   min-height:100vh;
   -webkit-font-smoothing:antialiased;
-  overflow-x:hidden;
 }
+/* Horizontal clipping belongs on <html>, NOT on <body>: overflow-x:hidden forces
+   overflow-y to compute to `auto`, which turns that element into a scroll
+   container. On <body> that makes it the sticky containing block for .topbar --
+   and since <body> itself never scrolls (the viewport does), the sticky offset
+   stays 0 and the title bar simply scrolls away with the page. */
+html{overflow-x:hidden}
 
 /* atmospheric overlays */
 .grain{
@@ -140,7 +150,11 @@ body{
 .scanlines{
   position:fixed; inset:0; pointer-events:none; z-index:2; opacity:.35;
   background:repeating-linear-gradient(180deg, transparent 0 3px, #0000000d 3px 4px);
-  mix-blend-mode:multiply;
+  /* No mix-blend-mode here: the overlay is pure black with alpha, for which
+     multiply and normal source-over are mathematically identical (both leave
+     C*(1-a)) -- but a blend mode forces the compositor to re-read and re-blend
+     the whole viewport on every frame anything underneath repaints. Same look,
+     none of the per-frame full-screen blend pass. */
 }
 
 /* ---------------- launch / splash screen ---------------- */
@@ -412,41 +426,163 @@ body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}
 .log-zone{grid-area:log}
 .scan-zone{grid-area:scan}
 .debug-zone{grid-area:debug}
-/* ASR debug log: monospace, scrollable, fixed height */
-.asr-log{
-  font-family:var(--font-mono); font-size:11.5px; line-height:1.5;
-  height:200px; overflow-y:auto; overflow-x:hidden;
-  padding:8px 10px; border-radius:6px;
-  background:#05080a; border:1px solid #0c151b; color:var(--text-dim);
+/* ---- ASR contact cards -------------------------------------------------- */
+/* Card tray. Empty slots are real grid items rather than a background raster:
+   they are placed by the same layout pass as the cards, so the grid can never
+   drift out of alignment (a gradient would have to re-derive the track pitch,
+   the centring offset and the scroll position by hand). */
+.asr-cards{
+  --ac-w:162px; --ac-h:84px; --ac-gap:8px; --ac-rows:3; --ac-pad:9px;
+  position:relative;
+  /* height derived from the slot geometry (border-box: padding + border count),
+     so the tray always shows exactly --ac-rows full rows and never a half one */
+  height:calc(var(--ac-rows) * var(--ac-h) + (var(--ac-rows) - 1) * var(--ac-gap)
+              + 2 * var(--ac-pad) + 2px);
+  overflow-y:auto; overflow-x:hidden;
+  padding:var(--ac-pad); border-radius:6px;
+  display:grid; grid-template-columns:repeat(auto-fill, var(--ac-w));
+  grid-auto-rows:var(--ac-h); gap:var(--ac-gap);
+  align-content:start; justify-content:center;
+  background-color:#05080a;
+  border:1px solid #0c151b;
 }
-body.theme-light .asr-log{background:#eef2f5; border-color:#d3dce2; color:#3a4a54}
-.asr-log-row{display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 8px; white-space:pre-wrap; word-break:break-word; padding:1px 0}
-.asr-log-row .al-time{color:var(--text-dim); opacity:.55; flex:0 0 auto}
-.asr-log-row .al-msg{color:var(--text)}                                       /* name · town — bright */
-.asr-log-row .al-s{flex:0 0 auto; color:#3ec98a; opacity:.85}                 /* S-value */
-.asr-log-row .al-band{flex:0 0 auto; color:#8ba0b0; opacity:.8}              /* band+freq */
-.asr-log-row .al-raw{flex:0 1 auto; color:var(--text-dim); opacity:.6; font-style:italic}  /* raw words, inline */
-.asr-log-row .al-nbest{flex:0 1 auto; color:#d9b84a}    /* N-best, inline, yellow */
-/* recognised callsign — prominent (bold, larger, green); red when VOID */
-.asr-log-row .al-call{flex:0 0 auto; font-weight:700; font-size:13.5px;
-  letter-spacing:.05em; color:#3ec98a}
-.asr-log-row.void .al-call, .asr-log-row.void .al-msg, .asr-log-row.void .al-void{color:#e0635a}
-.asr-log-row .al-klass{flex:0 0 auto; font-size:9.5px; letter-spacing:.02em; color:#9fb4c2; opacity:.85}
-.asr-log-row .al-void{flex:0 0 auto; font-size:9.5px; font-weight:700; letter-spacing:.06em; color:#e0635a}
-.asr-log-row .al-conf{flex:0 0 auto; color:var(--text-dim); opacity:.7}
-/* light theme: the chip colours above are tuned for the dark log box and drop
-   to ~2:1 contrast on the light one — restate them darker (--text/--text-dim
-   based rules already follow the theme and need no override). */
-body.theme-light .asr-log-row .al-call{color:#137a4a}
-body.theme-light .asr-log-row .al-s{color:#137a4a; opacity:1}
-body.theme-light .asr-log-row .al-band{color:#4d6472; opacity:1}
-body.theme-light .asr-log-row .al-klass{color:#435b69; opacity:1}
-body.theme-light .asr-log-row .al-nbest{color:#8a6510}
-body.theme-light .asr-log-row .al-void,
-body.theme-light .asr-log-row.void .al-call,
-body.theme-light .asr-log-row.void .al-msg,
-body.theme-light .asr-log-row.void .al-void{color:#b4241b}
-.asr-log:empty::before{content:"(no ASR activity yet)"; opacity:.5}
+body.theme-light .asr-cards{background-color:#eef2f5; border-color:#d3dce2}
+/* empty slot: a darkened, recessed card outline */
+.asr-slot{
+  border-radius:6px;
+  background:#0a1014;
+  border:1px dashed #1b2831;
+  box-shadow:inset 0 1px 2px #00000055;
+}
+body.theme-light .asr-slot{background:#e6ebef; border-color:#ccd6dd; box-shadow:inset 0 1px 2px #0000000d}
+/* "nothing yet" hint — overlaid, not a grid item, so it does not consume a slot */
+.asr-cards.no-cards::before{
+  content:attr(data-empty); position:absolute; left:0; right:0; top:10px;
+  text-align:center; pointer-events:none;
+  font-family:var(--font-mono); font-size:11.5px; color:var(--text-dim); opacity:.6;
+}
+/* Uniform grey card; the callsign-hashed hue (see asrAvatar) is carried by the
+   avatar alone. --ac-bg stays a variable because the flash keyframes have to
+   land back on exactly this value. */
+.asr-card{
+  --ac-hue:200;                                    /* avatar only, JS sets it */
+  --ac-bg:#212a31;
+  --ac-bd:#36434d;
+  position:relative; display:flex; flex-direction:column; gap:2px;
+  padding:7px 8px 6px; border-radius:6px; cursor:default; overflow:hidden;
+  background:var(--ac-bg); border:1px solid var(--ac-bd);
+  box-shadow:0 1px 2px #0006;
+}
+body.theme-light .asr-card{
+  --ac-bg:#ffffff;
+  --ac-bd:#cfd8de;
+  box-shadow:0 1px 2px #0000000f;
+}
+/* padding-right keeps the licence-class chip clear of the absolutely positioned
+   delete button in the corner (3px offset + 15px wide + a little air) */
+.asr-card .ac-head{display:flex; align-items:center; gap:6px; padding-right:21px}
+/* avatar: hue is a hash of the callsign (see asrAvatar) */
+.asr-card .ac-avatar{
+  flex:0 0 auto; width:22px; height:22px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-ui); font-size:9px; font-weight:700; letter-spacing:.04em;
+  color:#08131a;
+  background:hsl(var(--ac-hue) 62% 62%);
+  border:1px solid hsl(var(--ac-hue) 62% 74%);
+}
+/* the callsign is the identity of the card -- biggest, boldest element */
+.asr-card .ac-call{
+  flex:1 1 auto; font-family:var(--font-mono); font-size:14px; font-weight:700;
+  letter-spacing:.14em; color:#3ec98a; line-height:1.15;
+}
+body.theme-light .asr-card .ac-call{color:#137a4a}
+/* All three licence classes are always shown as one framed group; only the
+   holder's own class is lit, the other two stay dim. That way the card says
+   both "which class" and "out of which set" at a glance. */
+.asr-card .ac-klass{
+  flex:0 0 auto; display:flex; gap:2px;
+  font-family:var(--font-mono); font-size:8px; font-style:normal;
+  padding:1px 3px; border:1px solid #4a5b68; border-radius:3px;
+}
+.asr-card .ac-klass .ack{font-style:normal; color:#6b7c89; opacity:.7}
+.asr-card .ac-klass .ack.on{color:#dbe7ef; opacity:1; font-weight:700}
+body.theme-light .asr-card .ac-klass{border-color:#aebdc8}
+body.theme-light .asr-card .ac-klass .ack{color:#93a4b1}
+body.theme-light .asr-card .ac-klass .ack.on{color:#1b2731}
+/* line-height must clear the descenders: with `normal` the content box is
+   shorter than the glyphs, and overflow:hidden (needed for the ellipsis on long
+   names) then cuts the tail off a g/j/p — "Jörg" lost its g. */
+.asr-card .ac-name{font-family:var(--font-ui); font-size:11px; color:var(--text);
+  line-height:1.4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.asr-card .ac-city{font-family:var(--font-ui); font-size:10px; color:var(--text-dim);
+  line-height:1.4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.asr-card .ac-name:empty, .asr-card .ac-city:empty{display:none}
+/* margin-top:auto pins the bottom row to the bottom edge of the (fixed-height)
+   card, so it stays put on contacts with no name or town, where .ac-name /
+   .ac-city collapse to display:none and would otherwise pull it up */
+.asr-card .ac-foot{
+  display:flex; align-items:center; gap:5px; margin-top:auto;
+  font-family:var(--font-mono); font-size:9px; color:var(--text-dim); opacity:.75;
+}
+.asr-card .ac-count{margin-left:auto; font-weight:700; color:#d9b84a; opacity:1}
+body.theme-light .asr-card .ac-count{color:#8a6510}
+
+/* the newest / most recently heard contact stays marked until another takes over */
+/* Log button sits in the bottom row next to the time; only the delete button
+   stays a corner overlay (.ac-head reserves its width). */
+.asr-card .ac-log{
+  flex:0 0 auto; width:15px; height:13px; padding:0;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-ui); font-size:8px; line-height:1;
+  color:var(--text-dim); background:transparent;
+  border:1px solid transparent; border-radius:4px;
+  cursor:pointer; opacity:.55; transition:opacity .12s, color .12s, border-color .12s;
+}
+.asr-card:hover .ac-log, .asr-card .ac-log:focus-visible{opacity:.8}
+.asr-card .ac-log:hover{color:#1fb6a6; border-color:#1fb6a6; opacity:1}  /* wavelog teal */
+.asr-card .ac-log:disabled{opacity:.3; cursor:default}
+/* already logged in this session — stays lit so it is not sent twice */
+.asr-card.logged .ac-log{color:#1fb6a6; border-color:#1fb6a655; opacity:.9}
+.asr-card .ac-del{
+  position:absolute; top:3px; right:3px; width:15px; height:15px; padding:0;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-ui); font-size:9px; line-height:1;
+  color:var(--text-dim); background:transparent;
+  border:1px solid transparent; border-radius:4px;
+  cursor:pointer; opacity:.55; transition:opacity .12s, color .12s, border-color .12s;
+}
+.asr-card:hover .ac-del, .asr-card .ac-del:focus-visible{opacity:.8}
+.asr-card .ac-del:hover{color:#ff3b30; border-color:#ff3b30; opacity:1}
+
+/* the most recently heard contact -- marked in the TX red used elsewhere for
+   "live right now", so it reads as activity rather than as a status colour */
+.asr-card.marked{border-color:#ff3b30; box-shadow:0 0 0 1px #ff3b3055, 0 1px 2px #0006}
+body.theme-light .asr-card.marked{border-color:#c1392f; box-shadow:0 0 0 1px #c1392f44}
+/* one-shot flash on a new card and on every repeat of an existing one */
+/* the flash brightens the card's own tint and settles back onto it, so it never
+   snaps to a foreign colour when the animation ends */
+@keyframes asr-card-flash{
+  0%{background:#3b4b56; border-color:#ff3b30}
+  100%{background:var(--ac-bg); border-color:#ff3b30}
+}
+@keyframes asr-card-flash-lt{
+  0%{background:#dbe7ed; border-color:#c1392f}
+  100%{background:var(--ac-bg); border-color:#c1392f}
+}
+.asr-card.flash{animation:asr-card-flash 1.2s ease-out}
+body.theme-light .asr-card.flash{animation-name:asr-card-flash-lt}
+@media (prefers-reduced-motion:reduce){.asr-card.flash{animation:none}}
+
+/* shared hover tooltip with the recogniser detail (fixed: the grid scrolls) */
+.asr-tip{
+  position:fixed; z-index:500; pointer-events:none; max-width:320px;
+  font-family:var(--font-mono); font-size:10.5px; line-height:1.45;
+  white-space:pre-wrap; padding:6px 9px; border-radius:5px;
+  color:var(--text); background:#0e161cf2; border:1px solid var(--edge-hi);
+  box-shadow:0 6px 18px -6px #000a;
+}
+body.theme-light .asr-tip{background:#ffffffF2; border-color:#c5cfd8; box-shadow:0 6px 18px -8px #0004}
+.asr-tip[hidden]{display:none}
 /* source link + version, below the last panel, right-aligned */
 .console-foot{
   grid-area:foot; display:flex; justify-content:flex-end; align-items:center; gap:8px;
@@ -463,7 +599,10 @@ body.theme-light .asr-log-row.void .al-void{color:#b4241b}
 .foot-links{display:contents}
 @media (max-width:860px) and (min-width:761px){
   .console{grid-template-columns:1fr; grid-template-rows:none;
-           grid-template-areas:"bands" "ptt" "audio" "hackrf" "sel" "digi" "log" "scan" "foot"}
+           /* every grid-area used by a panel must appear here: a name that is
+              missing places the panel in an implicit track OUTSIDE the grid */
+           grid-template-areas:"bands" "ptt" "audio" "hackrf" "sel" "digi" "log" "scan"
+                               "debug" "foot"}
   .bands{grid-template-columns:1fr}
 }
 
@@ -527,7 +666,7 @@ body.theme-light .asr-log-row.void .al-void{color:#b4241b}
      beats ".console .collapsed .panel-body{display:block}" so the flex chain holds. */
   .console .debug-zone{display:flex; flex-direction:column}
   .console #debug-body{display:flex; flex-direction:column; flex:1 1 auto; min-height:0}
-  .debug-zone .asr-log{height:auto; flex:1 1 auto; min-height:0}
+  .debug-zone .asr-cards{height:auto; flex:1 1 auto; min-height:0}
   .ptab.active{color:var(--tab); border-left-color:var(--tab);
     text-shadow:0 0 8px color-mix(in srgb, var(--tab) 55%, transparent);
     background:color-mix(in srgb, var(--tab) 9%, transparent)}
@@ -1262,7 +1401,9 @@ body.airband #quick-dtmf{ opacity:.28; pointer-events:none; filter:grayscale(.7)
 @media (display-mode:standalone){
   .ptt-hint{display:none}
   .ptt-busy{display:inline-flex}
-  .asr-live{display:none}          /* ASR shown in the PTT status line instead */
+  /* No ASR indicator next to the callsign in the PWA — the strip is too narrow
+     even for the bare LED. The PTT status line carries the ASR lamp instead. */
+  .asr-live{display:none}
   .rx-call-log{display:none}       /* no log/play button in the PWA strip */
 }
 /* RX/TX gain readout beside the busy lamps (audio-panel colours) */
