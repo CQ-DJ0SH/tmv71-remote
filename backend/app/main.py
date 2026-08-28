@@ -43,7 +43,8 @@ from . import mixer
 from . import system_info
 from . import updater
 from .power_switch import PowerSwitch
-from .webrtc_audio import RadioAudio, RadioRxTrack, consume_mic, SAMPLE_RATE
+from .webrtc_audio import (RadioAudio, RadioRxTrack, consume_mic, SAMPLE_RATE,
+                           ROGER_BEEP_S)
 from . import digimodes
 from . import selcall
 from . import callsign_asr
@@ -886,7 +887,9 @@ async def lifespan(app: FastAPI):
             await radio_audio.drain_tx()
             if radio_audio.roger_beep and not radio_audio.test_tone:
                 radio_audio.trigger_roger_beep()
-                await asyncio.sleep(0.27)        # let the 250 ms beep finish before un-key
+                # wait exactly as long as the figure actually plays -- a hard-coded
+                # value silently truncates the beep whenever its length changes
+                await asyncio.sleep(ROGER_BEEP_S + 0.02)
 
         radio_audio.roger_beep = settings.roger_beep_enabled
         radio_audio.roger_beep_level = settings.roger_beep_level

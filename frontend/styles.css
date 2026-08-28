@@ -1359,7 +1359,29 @@ body.theme-light .sm-seg.speak{background:#8b99a2; box-shadow:none}
   font-family:var(--font-disp); font-weight:700; letter-spacing:.16em; font-size:16px;
   color:var(--accent); pointer-events:none;
 }
-.ptt-center{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; flex:1 1 auto; min-width:0}
+.ptt-center{position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; flex:1 1 auto; min-width:0}
+/* Squelch mute — sits inline next to the "PTT → BAND x" caption. Silences RX
+   until the busy signal drops, to blank out an interferer; a three-tone chime
+   marks the release. */
+.ptt-band-row{display:flex; align-items:center; justify-content:center; gap:10px}
+/* The button carries the colour of the PTT band, like the caption beside it.
+   body.ptt-b is already toggled in render(), so no extra JS is needed. */
+.ptt-mute{
+  --mute-col:var(--amber); --mute-glow:var(--amber-glow);
+  flex:0 0 auto;
+  font-family:var(--font-disp); font-weight:700; letter-spacing:.12em; font-size:9px;
+  min-width:52px; padding:3px 7px; border-radius:5px; white-space:nowrap;
+  color:var(--text-dim); background:var(--ctrl-bg);
+  border:1px solid var(--mute-col);
+  cursor:pointer; transition:.18s;
+}
+body.ptt-b .ptt-mute{--mute-col:var(--cyan); --mute-glow:var(--cyan-glow)}
+.ptt-mute:hover{color:var(--mute-col); box-shadow:0 0 10px -4px var(--mute-glow)}
+/* armed: filled and glowing in the band colour, with a slow pulse so a mute
+   left on is impossible to overlook */
+.ptt-mute.armed{color:#06222a; background:var(--mute-col); border-color:var(--mute-col);
+  box-shadow:0 0 18px -2px var(--mute-glow), inset 0 0 0 1px #ffffff55;
+  animation:txpulse 1.4s ease-in-out infinite}
 /* quick-access columns: memory recall (left) + DTMF send (right) */
 .quick-col{display:flex; flex-direction:column; gap:5px; flex:0 0 auto}
 /* right column: memory sub-group (M10–M16) directly above the DTMF sub-group */

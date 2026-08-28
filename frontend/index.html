@@ -266,7 +266,11 @@
             <span class="pg-tx" id="pb-gain-tx">TX 1.0×</span>
           </span>
         </div>
-        <span class="ptt-band" id="ptt-band">PTT → BAND A</span>
+        <div class="ptt-band-row">
+          <span class="ptt-band" id="ptt-band">PTT → BAND A</span>
+          <button class="ptt-mute" id="sq-mute" type="button" aria-pressed="false"
+                  title="Empfang stummschalten, bis der Störer die Rauschsperre wieder schließt (Dreiklang bei Freigabe)">MUTE</button>
+        </div>
         <span class="ptt-warn" id="ptt-warn" hidden>⚠ TWO-TONE TEST</span>
       </div>
       <button class="ptt" id="ptt" aria-label="Push to talk">

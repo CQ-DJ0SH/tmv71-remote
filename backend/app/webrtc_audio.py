@@ -35,6 +35,14 @@ DEF_PTT_TAIL_MS = 250     # default post-release transmit tail (drain settle)
 TX_LP_CUTOFF = 3500.0     # voice low-pass cutoff (Hz) for the TX mic path
 RX_LP_CUTOFF = 3500.0     # voice low-pass cutoff (Hz) for the RX path (de-hiss)
 ROGER_BEEP_AMP = 0.28     # roger-beep tone amplitude (fraction of full scale)
+# Roger beep: the descending triad d6 - a5 - e5. The browser's squelch-mute
+# chime uses the same three notes rising, so the two are recognisably related
+# while still telling apart "sent on air" from "local".
+ROGER_NOTES = (1174.7, 880.0, 659.3)   # d6 · a5 · e5
+ROGER_TONE_S = 0.06       # length of each tone
+ROGER_GAP_S = 0.03        # silence between them
+# total play-out time of the figure — the un-key path waits exactly this long
+ROGER_BEEP_S = len(ROGER_NOTES) * ROGER_TONE_S + (len(ROGER_NOTES) - 1) * ROGER_GAP_S
 
 
 class _FIRLowpass:
@@ -257,10 +265,8 @@ class RadioAudio:
         self._digi_pos = 0
         self._tone_phase = 0          # two-tone phase (sample counter, wraps)
         self._t1750_phase = 0         # 1750 Hz tone phase
-        self._beep_phase = 0          # roger-beep phase
-        self._beep_left = 0           # remaining roger-beep samples
-        self._beep_seg = 0            # samples per tone of the two-tone roger beep
-        self._beep_second = False     # second tone (1750 Hz) reached
+        self._beep_buf = None         # pre-rendered roger beep (int16), or None
+        self._beep_pos = 0            # play-out position in _beep_buf
 
     # -- device ------------------------------------------------------------
     def _find_device(self) -> int:
@@ -483,19 +489,15 @@ class RadioAudio:
         elif self._ptt_open:
             if self.tone_1750:
                 mono = self._gen_tone(frames, (1750.0,), 0.5, "_t1750_phase")
-            elif self._beep_left > 0:
-                k = min(frames, self._beep_left)
-                # two-tone: first segment 1000 Hz, second 1750 Hz (reset the
-                # phase at the change for a clean edge)
-                if self._beep_left > self._beep_seg:
-                    freq = 1000.0
-                else:
-                    if not self._beep_second:
-                        self._beep_phase = 0
-                        self._beep_second = True
-                    freq = 1750.0
-                mono[:k] = self._gen_tone(k, (freq,), self.roger_beep_level, "_beep_phase")
-                self._beep_left -= k
+            elif self._beep_buf is not None:
+                # the whole triad is rendered once on trigger; here it is only
+                # copied out block by block (see _render_roger_beep)
+                b = self._beep_buf
+                k = min(frames, len(b) - self._beep_pos)
+                mono[:k] = b[self._beep_pos:self._beep_pos + k]
+                self._beep_pos += k
+                if self._beep_pos >= len(b):
+                    self._beep_buf = None
             else:
                 with self._pb_lock:
                     n = min(frames, len(self._playback))
@@ -521,11 +523,32 @@ class RadioAudio:
         """Queue a short beep on the mic path — call while still keyed."""
         with self._pb_lock:
             self._playback.clear()         # drop trailing mic; beep only
-        self._beep_phase = 0
-        self._beep_second = False
-        # two-tone roger beep: 1000 Hz then 1750 Hz, 125 ms each (250 ms total)
-        self._beep_seg = int(SAMPLE_RATE * 0.125)
-        self._beep_left = 2 * self._beep_seg
+        self._beep_buf = self._render_roger_beep(self.roger_beep_level)
+        self._beep_pos = 0
+
+    @staticmethod
+    def _render_roger_beep(amp: float) -> np.ndarray:
+        """Render ROGER_NOTES as tone/silence/tone/... into one int16 buffer.
+
+        Rendering the whole figure up front keeps the audio callback to a plain
+        memcpy and makes the number of notes a data question, not a branching
+        one. Each tone starts and ends at zero phase and gets a short raised-
+        cosine fade so the edges do not click."""
+        seg = int(SAMPLE_RATE * ROGER_TONE_S)
+        gap = int(SAMPLE_RATE * ROGER_GAP_S)
+        fade = max(1, int(SAMPLE_RATE * 0.004))          # 4 ms in/out
+        env = np.ones(seg)
+        ramp = 0.5 * (1.0 - np.cos(np.pi * np.arange(fade) / fade))
+        env[:fade] = ramp
+        env[-fade:] = ramp[::-1]
+        t = np.arange(seg) / SAMPLE_RATE
+        parts = []
+        for i, f in enumerate(ROGER_NOTES):
+            if i:
+                parts.append(np.zeros(gap))
+            parts.append(np.sin(2.0 * np.pi * f * t) * env)
+        sig = np.concatenate(parts) * amp
+        return np.clip(sig * 32767, -32768, 32767).astype(np.int16)
 
     # -- digimodes (CW/RTTY) ----------------------------------------------
     def pop_digi_rx(self) -> Optional[np.ndarray]:

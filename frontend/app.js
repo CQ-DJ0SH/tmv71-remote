@@ -12,6 +12,10 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 // feature: the self-hosted fonts are Google-Fonts subsets, which usually drop it.)
 const callDisp = c => (c || "").replace(/0/g, "Ø");
 
+// squelch mute (PTT panel): silences RX until the busy signal drops — declared
+// up here because render() reads it long before its handlers are wired up
+let sqMuted = false;
+
 
 let last = null;          // last RadioStatus
 let memBase = 0;          // quick-key channel offset: 0 normally, 50 in the air band
@@ -206,6 +210,7 @@ function renderBand(b) {
 
 function render(st) {
   last = st;
+  sqMuteCheck(st);                       // release the squelch mute when clear
   $("#stat-radio").classList.toggle("online", st.connected);
   $("#stat-radio").classList.toggle("fault", !st.connected && !!st.error);
   document.body.classList.toggle("disconnected", !st.connected);
@@ -261,7 +266,7 @@ function render(st) {
   // while it transmits, and toggling the <audio> element upsets Bluetooth
   // routing. The mic is gated in the backend instead (only sent to the radio
   // while keyed). Selcall/mic-test muting stays.
-  const rxEl = $("#rx-audio"); if (rxEl) rxEl.muted = selcallMuted || micTestActive;
+  const rxEl = $("#rx-audio"); if (rxEl) rxEl.muted = selcallMuted || micTestActive || sqMuted;
   // keep the PTT-Lock honest: clear it only after TX was confirmed then dropped
   // on the radio side (e.g. time-out timer), never during the engage round-trip.
   if (pttLock && setPttLock) {
@@ -756,7 +761,7 @@ function bindControls() {
     // (TX audio is wired to the radio's front mic input, so it modulates the PTT
     // band regardless of the data-band setting — no audio-band/PTT-band check.)
     // RX is not muted for TX (see render()); keep only selcall/mic-test muting
-    const rx = $("#rx-audio"); if (rx) rx.muted = selcallMuted || micTestActive;
+    const rx = $("#rx-audio"); if (rx) rx.muted = selcallMuted || micTestActive || sqMuted;
     try { await api("POST", "/api/ptt", { transmit: on }); }
     catch (e) { toast("PTT: " + e.message, "err"); }
 
@@ -1304,7 +1309,7 @@ function bindAudio() {
     // mute the radio RX (noise) while testing; un-mute on switch-off so the
     // echo replay is audible
     micTestActive = on;
-    { const a = $("#rx-audio"); if (a) a.muted = on || selcallMuted; }
+    { const a = $("#rx-audio"); if (a) a.muted = on || selcallMuted || sqMuted; }
     // cap the test at 30 s — auto-switch off (which starts the replay)
     if (micTestTimer) { clearTimeout(micTestTimer); micTestTimer = null; }
     if (on) micTestTimer = setTimeout(() => {
@@ -1319,7 +1324,7 @@ function bindAudio() {
     } catch (err) {
       toast("Mic test: " + err.message, "err");
       e.target.checked = !on; micTestActive = !on;
-      const a = $("#rx-audio"); if (a) a.muted = (!on) || selcallMuted;
+      const a = $("#rx-audio"); if (a) a.muted = (!on) || selcallMuted || sqMuted;
     }
   });
   $("#set-tx-lowpass")?.addEventListener("change", async e => {
@@ -2846,7 +2851,7 @@ function bindSelcall() {
   const setMute = on => {
     muted = on;
     selcallMuted = on;
-    const a = $("#rx-audio"); if (a) a.muted = on || micTestActive;
+    const a = $("#rx-audio"); if (a) a.muted = on || micTestActive || sqMuted;
     muteBtn.classList.toggle("armed", on);
     muteBtn.textContent = on ? "MUTED" : "MUTE";
     if (on && $("#sel-rx") && !$("#sel-rx").checked) { $("#sel-rx").checked = true; post({ rx: true }); }
@@ -2969,6 +2974,64 @@ function bindCallsign() {
   });
   connectCallsignWS();
 }
+
+// ---- squelch mute: blank an interferer until it stops keying ---------------
+// Client-side on purpose: it silences what YOU hear, while the S-meter, the raw
+// recorder and the callsign ASR keep seeing the signal.
+function sqSetMute(on) {
+  sqMuted = on;
+  const b = $("#sq-mute");
+  if (b) {
+    b.classList.toggle("armed", on);
+    b.setAttribute("aria-pressed", String(on));
+    b.textContent = on ? "MUTED" : "MUTE";
+  }
+  const a = $("#rx-audio");
+  if (a) a.muted = on || selcallMuted || micTestActive;
+}
+// three-tone chime on release — generated in the browser (WebAudio), so it is
+// never mixed into the radio audio and cannot end up transmitted
+let chimeCtx = null;
+// down=true plays the triad in reverse, so muting and un-muting are told apart
+// by ear without looking at the button
+function threeToneChime(down = false) {
+  try {
+    chimeCtx = chimeCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (chimeCtx.state === "suspended") chimeCtx.resume();
+    const t0 = chimeCtx.currentTime + 0.02;
+    const notes = [659.3, 880.0, 1174.7];               // e5 · a5 · d6
+    (down ? [...notes].reverse() : notes).forEach((f, i) => {
+      const o = chimeCtx.createOscillator(), g = chimeCtx.createGain();
+      o.type = "sine"; o.frequency.value = f;
+      const t = t0 + i * 0.11;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.16, t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.10);
+      o.connect(g).connect(chimeCtx.destination);
+      o.start(t); o.stop(t + 0.12);
+    });
+  } catch { /* no WebAudio -> silent release */ }
+}
+// Called from render() on every status push. The mute is lifted on the FALLING
+// EDGE of the audio band's busy signal — the interferer actually stopping — not
+// merely because the channel happens to be quiet: arming while nothing is being
+// received would otherwise unmute again on the very next status update.
+let sqPrevBusy = false;
+function sqMuteCheck(st) {
+  if (!st || !st.bands) return;
+  const ab = st.audio_band ?? st.control_band;
+  const band = st.bands.find(b => b.band === ab);
+  const busy = !!(band && band.squelch_open);
+  if (sqMuted && sqPrevBusy && !busy) { sqSetMute(false); threeToneChime(); }
+  sqPrevBusy = busy;                   // tracked even while not muted, so arming
+}                                      // mid-transmission already sees the edge
+// Every state change is confirmed by the chime — switching on, switching off by
+// hand, and the automatic release (sqMuteCheck). The click doubles as the user
+// gesture browsers require before an AudioContext may start.
+$("#sq-mute")?.addEventListener("click", () => {
+  sqSetMute(!sqMuted);
+  threeToneChime(sqMuted);            // muting = descending, release = ascending
+});
 
 // ---- ASR contact cards (debug panel under band scan) ----------------------
 // Every recognised contact becomes one index card, newest first. A call heard
