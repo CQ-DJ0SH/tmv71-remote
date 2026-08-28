@@ -349,9 +349,10 @@ EN = [
     ("p", "Hold the large PTT button (or the space bar) to transmit; PTT-LOCK "
           "latches transmit. PTT and PTT-LOCK require connected audio (there is no "
           "mic otherwise) — they are disabled while audio is off and released "
-          "automatically if audio disconnects. ROGER adds a two-tone "
-          "(1000/1750 Hz) beep on "
-          "release; while transmitting the button shows a count-up timer (MM:SS). "
+          "automatically if audio disconnects. ROGER adds a descending three-tone "
+          "beep (d6 · a5 · e5, i.e. 1175/880/659 Hz, 60 ms each with 30 ms gaps) "
+          "on release, at the level set in the audio settings; "
+          "while transmitting the button shows a count-up timer (MM:SS). "
           "The 1750 Hz button "
           "arms a tone-call. Memory quick keys recall channels 0–16 (M0–M9 in the "
           "left column, M10–M16 in the right; the loaded channel's key glows); "
@@ -359,6 +360,26 @@ EN = [
           "line shows per-band BUSY, the ASR state and the live RX/TX gain (in the "
           "PWA; the desktop shows the transmit hint). On mobile, mini RX/TX VU "
           "bars with peak-hold flank the button."),
+    ("h2", "Squelch mute (blanking an interferer)"),
+    ("p", "MUTE, beside the \u201cPTT \u2192 BAND x\u201d caption, silences the received "
+          "audio and releases itself as soon as the station being received stops "
+          "keying. It is meant for an interferer or a rag-chew you do not want to "
+          "listen to without having to remember to un-mute afterwards. The button "
+          "carries the colour of the transmit band and glows while armed."),
+    ("ul", [
+        "The release happens on the falling edge of that band's BUSY signal, not "
+        "merely because the channel is quiet: arming on an idle channel keeps the "
+        "audio muted until the end of the next transmission, rather than "
+        "un-muting again immediately.",
+        "Muting is done in the browser, on the audio element. The S-meter, the "
+        "raw RX recorder and the callsign recognition keep receiving the signal — "
+        "only what you hear is silenced.",
+        "A three-tone chime confirms the release (e5 · a5 · d6, rising); "
+        "switching the mute on plays the same triad in reverse, so the two are "
+        "told apart without looking. It is generated in the browser and can "
+        "therefore never be mixed into the transmitted audio, unlike the roger "
+        "beep, which deliberately is.",
+    ]),
     ("h2", "Audio (WebRTC/Opus)"),
     ("p", "Open the AUDIO panel, pick the RX band with the RX-A/RX-B switch, click "
           "CONNECT and allow the microphone. RX and mic levels are shown live, with "
@@ -669,7 +690,9 @@ DE = [
           "voraus (sonst gibt es kein Mikrofon) — sie sind deaktiviert, solange "
           "Audio aus ist, und werden bei einer Audio-Trennung automatisch beendet. "
           "ROGER fügt beim Loslassen einen "
-          "Zweiton-Piep (1000/1750 Hz) hinzu; während des Sendens zeigt der Knopf "
+          "absteigenden Dreiklang hinzu (d6 · a5 · e5, also 1175/880/659 Hz, je "
+          "60 ms mit 30 ms Pause), in der in den Audio-Einstellungen gewählten "
+          "Lautstärke; während des Sendens zeigt der Knopf "
           "einen aufwärts laufenden Timer (MM:SS). Die 1750-Hz-Taste schärft einen "
           "Tonruf. Die Speicher-Schnelltasten rufen die Kanäle 0–16 ab (M0–M9 in "
           "der linken, M10–M16 in der rechten Spalte; die Taste des geladenen "
@@ -677,6 +700,27 @@ DE = [
           "(0–2). Eine Statuszeile zeigt BUSY je Band, den ASR-Zustand und den "
           "Live-RX/TX-Gain (in der PWA; am Desktop steht dort der Sende-Hinweis). "
           "Auf dem Handy flankieren Mini-RX/TX-VU-Bars mit Peak-Hold den Knopf."),
+    ("h2", "Mute (Störer ausblenden)"),
+    ("p", "MUTE neben dem Schriftzug \u201ePTT \u2192 BAND x\u201c schaltet den Empfangston "
+          "stumm und hebt sich selbst auf, sobald die empfangene Station die "
+          "Taste loslässt. Gedacht für einen Störer oder ein Gespräch, das man "
+          "nicht mithören möchte, ohne hinterher an das Aufheben denken zu "
+          "müssen. Der Knopf trägt die Farbe des Sendebands und leuchtet, solange "
+          "er scharf ist."),
+    ("ul", [
+        "Die Freigabe erfolgt auf der fallenden Flanke des BUSY-Signals dieses "
+        "Bandes, nicht schon deshalb, weil der Kanal gerade frei ist: Beim "
+        "Aktivieren auf einem stillen Kanal bleibt der Ton bis zum Ende der "
+        "nächsten Aussendung stumm, statt sofort wieder aufzugehen.",
+        "Stummgeschaltet wird im Browser, am Audio-Element. S-Meter, "
+        "Roh-Rekorder und Rufzeichenerkennung bekommen das Signal weiterhin — "
+        "still ist nur, was man hört.",
+        "Ein Dreiklang bestätigt die Freigabe (e5 · a5 · d6, aufsteigend); beim "
+        "Einschalten erklingt derselbe Dreiklang rückwärts, sodass beides ohne "
+        "Hinsehen zu unterscheiden ist. Er entsteht im Browser und kann deshalb "
+        "nie ins Sendesignal geraten — anders als der Roger-Beep, der bewusst "
+        "dorthin gehört.",
+    ]),
     ("h2", "Audio (WebRTC/Opus)"),
     ("p", "Das AUDIO-Panel öffnen, mit dem RX-A/RX-B-Schalter das Empfangsband "
           "wählen, CONNECT klicken und das Mikrofon erlauben. RX- und Mic-Pegel "
