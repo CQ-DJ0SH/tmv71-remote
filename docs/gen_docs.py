@@ -360,25 +360,30 @@ EN = [
           "line shows per-band BUSY, the ASR state and the live RX/TX gain (in the "
           "PWA; the desktop shows the transmit hint). On mobile, mini RX/TX VU "
           "bars with peak-hold flank the button."),
-    ("h2", "Squelch mute (blanking an interferer)"),
-    ("p", "MUTE, beside the \u201cPTT \u2192 BAND x\u201d caption, silences the received "
-          "audio and releases itself as soon as the station being received stops "
-          "keying. It is meant for an interferer or a rag-chew you do not want to "
-          "listen to without having to remember to un-mute afterwards. The button "
-          "carries the colour of the transmit band and glows while armed."),
+    ("h2", "MUTE and DROP"),
+    ("p", "Two buttons flank the \u201cPTT \u2192 BAND x\u201d caption and silence the "
+          "received audio, differing only in when they stop:"),
     ("ul", [
-        "The release happens on the falling edge of that band's BUSY signal, not "
-        "merely because the channel is quiet: arming on an idle channel keeps the "
+        "MUTE (left) is the plain one: it stays until it is pressed again. The "
+        "label reads MUTED while it is on.",
+        "DROP (right) blanks the transmission in progress and lifts itself as "
+        "soon as that station stops keying — for an interferer or a rag-chew you "
+        "do not want to hear, without having to remember to un-mute afterwards.",
+    ]),
+    ("p", "Both glow in the colour of the transmit band while armed. Three "
+          "details are worth knowing:"),
+    ("ul", [
+        "DROP releases on the falling edge of that band's BUSY signal, not merely "
+        "because the channel is quiet: arming it on an idle channel keeps the "
         "audio muted until the end of the next transmission, rather than "
-        "un-muting again immediately.",
+        "un-muting again on the next status update.",
         "Muting is done in the browser, on the audio element. The S-meter, the "
         "raw RX recorder and the callsign recognition keep receiving the signal — "
         "only what you hear is silenced.",
-        "A three-tone chime confirms the release (e5 · a5 · d6, rising); "
-        "switching the mute on plays the same triad in reverse, so the two are "
-        "told apart without looking. It is generated in the browser and can "
-        "therefore never be mixed into the transmitted audio, unlike the roger "
-        "beep, which deliberately is.",
+        "A three-tone chime confirms each change (e5 · a5 · d6 rising on release, "
+        "the same triad reversed when muting), so the two are told apart without "
+        "looking. It is generated in the browser and can therefore never be mixed "
+        "into the transmitted audio, unlike the roger beep, which deliberately is.",
     ]),
     ("h2", "Audio (WebRTC/Opus)"),
     ("p", "Open the AUDIO panel, pick the RX band with the RX-A/RX-B switch, click "
@@ -454,6 +459,13 @@ EN = [
           "built once from the PDF with a converter (python -m app.callsign_list); "
           "QRZ.com is used only for a manual lookup in the logbook, never by the "
           "ASR."),
+    ("p", "Powering the radio down suspends the recognition — there is no RX "
+          "audio to analyse — and switching it back on resumes it. Your setting "
+          "is not overwritten by this, so detection does not quietly stay off "
+          "after a power cycle. The ASR indicator and the detected-callsign field "
+          "stay on screen throughout; only the LED changes: green and pulsing "
+          "while listening, red while suspended, dim when switched off. The pulse "
+          "is what says \u201clistening right now\u201d, so neither off-state pulses."),
     ("h2", "Band scan"),
     ("p", "Sweep a VHF/UHF range or the memory bank and see an occupancy "
           "spectrum + waterfall. Double-click a channel to tune the control VFO "
@@ -700,26 +712,33 @@ DE = [
           "(0–2). Eine Statuszeile zeigt BUSY je Band, den ASR-Zustand und den "
           "Live-RX/TX-Gain (in der PWA; am Desktop steht dort der Sende-Hinweis). "
           "Auf dem Handy flankieren Mini-RX/TX-VU-Bars mit Peak-Hold den Knopf."),
-    ("h2", "Mute (Störer ausblenden)"),
-    ("p", "MUTE neben dem Schriftzug \u201ePTT \u2192 BAND x\u201c schaltet den Empfangston "
-          "stumm und hebt sich selbst auf, sobald die empfangene Station die "
-          "Taste loslässt. Gedacht für einen Störer oder ein Gespräch, das man "
-          "nicht mithören möchte, ohne hinterher an das Aufheben denken zu "
-          "müssen. Der Knopf trägt die Farbe des Sendebands und leuchtet, solange "
-          "er scharf ist."),
+    ("h2", "MUTE und DROP"),
+    ("p", "Zwei Knöpfe flankieren den Schriftzug \u201ePTT \u2192 BAND x\u201c und "
+          "schalten den Empfangston stumm; sie unterscheiden sich nur darin, wann "
+          "sie wieder aufhören:"),
     ("ul", [
-        "Die Freigabe erfolgt auf der fallenden Flanke des BUSY-Signals dieses "
-        "Bandes, nicht schon deshalb, weil der Kanal gerade frei ist: Beim "
-        "Aktivieren auf einem stillen Kanal bleibt der Ton bis zum Ende der "
-        "nächsten Aussendung stumm, statt sofort wieder aufzugehen.",
+        "MUTE (links) ist der schlichte: Er bleibt, bis er erneut gedrückt wird. "
+        "Die Beschriftung lautet dann MUTED.",
+        "DROP (rechts) blendet die laufende Aussendung aus und hebt sich auf, "
+        "sobald diese Station die Taste loslässt — für einen Störer oder ein "
+        "Gespräch, das man nicht mithören möchte, ohne hinterher an das Aufheben "
+        "denken zu müssen.",
+    ]),
+    ("p", "Beide leuchten im aktiven Zustand in der Farbe des Sendebands. Drei "
+          "Punkte sind erwähnenswert:"),
+    ("ul", [
+        "DROP gibt auf der fallenden Flanke des BUSY-Signals frei, nicht schon "
+        "deshalb, weil der Kanal gerade frei ist: Auf einem stillen Kanal "
+        "aktiviert, bleibt der Ton bis zum Ende der nächsten Aussendung stumm, "
+        "statt beim nächsten Statuswechsel sofort wieder aufzugehen.",
         "Stummgeschaltet wird im Browser, am Audio-Element. S-Meter, "
         "Roh-Rekorder und Rufzeichenerkennung bekommen das Signal weiterhin — "
         "still ist nur, was man hört.",
-        "Ein Dreiklang bestätigt die Freigabe (e5 · a5 · d6, aufsteigend); beim "
-        "Einschalten erklingt derselbe Dreiklang rückwärts, sodass beides ohne "
-        "Hinsehen zu unterscheiden ist. Er entsteht im Browser und kann deshalb "
-        "nie ins Sendesignal geraten — anders als der Roger-Beep, der bewusst "
-        "dorthin gehört.",
+        "Ein Dreiklang bestätigt jeden Wechsel (e5 · a5 · d6 aufsteigend bei der "
+        "Freigabe, derselbe Dreiklang rückwärts beim Stummschalten), sodass "
+        "beides ohne Hinsehen zu unterscheiden ist. Er entsteht im Browser und "
+        "kann deshalb nie ins Sendesignal geraten — anders als der Roger-Beep, "
+        "der bewusst dorthin gehört.",
     ]),
     ("h2", "Audio (WebRTC/Opus)"),
     ("p", "Das AUDIO-Panel öffnen, mit dem RX-A/RX-B-Schalter das Empfangsband "
@@ -798,6 +817,15 @@ DE = [
           "Rufzeichenliste wird einmalig per Converter aus der PDF erzeugt "
           "(python -m app.callsign_list); QRZ.com wird nur bei der manuellen "
           "Abfrage im Logbuch genutzt, nie von der ASR."),
+    ("p", "Wird das Funkgerät abgeschaltet, setzt die Erkennung aus — es gibt "
+          "kein RX-Audio zu analysieren — und nimmt beim Einschalten wieder auf. "
+          "Die gespeicherte Einstellung wird dabei nicht überschrieben, die "
+          "Erkennung bleibt nach einem Aus- und Einschalten also nicht "
+          "unbemerkt abgeschaltet. ASR-Anzeige und Rufzeichenfeld bleiben "
+          "durchgehend sichtbar; nur die LED wechselt: grün pulsierend im "
+          "Betrieb, rot während des Aussetzens, gedimmt bei ausgeschalteter "
+          "Erkennung. Der Puls bedeutet \u201eh\u00f6rt gerade zu\u201c — deshalb pulst "
+          "keiner der beiden Aus-Zustände."),
     ("h2", "Bandscan"),
     ("p", "Einen VHF/UHF-Bereich oder die Speicherbank absuchen und ein "
           "Belegungs-Spektrum + Wasserfall sehen. Ein Doppelklick auf einen Kanal "
