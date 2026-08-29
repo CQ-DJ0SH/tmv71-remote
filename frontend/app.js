@@ -12,9 +12,10 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 // feature: the self-hosted fonts are Google-Fonts subsets, which usually drop it.)
 const callDisp = c => (c || "").replace(/0/g, "Ø");
 
-// squelch mute (PTT panel): silences RX until the busy signal drops — declared
-// up here because render() reads it long before its handlers are wired up
-let sqMuted = false;
+// RX mute sources (PTT panel), declared up here because render() reads them long
+// before their handlers are wired up: permMuted is the plain MUTE toggle, sqMuted
+// the DROP button that lifts itself when the busy signal falls.
+let permMuted = false, sqMuted = false;
 
 
 let last = null;          // last RadioStatus
@@ -266,7 +267,7 @@ function render(st) {
   // while it transmits, and toggling the <audio> element upsets Bluetooth
   // routing. The mic is gated in the backend instead (only sent to the radio
   // while keyed). Selcall/mic-test muting stays.
-  const rxEl = $("#rx-audio"); if (rxEl) rxEl.muted = selcallMuted || micTestActive || sqMuted;
+  rxApplyMute();
   // keep the PTT-Lock honest: clear it only after TX was confirmed then dropped
   // on the radio side (e.g. time-out timer), never during the engage round-trip.
   if (pttLock && setPttLock) {
@@ -761,7 +762,7 @@ function bindControls() {
     // (TX audio is wired to the radio's front mic input, so it modulates the PTT
     // band regardless of the data-band setting — no audio-band/PTT-band check.)
     // RX is not muted for TX (see render()); keep only selcall/mic-test muting
-    const rx = $("#rx-audio"); if (rx) rx.muted = selcallMuted || micTestActive || sqMuted;
+    rxApplyMute();
     try { await api("POST", "/api/ptt", { transmit: on }); }
     catch (e) { toast("PTT: " + e.message, "err"); }
 
@@ -1309,7 +1310,7 @@ function bindAudio() {
     // mute the radio RX (noise) while testing; un-mute on switch-off so the
     // echo replay is audible
     micTestActive = on;
-    { const a = $("#rx-audio"); if (a) a.muted = on || selcallMuted || sqMuted; }
+    { const a = $("#rx-audio"); if (a) a.muted = on || permMuted || sqMuted || selcallMuted; }
     // cap the test at 30 s — auto-switch off (which starts the replay)
     if (micTestTimer) { clearTimeout(micTestTimer); micTestTimer = null; }
     if (on) micTestTimer = setTimeout(() => {
@@ -1324,7 +1325,7 @@ function bindAudio() {
     } catch (err) {
       toast("Mic test: " + err.message, "err");
       e.target.checked = !on; micTestActive = !on;
-      const a = $("#rx-audio"); if (a) a.muted = (!on) || selcallMuted || sqMuted;
+      const a = $("#rx-audio"); if (a) a.muted = (!on) || permMuted || sqMuted || selcallMuted;
     }
   });
   $("#set-tx-lowpass")?.addEventListener("change", async e => {
@@ -2851,7 +2852,7 @@ function bindSelcall() {
   const setMute = on => {
     muted = on;
     selcallMuted = on;
-    const a = $("#rx-audio"); if (a) a.muted = on || micTestActive || sqMuted;
+    const a = $("#rx-audio"); if (a) a.muted = on || permMuted || sqMuted || micTestActive;
     muteBtn.classList.toggle("armed", on);
     muteBtn.textContent = on ? "MUTED" : "MUTE";
     if (on && $("#sel-rx") && !$("#sel-rx").checked) { $("#sel-rx").checked = true; post({ rx: true }); }
@@ -2895,12 +2896,27 @@ function reflectAsr(s) {
   if (!s) return;
   const tgl = $("#set-asr-callsign");
   if (tgl) { tgl.checked = !!s.enabled; tgl.disabled = !s.available; }
-  const rc = $("#rx-call");            // field + ASR-active tag only while detection is on
-  if (rc) { rc.hidden = !s.enabled; if (!s.enabled) rc.textContent = ""; }
+  // The detected-callsign field stays on screen too — it is the place a call
+  // appears, and an empty frame says that more clearly than a gap in the bar.
+  const rc = $("#rx-call");
+  if (rc) {
+    rc.hidden = false;
+    if (!s.enabled) { rc.textContent = ""; delete rc.dataset.call; }
+  }
   const lg = $("#rx-call-log"); if (lg) lg.hidden = !s.enabled;
+  // The ASR field stays on screen in every state; only its LED changes, so the
+  // absence of detection is visible instead of the whole indicator vanishing.
   const live = $("#asr-live");
-  if (live) live.hidden = !s.enabled;
+  if (live) {
+    live.hidden = false;
+    live.classList.toggle("suspended", !!s.suspended);
+    live.classList.toggle("off", !s.enabled && !s.suspended);
+    live.title = s.suspended ? "Rufzeichenerkennung ausgesetzt — Funkgerät ist aus"
+               : s.enabled   ? "Callsign ASR active"
+                             : "Rufzeichenerkennung ausgeschaltet";
+  }
   $("#pb-asr")?.classList.toggle("on", !!s.enabled);        // PTT status-line ASR lamp
+  $("#pb-asr")?.classList.toggle("suspended", !!s.suspended);
   document.body.classList.toggle("asr-on", !!s.enabled);   // PWA: drop nameplate, rotate ASR
   const hint = $("#asr-hint");
   if (hint && !s.available)
@@ -2931,8 +2947,10 @@ function showRxCall(m) {
   chip.textContent = callDisp(m.call);                // always show the recognised call
   chip.dataset.call = m.call;                         // real value for the logbook
   chip.classList.toggle("void", isVoid);
+  const hint = window.matchMedia("(max-width:760px)").matches
+    ? " · tap for the contact cards" : " · click to clear";
   chip.title = (isVoid ? m.call + " — not in the callsign list (VOID)"
-                       : m.call + (det ? " — " + det : " (auto-detected)")) + " · click to clear";
+                       : m.call + (det ? " — " + det : " (auto-detected)")) + hint;
   chip.classList.remove("flash"); void chip.offsetWidth; chip.classList.add("flash");   // restart flash
   if (rxCallTimer) clearTimeout(rxCallTimer);
   rxCallTimer = setTimeout(clearRxCall, 30000);      // auto-clear 30 s after a detection
@@ -2959,7 +2977,19 @@ async function logRxCall() {
 
 function bindCallsign() {
   const chip = $("#rx-call");
-  if (chip) chip.addEventListener("click", clearRxCall);
+  // In the mobile deck the contact panel has no tab of its own (it sits past the
+  // band scan), so the detected callsign doubles as the shortcut to it. On the
+  // desktop, where the panel is simply on the page, the click still clears the
+  // chip — there is nothing to navigate to.
+  if (chip) chip.addEventListener("click", () => {
+    const deck = document.querySelector(".console");
+    const dbg = document.querySelector(".debug-zone");
+    if (deck && dbg && window.matchMedia("(max-width:760px)").matches) {
+      deck.scrollTo({ top: dbg.offsetTop, behavior: "smooth" });
+      return;
+    }
+    clearRxCall();
+  });
   $("#rx-call-log")?.addEventListener("click", logRxCall);
   const tgl = $("#set-asr-callsign");
   if (tgl) tgl.addEventListener("change", async e => {
@@ -2978,17 +3008,34 @@ function bindCallsign() {
 // ---- squelch mute: blank an interferer until it stops keying ---------------
 // Client-side on purpose: it silences what YOU hear, while the S-meter, the raw
 // recorder and the callsign ASR keep seeing the signal.
+// One place that knows every reason the RX may be silent. Adding a further mute
+// source anywhere else means adding it here, not at each call site.
+function rxApplyMute() {
+  const a = $("#rx-audio");
+  if (a) a.muted = permMuted || sqMuted || selcallMuted || micTestActive;
+}
+// DROP: blanks the transmission in progress, releases itself on the busy edge
 function sqSetMute(on) {
   sqMuted = on;
   const b = $("#sq-mute");
+  if (b) { b.classList.toggle("armed", on); b.setAttribute("aria-pressed", String(on)); }
+  rxApplyMute();
+}
+// MUTE: plain, permanent — stays until it is pressed again
+function permSetMute(on) {
+  permMuted = on;
+  const b = $("#rx-mute");
   if (b) {
     b.classList.toggle("armed", on);
     b.setAttribute("aria-pressed", String(on));
     b.textContent = on ? "MUTED" : "MUTE";
   }
-  const a = $("#rx-audio");
-  if (a) a.muted = on || selcallMuted || micTestActive;
+  rxApplyMute();
 }
+$("#rx-mute")?.addEventListener("click", () => {
+  permSetMute(!permMuted);
+  threeToneChime(permMuted);          // muting = descending, release = ascending
+});
 // three-tone chime on release — generated in the browser (WebAudio), so it is
 // never mixed into the radio audio and cannot end up transmitted
 let chimeCtx = null;

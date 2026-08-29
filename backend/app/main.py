@@ -397,6 +397,7 @@ class CallsignService:
         self._recent: list = []                # (ts, call) for repetition voting
         self._log: list = []                   # ASR debug log (ring buffer of last N)
         self._calls: dict = {}                 # call -> {class,name,city} (empty = unverified)
+        self._suspended = False                # off because the radio is powered down
         self._lock = asyncio.Lock()
 
     def _model_dir(self) -> str:
@@ -416,9 +417,23 @@ class CallsignService:
 
     def status(self) -> dict:
         return {"enabled": self.enabled, "available": self.available,
-                "ready": self._rec is not None}
+                "ready": self._rec is not None, "suspended": self._suspended}
 
-    async def set_enabled(self, on: bool) -> dict:
+    async def suspend(self) -> None:
+        """Stop listening while the radio is powered down — there is no RX audio
+        to analyse. The user's preference is NOT written away: it is remembered
+        here and re-applied by resume(), so switching the radio back on does not
+        leave callsign detection silently off."""
+        if self.enabled:
+            self._suspended = True
+            await self.set_enabled(False, persist=False)
+
+    async def resume(self) -> None:
+        if self._suspended:
+            self._suspended = False
+            await self.set_enabled(True, persist=False)
+
+    async def set_enabled(self, on: bool, persist: bool = True) -> dict:
         async with self._lock:
             if on and self._rec is None:
                 try:
@@ -446,10 +461,15 @@ class CallsignService:
                               if on else "ASR disabled")
             if not on:
                 self._seen.clear()
-            if settings.asr_callsign_enabled != on:
+            if persist and settings.asr_callsign_enabled != on:
                 settings.asr_callsign_enabled = on
                 save_runtime(asr_callsign_enabled=on)
-            return self.status()
+            st = self.status()
+            # push the new state: without this the panel toggle and the ASR lamp
+            # keep showing the old value when the change came from the server
+            # side (radio powered off) rather than from a click.
+            self._broadcast({"t": "status", **st})
+            return st
 
     def set_own(self, call: str) -> None:
         if self._rec is not None:
@@ -713,6 +733,10 @@ async def _shut_down_peripherals() -> None:
             pass
         pcs.discard(pc)
     radio_audio.peers = 0
+    try:
+        await callsign_svc.suspend()      # no RX audio while the radio is dark
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _remember_mem_for_boot() -> None:
@@ -1154,6 +1178,7 @@ async def set_power_switch(req: PowerSwitchRequest) -> dict:
         await _shut_down_peripherals()   # radio off -> stop HackRF + audio peers
     else:
         asyncio.create_task(_restore_mem_after_boot())   # bring back the saved channel
+        asyncio.create_task(callsign_svc.resume())       # ...and the ASR, if it was on
     touch_activity()
     return _power_switch_status()
 

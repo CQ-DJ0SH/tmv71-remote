@@ -67,7 +67,8 @@ body.theme-light .dig:focus{background:#e6edf2}
 /* tuning bars stay outlined (not filled) on the light background too */
 body.theme-light .dbar{background:transparent}
 body.theme-light .dcell:focus-within .dbar{background:transparent; border-color:var(--text-dim)}
-body.theme-light .darr:hover{text-shadow:none}
+@media (hover:hover){
+body.theme-light .darr:hover{text-shadow:none}}
 body.theme-light .freq-spin.pending{box-shadow:0 0 0 1px var(--accent)}
 body.theme-light .sm-bar{background:#dde5ea; border-color:#c4cfd6}
 body.theme-light .sm-seg{background:#c8d2d9}
@@ -112,9 +113,10 @@ body.theme-light .sql-val{color:#46545f}
    (cyan) colour, the way the logbook recent list is tinted in its teal accent */
 body.theme-light .mem-table-wrap{background:#e8f7f5; border-color:#b9e3dd}
 body.theme-light .mem-table-wrap th{background:#d4efeb; color:#2f6b64}
+@media (hover:hover){
 /* row hover: the dark-theme near-black wash turns rows almost black on the
    light dialog — use a light cyan highlight instead */
-body.theme-light .mem-table tbody tr:hover{background:#d2ece8}
+body.theme-light .mem-table tbody tr:hover{background:#d2ece8}}
 body.theme-light .mem-table td{border-bottom-color:#cae7e2}
 
 *{box-sizing:border-box;margin:0;padding:0}
@@ -211,7 +213,8 @@ body.theme-light .launch{background:radial-gradient(120% 90% at 50% 34%, #ffffff
 .rh-msg .rh-ico{color:var(--tx); font-size:30px; display:flex; align-items:center}
 .rh-x{position:absolute; top:7px; right:9px; background:none; border:0; color:var(--text-dim);
   font-size:13px; cursor:pointer; padding:2px 5px; border-radius:5px; line-height:1}
-.rh-x:hover{color:#fff; background:var(--tx)}
+@media (hover:hover){
+.rh-x:hover{color:#fff; background:var(--tx)}}
 /* draw the eye to the power button while the radio is off */
 /* (no continuous pulse on the off button — an endless animation keeps the
    compositor at 60fps and the GPU process busy while the radio is off; the
@@ -284,9 +287,11 @@ body.theme-light .launch{background:radial-gradient(120% 90% at 50% 34%, #ffffff
   border:1px solid var(--edge); border-radius:8px; width:34px; height:34px;
   cursor:pointer; transition:.25s;
 }
-.gear:hover{color:var(--amber); border-color:var(--amber); transform:rotate(45deg)}
+@media (hover:hover){
+.gear:hover{color:var(--amber); border-color:var(--amber); transform:rotate(45deg)}}
 .theme-toggle{font-size:16px}
-.theme-toggle:hover{color:var(--cyan); border-color:var(--cyan); transform:none}
+@media (hover:hover){
+.theme-toggle:hover{color:var(--cyan); border-color:var(--cyan); transform:none}}
 
 /* prominent GPIO power switch */
 .power-switch{
@@ -299,7 +304,8 @@ body.theme-light .launch{background:radial-gradient(120% 90% at 50% 34%, #ffffff
 /* inline power glyph as SVG (the ⏻ codepoint isn't in the UI font) — sized via
    1em so the existing font-size rules keep controlling it, colour via currentColor */
 .pwr-svg{width:1em; height:1em; display:block}
-.power-switch:hover{border-color:var(--edge-hi); color:var(--text)}
+@media (hover:hover){
+.power-switch:hover{border-color:var(--edge-hi); color:var(--text)}}
 .power-switch.on{
   color:#04220f; background:#48b074; border-color:#48b074;   /* dampened green */
   box-shadow:0 0 13px -5px #48b074;
@@ -342,9 +348,11 @@ body.theme-light .rx-call.band-b{--rxc:#0c7b71}
 .rx-call.void, body.theme-light .rx-call.void{--rxc:#cf6159}
 .rx-call.void::after{content:"·VOID"; font-weight:700; margin-left:5px;
   letter-spacing:.06em}
-.rx-call[hidden]{display:none}          /* only shown while callsign detect is on */
-.rx-call:hover{background:rgba(255,255,255,0.09)}
-body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}
+.rx-call[hidden]{display:none}
+@media (hover:hover){          /* only shown while callsign detect is on */
+.rx-call:hover{background:rgba(255,255,255,0.09)}}
+@media (hover:hover){
+body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}}
 .rx-call:empty::before{content:"REMOTE-CS"; color:var(--text-dim); font-weight:600; font-size:13px; letter-spacing:.12em; opacity:.6}
 /* short glow (halo + text) in the band colour on each update */
 .rx-call.flash{animation:rxCallFlash .7s ease}
@@ -358,7 +366,8 @@ body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}
   justify-content:center; line-height:1; transition:.15s;
   font-family:var(--font-mono); font-size:13px; font-weight:700;
   color:var(--text-dim); background:transparent; border:none}
-.rx-call-log:hover{color:#3ec98a}
+@media (hover:hover){
+.rx-call-log:hover{color:#3ec98a}}
 .rx-call-log[hidden]{display:none}
 
 /* "ASR active" indicator next to the field — same font/size/LED as the CAT
@@ -372,6 +381,16 @@ body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}
   background:var(--ok); box-shadow:0 0 10px var(--ok), inset 0 0 3px #fff8;
   animation:asrPulse 1.6s ease-in-out infinite;
 }
+/* Only the LED carries the state; the "ASR" caption keeps its normal colour.
+   suspended (radio powered off) = red, off = dark — neither pulses, because the
+   pulse is what says "listening right now". */
+.asr-live.off::before{
+  background:var(--text-dim); box-shadow:none; opacity:.45; animation:none;
+}
+.asr-live.suspended::before{
+  background:var(--tx); box-shadow:0 0 10px var(--tx), inset 0 0 3px #fff8;
+  animation:none;
+}
 .asr-live[hidden]{display:none}
 @keyframes asrPulse{0%,100%{opacity:1} 50%{opacity:.3}}
 
@@ -383,7 +402,8 @@ body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}
   color:var(--text-dim); background:var(--field-bg); border:none; cursor:pointer; transition:.15s;
 }
 .seg .sg+.sg{border-left:1px solid var(--sw-edge)}
-.seg .sg:hover{color:var(--accent)}
+@media (hover:hover){
+.seg .sg:hover{color:var(--accent)}}
 .seg .sg.active{color:#06222a; background:var(--accent); font-weight:600; box-shadow:0 0 10px -3px var(--accent-glow)}
 .tone-sel, .tone-tx-sel{
   font-family:var(--font-mono); font-size:11px; color:var(--text);
@@ -539,7 +559,8 @@ body.theme-light .asr-card .ac-count{color:#8a6510}
   cursor:pointer; opacity:.55; transition:opacity .12s, color .12s, border-color .12s;
 }
 .asr-card:hover .ac-log, .asr-card .ac-log:focus-visible{opacity:.8}
-.asr-card .ac-log:hover{color:#1fb6a6; border-color:#1fb6a6; opacity:1}  /* wavelog teal */
+@media (hover:hover){
+.asr-card .ac-log:hover{color:#1fb6a6; border-color:#1fb6a6; opacity:1}}  /* wavelog teal */
 .asr-card .ac-log:disabled{opacity:.3; cursor:default}
 /* already logged in this session — stays lit so it is not sent twice */
 .asr-card.logged .ac-log{color:#1fb6a6; border-color:#1fb6a655; opacity:.9}
@@ -552,7 +573,8 @@ body.theme-light .asr-card .ac-count{color:#8a6510}
   cursor:pointer; opacity:.55; transition:opacity .12s, color .12s, border-color .12s;
 }
 .asr-card:hover .ac-del, .asr-card .ac-del:focus-visible{opacity:.8}
-.asr-card .ac-del:hover{color:#ff3b30; border-color:#ff3b30; opacity:1}
+@media (hover:hover){
+.asr-card .ac-del:hover{color:#ff3b30; border-color:#ff3b30; opacity:1}}
 
 /* the most recently heard contact -- marked in the TX red used elsewhere for
    "live right now", so it reads as activity rather than as a status colour */
@@ -590,7 +612,8 @@ body.theme-light .asr-tip{background:#ffffffF2; border-color:#c5cfd8; box-shadow
   font-family:var(--font-mono); font-size:11px; color:var(--text-dim); letter-spacing:.04em;
 }
 .console-foot a{color:var(--text-dim); text-decoration:none; transition:.12s}
-.console-foot a:hover{color:var(--accent)}
+@media (hover:hover){
+.console-foot a:hover{color:var(--accent)}}
 .console-foot .foot-sep{opacity:.6}
 .console-foot .foot-date{color:var(--text-dim)}
 .console-foot .foot-date::before{content:"·"; opacity:.6; margin-right:8px}
@@ -708,7 +731,8 @@ body.theme-light .asr-tip{background:#ffffffF2; border-color:#c5cfd8; box-shadow
      also kill the gear hover-rotate that "sticks" after a tap on touch screens */
   .topbar .gear, .topbar .power-switch{margin:0; width:30px; height:30px; flex:0 0 auto}
   .topbar .gear{font-size:15px}
-  .topbar .gear:hover, .topbar .power-switch:hover{transform:none}
+@media (hover:hover){
+  .topbar .gear:hover, .topbar .power-switch:hover{transform:none}}
   .topbar .theme-toggle, .topbar .theme-toggle:hover{transform:rotate(-90deg)}  /* 90° left */
   .topbar .power-switch .ps-icon{font-size:15px}
   .hdr-hide, .hdr-reveal{display:none}   /* not needed: the title bar is always docked */
@@ -979,11 +1003,13 @@ body.theme-light .digi-decode{background:#f3f7f4; border-color:#cfe0d6;
   cursor:pointer; border-radius:7px; padding:8px 14px; transition:.15s; flex:0 0 auto}
 .digi-send{color:#06231a; background:var(--accent); border:1px solid var(--accent); font-weight:600;
   padding:5px 10px; font-size:9px}
-.digi-send:hover{box-shadow:0 0 14px -4px var(--accent-glow)}
+@media (hover:hover){
+.digi-send:hover{box-shadow:0 0 14px -4px var(--accent-glow)}}
 .digi-send:disabled{opacity:.5; cursor:default; box-shadow:none}
 .digi-send.tx{color:#fff; background:var(--tx); border-color:var(--tx); box-shadow:0 0 16px -4px var(--tx-glow)}
 .digi-clear{color:var(--text-dim); background:var(--ctrl-bg); border:1px solid var(--edge)}
-.digi-clear:hover{color:var(--accent); border-color:var(--accent)}
+@media (hover:hover){
+.digi-clear:hover{color:var(--accent); border-color:var(--accent)}}
 .digi-hint{margin:8px 0 0; font-family:var(--font-ui); font-size:10px;
   letter-spacing:.04em; color:var(--text-dim); opacity:.8; text-align:center}
 
@@ -1021,11 +1047,13 @@ body.theme-light .sel-d{background:#f6f1e8; color:#8a6a2f; text-shadow:none; bor
 .sel-call, .sel-mute{font-family:var(--font-ui); font-size:11px; letter-spacing:.12em;
   cursor:pointer; border-radius:7px; padding:9px 16px; transition:.15s; flex:0 0 auto}
 .sel-call{color:#241803; background:var(--accent); border:1px solid var(--accent); font-weight:600}
-.sel-call:hover{box-shadow:0 0 14px -4px var(--accent-glow)}
+@media (hover:hover){
+.sel-call:hover{box-shadow:0 0 14px -4px var(--accent-glow)}}
 .sel-call:disabled{opacity:.5; cursor:default; box-shadow:none}
 .sel-call.tx{color:#fff; background:var(--tx); border-color:var(--tx); box-shadow:0 0 16px -4px var(--tx-glow)}
 .sel-mute{color:var(--text-dim); background:var(--ctrl-bg); border:1px solid var(--edge)}
-.sel-mute:hover{color:var(--accent); border-color:var(--accent)}
+@media (hover:hover){
+.sel-mute:hover{color:var(--accent); border-color:var(--accent)}}
 .sel-mute.armed{color:#fff; background:var(--tx); border-color:var(--tx);
   box-shadow:0 0 14px -4px var(--tx-glow); animation:lockpulse 1.3s ease-in-out infinite}
 .sel-tone-row select{max-width:120px}
@@ -1064,7 +1092,8 @@ body.radio-off .hackrf-zone{opacity:.32; filter:grayscale(.6) brightness(.78)}
   font-size:13px; line-height:1; color:var(--text-dim);
   background:var(--ctrl-bg); border:1px solid var(--sw-edge); border-radius:6px; cursor:pointer; transition:.15s;
 }
-.band-power:hover{color:var(--accent)}
+@media (hover:hover){
+.band-power:hover{color:var(--accent)}}
 .band:not(.is-off) .band-power{
   color:var(--accent); border-color:var(--accent); box-shadow:0 0 9px -2px var(--accent-glow);
 }
@@ -1082,7 +1111,8 @@ body.radio-off .hackrf-zone{opacity:.32; filter:grayscale(.6) brightness(.78)}
   color:var(--text-dim); background:var(--ctrl-bg); border:1px solid var(--sw-edge);
   padding:4px 10px; border-radius:6px; cursor:pointer; transition:.2s;
 }
-.ctrl-band-btn:hover{color:var(--accent)}
+@media (hover:hover){
+.ctrl-band-btn:hover{color:var(--accent)}}
 .band.is-ctrl .ctrl-band-btn{
   color:#06222a; background:var(--accent); border-color:var(--accent);
   box-shadow:0 0 14px var(--accent-glow); font-weight:600;
@@ -1092,7 +1122,8 @@ body.radio-off .hackrf-zone{opacity:.32; filter:grayscale(.6) brightness(.78)}
   color:var(--text-dim); background:var(--ctrl-bg); border:1px solid var(--sw-edge);
   padding:4px 10px; border-radius:6px; cursor:pointer; transition:.2s;
 }
-.ptt-band-btn:hover{color:var(--accent)}
+@media (hover:hover){
+.ptt-band-btn:hover{color:var(--accent)}}
 .band.is-ptt .ptt-band-btn{
   color:#06222a; background:var(--accent); border-color:var(--accent);
   box-shadow:0 0 14px var(--accent-glow); font-weight:600;
@@ -1247,7 +1278,8 @@ body.theme-light .sm-seg.speak{background:#8b99a2; box-shadow:none}
   color:var(--text-dim); background:var(--ctrl-bg); border:1px solid var(--sw-edge);
   border-radius:6px; padding:4px 10px; cursor:pointer; transition:.15s;
 }
-.air-btn:hover{color:var(--accent)}
+@media (hover:hover){
+.air-btn:hover{color:var(--accent)}}
 .air-btn.active{color:#06222a; background:var(--accent); border-color:var(--accent);
   font-weight:700; box-shadow:0 0 14px var(--accent-glow)}
 /* in the band head: centered in the gap between the BAND tag and CTRL */
@@ -1273,7 +1305,8 @@ body.theme-light .sm-seg.speak{background:#8b99a2; box-shadow:none}
   color:var(--text-dim); background:transparent; border:none; padding:0;
   transition:.12s; border-radius:4px;
 }
-.darr:hover{color:var(--accent); text-shadow:0 0 8px var(--accent-glow)}
+@media (hover:hover){
+.darr:hover{color:var(--accent); text-shadow:0 0 8px var(--accent-glow)}}
 .darr:active{transform:scale(.85)}
 .dcell{display:flex; flex-direction:column; align-items:center; gap:4px}
 /* clickable tuning bars above (+1) and below (-1) each digit */
@@ -1287,6 +1320,7 @@ body.theme-light .sm-seg.speak{background:#8b99a2; box-shadow:none}
   content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
   width:12px; height:2px; border-radius:1px; background:var(--text-dim);   /* grey dash, not dot */
 }
+@media (hover:hover){
 /* hover only with a real pointer — on touch :hover sticks after a tap and would
    leave the bar highlighted until you tap elsewhere. Keep it outlined: brighten
    the frame + dot rather than filling it. */
@@ -1294,7 +1328,7 @@ body.theme-light .sm-seg.speak{background:#8b99a2; box-shadow:none}
 @media (hover: hover){
   .dbar:hover{background:var(--accent); border-color:var(--accent)}
   .dbar:hover::before{background:var(--field-bg)}   /* dash stays visible on the fill */
-}
+}}
 .dbar:active{transform:scaleY(.6)}
 .dcell:focus-within .dbar{border-color:var(--text-dim)}
 .dig{
@@ -1319,7 +1353,8 @@ body.theme-light .sm-seg.speak{background:#8b99a2; box-shadow:none}
   color:var(--accent); background:var(--field-bg);
   border:1px solid var(--accent); border-radius:6px; transition:.12s;
 }
-.spin-apply:hover{background:var(--accent); color:#06222a; box-shadow:0 0 12px -3px var(--accent-glow)}
+@media (hover:hover){
+.spin-apply:hover{background:var(--accent); color:#06222a; box-shadow:0 0 12px -3px var(--accent-glow)}}
 .spin-apply:active{transform:scale(.9)}
 
 /* mic UP / DOWN keys: arrows beside the (shortened) tuner, full-height */
@@ -1332,7 +1367,8 @@ body.theme-light .sm-seg.speak{background:#8b99a2; box-shadow:none}
   border:1px solid var(--accent); border-radius:7px; cursor:pointer;
   opacity:.85; transition:.15s;
 }
-.step-btn:hover{opacity:1}
+@media (hover:hover){
+.step-btn:hover{opacity:1}}
 .step-btn:active{transform:translateY(1px)}
 
 /* VFO/SPEICHER toggle now rides in the tuner row, centered beside the ▲▼ keys */
@@ -1344,7 +1380,8 @@ body.theme-light .sm-seg.speak{background:#8b99a2; box-shadow:none}
   padding:5px 9px; font-family:var(--font-ui); font-size:10px; letter-spacing:.1em;
   color:var(--text-dim); background:var(--field-bg); border:none; cursor:pointer; transition:.15s;
 }
-.mode-toggle .mt:hover{color:var(--accent)}
+@media (hover:hover){
+.mode-toggle .mt:hover{color:var(--accent)}}
 .mode-toggle .mt+.mt{border-left:1px solid var(--sw-edge)}
 .mode-toggle .mt.active{color:#06222a; background:var(--accent); font-weight:600; box-shadow:0 0 12px -3px var(--accent-glow)}
 
@@ -1364,19 +1401,25 @@ body.theme-light .sm-seg.speak{background:#8b99a2; box-shadow:none}
    until the busy signal drops, to blank out an interferer; a three-tone chime
    marks the release. */
 .ptt-band-row{display:flex; align-items:center; justify-content:center; gap:10px}
-/* The button carries the colour of the PTT band, like the caption beside it.
-   body.ptt-b is already toggled in render(), so no extra JS is needed. */
+/* Neutral border at rest; the PTT band's colour is used only for hover and for
+   the armed state (body.ptt-b is already toggled in render(), no extra JS). */
 .ptt-mute{
   --mute-col:var(--amber); --mute-glow:var(--amber-glow);
   flex:0 0 auto;
   font-family:var(--font-disp); font-weight:700; letter-spacing:.12em; font-size:9px;
-  min-width:52px; padding:3px 7px; border-radius:5px; white-space:nowrap;
+  /* fixed width, not min-width: the two buttons flank the caption, and a label
+     that grows ("MUTE" -> "MUTED") would push the centred text sideways */
+  width:60px; text-align:center; padding:3px 0; border-radius:5px; white-space:nowrap;
   color:var(--text-dim); background:var(--ctrl-bg);
-  border:1px solid var(--mute-col);
+  border:1px solid var(--edge-hi);
   cursor:pointer; transition:.18s;
 }
-body.ptt-b .ptt-mute{--mute-col:var(--cyan); --mute-glow:var(--cyan-glow)}
-.ptt-mute:hover{color:var(--mute-col); box-shadow:0 0 10px -4px var(--mute-glow)}
+body.ptt-b .ptt-mute{--mute-col:var(--cyan); --mute-glow:var(--cyan-glow)}/* hover only where there is a real pointer: on a touch screen the :hover state
+   sticks after a tap, leaving the band-coloured border on a button that is off */
+@media (hover:hover){
+  .ptt-mute:hover{color:var(--mute-col); border-color:var(--mute-col);
+    box-shadow:0 0 10px -4px var(--mute-glow)}
+}
 /* armed: filled and glowing in the band colour, with a slow pulse so a mute
    left on is impossible to overlook */
 .ptt-mute.armed{color:#06222a; background:var(--mute-col); border-color:var(--mute-col);
@@ -1393,12 +1436,16 @@ body.ptt-b .ptt-mute{--mute-col:var(--cyan); --mute-glow:var(--cyan-glow)}
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center;
 }                                              /* DTMF: red border like the PTT button */
 /* memory keys keep the base red border, matching the DTMF keys */
-.qbtn.qmem.empty{color:#566472; opacity:.7; font-weight:500}   /* placeholder */
-.qbtn:hover{opacity:1}
-.qbtn.qdtmf{color:#9e2f26}                      /* DTMF keys: dark red text */
-.qbtn.qdtmf:hover{color:var(--tx)}              /* …brighter red on hover */
-.qbtn.qmem:hover{color:var(--amber)}            /* memory keys: control-band colour (A) */
-body.ctrl-b .qbtn.qmem:hover{color:var(--cyan)} /* …or cyan when control band = B */
+.qbtn.qmem.empty{color:#566472; opacity:.7; font-weight:500}
+@media (hover:hover){   /* placeholder */
+.qbtn:hover{opacity:1}}
+.qbtn.qdtmf{color:#9e2f26}
+@media (hover:hover){                      /* DTMF keys: dark red text */
+.qbtn.qdtmf:hover{color:var(--tx)}}
+@media (hover:hover){              /* …brighter red on hover */
+.qbtn.qmem:hover{color:var(--amber)}}
+@media (hover:hover){            /* memory keys: control-band colour (A) */
+body.ctrl-b .qbtn.qmem:hover{color:var(--cyan)}} /* …or cyan when control band = B */
 .qbtn:active{transform:translateY(1px)}
 /* memory channel currently loaded on the radio: glowing text in the control-band colour */
 .qbtn.qmem.active{color:var(--amber); text-shadow:0 0 9px var(--amber-glow); opacity:1}
@@ -1409,7 +1456,8 @@ body.ctrl-b .qbtn.qmem.active{color:var(--cyan); text-shadow:0 0 9px var(--cyan-
    control (PTT, lock/roger/1750, DTMF column) is disabled. --- */
 body.airband .qbtn.qmem{border-color:var(--amber)}
 body.airband .qbtn.qmem.empty{color:#566472; opacity:.6}
-body.airband .qbtn.qmem:hover{color:var(--amber)}
+@media (hover:hover){
+body.airband .qbtn.qmem:hover{color:var(--amber)}}
 body.airband .qbtn.qmem.active{color:var(--amber); text-shadow:0 0 9px var(--amber-glow)}
 body.airband .ptt,
 body.airband .ptt-lock-row,
@@ -1444,6 +1492,8 @@ body.airband #quick-dtmf{ opacity:.28; pointer-events:none; filter:grayscale(.7)
 #pb-busy-1.on::after{background:var(--cyan);  box-shadow:0 0 7px var(--cyan)}
 #pb-asr.on::after{background:var(--ok); box-shadow:0 0 7px var(--ok);
   animation:asrPulse 1.6s ease-in-out infinite}
+#pb-asr.suspended::after{background:var(--tx); box-shadow:0 0 7px var(--tx);
+  animation:none}
 body.theme-light .pb-lamp::after{background:#c8d2d9; box-shadow:none}
 body.theme-light #pb-busy-0.on::after{background:#b3650f; box-shadow:0 0 7px #b3650f}
 body.theme-light #pb-busy-1.on::after{background:#0c7b71; box-shadow:0 0 7px #0c7b71}
@@ -1526,7 +1576,7 @@ body.theme-light #pb-busy-1.on::after{background:#0c7b71; box-shadow:0 0 7px #0c
   color:var(--text-dim); padding:6px 16px; border:1px solid #c1392f; border-radius:6px;
   background:var(--ctrl-bg); cursor:pointer; transition:.18s;
 }
-.ptt-lock:hover{color:var(--tx)}
+@media (hover:hover){.ptt-lock:hover{color:var(--tx)}}
 .ptt-lock.locked{color:#fff; background:var(--tx); border-color:var(--tx);
   box-shadow:0 0 22px var(--tx-glow); animation:lockpulse 1.2s ease-in-out infinite}
 @keyframes lockpulse{0%,100%{box-shadow:0 0 14px var(--tx-glow)}50%{box-shadow:0 0 26px var(--tx-glow)}}
@@ -1537,7 +1587,9 @@ body.theme-light #pb-busy-1.on::after{background:#0c7b71; box-shadow:0 0 7px #0c
   min-width:80px; padding:4px 9px; border-radius:5px; border:1px solid #c1392f; white-space:nowrap;
   color:var(--text-dim); background:var(--ctrl-bg); cursor:pointer; transition:.18s;
 }
-.ptt-side:hover{color:var(--tx); border-color:var(--tx)}
+/* touch screens keep :hover after a tap, so the button would stay red once
+   pressed — same guard as on .ptt-mute */
+@media (hover:hover){.ptt-side:hover{color:var(--tx); border-color:var(--tx)}}
 /* active ROGER / 1750 glow red */
 .ptt-side.on{color:#fff;
   background:var(--tx); border-color:var(--tx); box-shadow:0 0 14px -3px var(--tx-glow)}
@@ -1562,7 +1614,8 @@ body.theme-light .rng input{color-scheme:light}
   color:var(--text); background:var(--ctrl-bg); border:1px solid var(--edge); border-radius:7px;
   padding:7px 12px; text-decoration:none; transition:.15s;
 }
-.mem-actions button:hover, .mem-actions a:hover, .import-btn:hover{border-color:var(--cyan); color:var(--cyan)}
+@media (hover:hover){
+.mem-actions button:hover, .mem-actions a:hover, .import-btn:hover{border-color:var(--cyan); color:var(--cyan)}}
 
 .mem-table-wrap{overflow:auto; border:1px solid var(--edge); border-radius:10px; max-height:340px}
 .mem-table{width:100%; border-collapse:collapse; font-family:var(--font-mono); font-size:12px}
@@ -1573,7 +1626,8 @@ body.theme-light .rng input{color-scheme:light}
 }
 .mem-table td{padding:8px 10px; border-bottom:1px solid #161f26; color:var(--text)}
 .mem-table tbody tr{transition:.12s; cursor:default}
-.mem-table tbody tr:hover{background:#121b22}
+@media (hover:hover){
+.mem-table tbody tr:hover{background:#121b22}}
 .mem-table .ch{color:var(--cyan)}
 .mem-table .name{color:var(--amber)}
 .mem-table .empty{color:var(--text-dim); text-align:center; padding:26px; font-family:var(--font-ui); letter-spacing:.08em}
@@ -1582,8 +1636,10 @@ body.theme-light .rng input{color-scheme:light}
   font-family:var(--font-ui); font-size:10px; letter-spacing:.1em; cursor:pointer;
   background:var(--ctrl-bg); border:1px solid var(--edge); border-radius:5px; padding:4px 8px; color:var(--text-dim); transition:.12s;
 }
-.row-actions .recall:hover{border-color:var(--cyan); color:var(--cyan)}
-.row-actions .del:hover{border-color:var(--tx); color:var(--tx)}
+@media (hover:hover){
+.row-actions .recall:hover{border-color:var(--cyan); color:var(--cyan)}}
+@media (hover:hover){
+.row-actions .del:hover{border-color:var(--tx); color:var(--tx)}}
 
 /* ---------------- audio panel ---------------- */
 .audio{padding:26px 30px 26px; display:flex; flex-direction:column}
@@ -1613,12 +1669,14 @@ body.theme-light .rng input{color-scheme:light}
      doesn't shift when the connection state changes */
   min-width:96px; box-sizing:border-box; text-align:center;
 }
-#audio-toggle:hover{border-color:var(--accent); color:var(--accent)}
+@media (hover:hover){
+#audio-toggle:hover{border-color:var(--accent); color:var(--accent)}}
 #audio-toggle.connected{   /* filled in the audio-panel colour while connected */
   color:#120e22; background:var(--accent); border-color:var(--accent); font-weight:600;
   box-shadow:0 0 16px -5px var(--accent);
 }
-#audio-toggle.connected:hover{color:#120e22}
+@media (hover:hover){
+#audio-toggle.connected:hover{color:#120e22}}
 /* light theme: the violet accent fill reads too dark/heavy — lighten it */
 body.theme-light #audio-toggle.connected,
 body.theme-light #audio-toggle.connected:hover{
@@ -1656,7 +1714,8 @@ body.theme-light #audio-toggle.connected:hover{
 .rec-btn{font-family:var(--font-mono); font-size:10px; letter-spacing:.06em;
   color:var(--text-dim); background:transparent; border:1px solid var(--edge);
   border-radius:5px; padding:3px 7px; cursor:pointer; white-space:nowrap; transition:.15s}
-.rec-btn:hover:not(:disabled){color:var(--text); border-color:var(--text-dim)}
+@media (hover:hover){
+.rec-btn:hover:not(:disabled){color:var(--text); border-color:var(--text-dim)}}
 .rec-btn:disabled{opacity:.4; cursor:default}
 /* size readout + download sit together on the RIGHT of the centred title
    (REC/PLAY stay on the left) so neither group overlaps the title */
@@ -1666,8 +1725,9 @@ body.theme-light #audio-toggle.connected:hover{
   animation:txpulse 1.4s ease-in-out infinite}
 .rec-time{display:none; font-family:var(--font-mono); font-size:10px;
   color:var(--text-dim); text-align:right; white-space:nowrap}
+@media (hover:hover){
 /* size/duration only on hover (keeps the header clean) */
-.rec-right:hover .rec-time{display:inline-block}
+.rec-right:hover .rec-time{display:inline-block}}
 /* live playback time next to the play/stop button (shown only while playing) */
 .rec-playtime{font-family:var(--font-mono); font-size:10px; color:var(--accent);
   white-space:nowrap}
@@ -1759,7 +1819,8 @@ body.theme-light .graph-bytes .gb-tx{color:#b64a42}
   color:var(--text); background:var(--ctrl-bg); border:1px solid var(--sw-edge);
   border-radius:7px; padding:6px 12px; transition:.15s;
 }
-.scan-band:hover{color:var(--cyan); border-color:var(--cyan)}
+@media (hover:hover){
+.scan-band:hover{color:var(--cyan); border-color:var(--cyan)}}
 .scan-band.active{color:#06222a; background:var(--cyan); border-color:var(--cyan); font-weight:600}
 .scan-band.running{color:#fff; background:var(--tx); border-color:var(--tx); font-weight:600;
   animation:lockpulse 1.2s ease-in-out infinite}
@@ -1769,13 +1830,15 @@ body.theme-light .graph-bytes .gb-tx{color:#b64a42}
   color:var(--text-dim); background:transparent; border:1px solid var(--edge);
   border-radius:7px; padding:6px 12px; margin-left:6px; transition:.15s;
 }
-.scan-clear:hover{color:var(--amber); border-color:var(--amber)}
+@media (hover:hover){
+.scan-clear:hover{color:var(--amber); border-color:var(--amber)}}
 #scan-toggle{
   font-family:var(--font-ui); font-size:11px; letter-spacing:.14em; cursor:pointer;
   color:var(--text); background:var(--ctrl-bg); border:1px solid var(--edge);
   border-radius:7px; padding:7px 16px; transition:.15s;
 }
-#scan-toggle:hover:not(:disabled){border-color:var(--cyan); color:var(--cyan)}
+@media (hover:hover){
+#scan-toggle:hover:not(:disabled){border-color:var(--cyan); color:var(--cyan)}}
 #scan-toggle:disabled{opacity:.45; cursor:default}
 #scan-toggle.running{color:#fff; background:var(--tx); border-color:var(--tx)}
 .scan-prog{margin-left:auto; font-family:var(--font-mono); font-size:11px; color:var(--text-dim); letter-spacing:.06em}
@@ -1900,19 +1963,23 @@ body.theme-light .mixer-row .mx-mute input{color-scheme:light}
   padding:10px 20px; border-radius:8px; border:1px solid var(--edge); transition:.15s;
 }
 .btn-ghost{background:var(--ctrl-bg); color:var(--text-dim)}
-.btn-ghost:hover{border-color:var(--edge-hi); color:var(--text)}
+@media (hover:hover){
+.btn-ghost:hover{border-color:var(--edge-hi); color:var(--text)}}
 .btn-primary{background:var(--cyan); color:#06222a; border-color:var(--cyan); font-weight:600}
-.btn-primary:hover{box-shadow:0 0 16px -2px var(--cyan-glow)}
+@media (hover:hover){
+.btn-primary:hover{box-shadow:0 0 16px -2px var(--cyan-glow)}}
 /* destructive confirm action (delete / power off) */
 .btn-danger{background:var(--tx); color:#fff; border-color:var(--tx); font-weight:600}
-.btn-danger:hover{box-shadow:0 0 16px -2px var(--tx-glow)}
+@media (hover:hover){
+.btn-danger:hover{box-shadow:0 0 16px -2px var(--tx-glow)}}
 /* confirm dialog: above the settings (40) and editor (50) modals so it shows
    when triggered from inside them (memory delete, update) */
 #confirm-dialog{z-index:60}
 .confirm-card{width:min(420px,94vw)}
 .confirm-msg{font-family:var(--font-ui); font-size:13px; line-height:1.5; color:var(--text)}
 #mem-new{color:var(--amber)!important}
-#mem-new:hover{border-color:var(--amber)!important; color:var(--amber)!important}
+@media (hover:hover){
+#mem-new:hover{border-color:var(--amber)!important; color:var(--amber)!important}}
 @media (max-width:520px){.form-grid{grid-template-columns:1fr}}
 
 /* ---------------- settings: tabbed dialog ---------------- */
@@ -1928,7 +1995,8 @@ body.theme-light .mixer-row .mx-mute input{color-scheme:light}
   background:transparent; border:1px solid var(--edge); color:var(--text-dim);
   font-size:13px; transition:.15s;
 }
-.set-x:hover{border-color:var(--tx); color:var(--tx)}
+@media (hover:hover){
+.set-x:hover{border-color:var(--tx); color:var(--tx)}}
 
 .tabs{display:flex; gap:4px; border-bottom:1px solid var(--edge); margin-bottom:18px; flex-wrap:wrap}
 .tab{
@@ -1936,7 +2004,8 @@ body.theme-light .mixer-row .mx-mute input{color-scheme:light}
   color:var(--text-dim); background:transparent; border:none; padding:9px 16px;
   border-bottom:2px solid transparent; margin-bottom:-1px; transition:.15s;
 }
-.tab:hover{color:var(--text)}
+@media (hover:hover){
+.tab:hover{color:var(--text)}}
 .tab.active{color:var(--cyan); border-bottom-color:var(--cyan)}
 
 .tab-pane{display:none}
@@ -1971,8 +2040,10 @@ body.theme-light .mixer-row .mx-mute input{color-scheme:light}
   color:var(--text); background:var(--ctrl-bg); border:1px solid var(--edge); border-radius:7px;
   padding:8px 12px; transition:.15s;
 }
-.mini-btn:hover{border-color:var(--cyan); color:var(--cyan)}
-.mini-btn.danger:hover{border-color:var(--tx); color:var(--tx)}
+@media (hover:hover){
+.mini-btn:hover{border-color:var(--cyan); color:var(--cyan)}}
+@media (hover:hover){
+.mini-btn.danger:hover{border-color:var(--tx); color:var(--tx)}}
 
 /* info readouts (ID / AE / FV / TY) */
 .info-grid{
@@ -2008,7 +2079,8 @@ body.theme-light .info-grid dt{background:#e4eaef; color:#46545f}
   color:var(--text-dim); background:var(--ctrl-bg); border:1px solid var(--edge); border-radius:7px;
   padding:9px 13px; transition:.15s;
 }
-.dtmf-row .dtmf-save:hover{border-color:var(--cyan); color:var(--cyan)}
+@media (hover:hover){
+.dtmf-row .dtmf-save:hover{border-color:var(--cyan); color:var(--cyan)}}
 .dtmf-row .dtmf-save.dirty{border-color:var(--amber); color:var(--amber)}
 
 /* ---------------- toast ---------------- */
@@ -2055,7 +2127,8 @@ body.disconnected .console{opacity:.5; filter:grayscale(.4); transition:.4s}
   background:#3a9ff0; box-shadow:0 0 7px 1px rgba(58,159,240,.75);
 }
 .hackrf-zone .panel-head .panel-toggle{margin-left:10px}
-.panel-toggle:hover{color:var(--accent); border-color:var(--accent)}
+@media (hover:hover){
+.panel-toggle:hover{color:var(--accent); border-color:var(--accent)}}
 .collapsed .panel-body{display:none}
 .hackrf-zone{padding:26px 30px 26px}
 .hackrf-zone.collapsed{padding-bottom:22px}
@@ -2075,7 +2148,8 @@ body.disconnected .console{opacity:.5; filter:grayscale(.4); transition:.4s}
 .hrf-m{font-family:var(--font-mono); font-size:11px; padding:6px 11px; cursor:pointer; color:var(--text-dim);
   background:var(--ctrl-bg); border:none; border-right:1px solid var(--sw-edge); transition:.15s}
 .hrf-m:last-child{border-right:none}
-.hrf-m:hover{color:var(--accent)}
+@media (hover:hover){
+.hrf-m:hover{color:var(--accent)}}
 .hrf-m.active{color:#06220f; background:var(--accent); font-weight:600}
 .hrf-follow, .hrf-amp{display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono);
   font-size:11px; color:var(--text-dim); cursor:pointer; user-select:none}
@@ -2153,9 +2227,11 @@ body.theme-light .hrf-graph{border-color:var(--edge)}
 .log-btn{font-family:var(--font-ui); font-size:11px; letter-spacing:.14em; cursor:pointer;
   border-radius:8px; padding:9px 16px; border:1px solid var(--edge); transition:.15s;
   background:var(--ctrl-bg); color:var(--text-dim)}
-.log-btn.ghost:hover{color:var(--accent); border-color:var(--accent)}
+@media (hover:hover){
+.log-btn.ghost:hover{color:var(--accent); border-color:var(--accent)}}
 .log-btn.primary{background:var(--accent); border-color:var(--accent); color:#04201d; font-weight:700}
-.log-btn.primary:hover{filter:brightness(1.12)}
+@media (hover:hover){
+.log-btn.primary:hover{filter:brightness(1.12)}}
 .log-btn:disabled{opacity:.45; cursor:not-allowed; filter:saturate(.4)}
 .log-stats{display:flex; gap:12px; flex-wrap:wrap;
   font-family:var(--font-mono); font-size:11px; color:var(--text-dim)}
@@ -2168,9 +2244,10 @@ body.theme-light .hrf-graph{border-color:var(--edge)}
 .log-clear-btn{font-family:var(--font-ui); font-size:9px; letter-spacing:.14em;
   color:var(--text-dim); background:transparent; border:1px solid var(--edge);
   border-radius:5px; padding:3px 9px; cursor:pointer; transition:.15s}
+@media (hover:hover){
 /* hover only with a real pointer — on touch :hover sticks after a tap and would
    leave the button red until you tap elsewhere */
-@media (hover: hover){ .log-clear-btn:hover{color:#fff; background:#c0392b; border-color:#c0392b} }
+@media (hover: hover){ .log-clear-btn:hover{color:#fff; background:#c0392b; border-color:#c0392b} }}
 /* list + scroll-nav side by side */
 .log-recent-body{display:flex; gap:8px; align-items:stretch}
 /* fixed height so the panel never grows as QSOs are added — it just scrolls.
