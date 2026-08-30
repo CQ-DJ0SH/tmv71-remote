@@ -716,8 +716,10 @@ body.theme-light .asr-tip{background:#ffffffF2; border-color:#c5cfd8; box-shadow
   .brand .rx-call{writing-mode:vertical-rl; transform:rotate(180deg);
     min-width:0; height:auto; min-height:92px; padding:6px 1px;
     font-size:13px; letter-spacing:.16em}
-  /* the title nameplate is dropped from the strip while ASR is on (makes room) */
-  body.asr-on .title-center{display:none}
+  /* The title nameplate has no place in this narrow strip — it is dropped
+     unconditionally, not only while a callsign is on screen. That also keeps the
+     strip a fixed length whatever the ASR is doing. */
+  .title-center{display:none}
   .title-center{writing-mode:vertical-rl; transform:none; padding:0; gap:2px;
     max-width:none; max-height:none; background:none; border:none; box-shadow:none; overflow:visible}
   .title-center .screw{display:none}

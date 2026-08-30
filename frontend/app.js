@@ -390,6 +390,7 @@ async function refreshAudio() {
     }
     // feed the in-display S-meter with the live RX / mic audio levels
     lastRxDb = a.rx_db; lastTxDb = a.tx_db; lastRxS = a.rx_s;
+    sqQuietCheck(a.rx_db);            // DROP: also release after 3 s of silence
     updateSmeters();
     // mini VU bars flanking the PTT button (PWA): RX left, TX right, with 1 s
     // peak-hold. The mask covers the empty (top) part → fills upward from bottom.
@@ -2917,7 +2918,6 @@ function reflectAsr(s) {
   }
   $("#pb-asr")?.classList.toggle("on", !!s.enabled);        // PTT status-line ASR lamp
   $("#pb-asr")?.classList.toggle("suspended", !!s.suspended);
-  document.body.classList.toggle("asr-on", !!s.enabled);   // PWA: drop nameplate, rotate ASR
   const hint = $("#asr-hint");
   if (hint && !s.available)
     hint.textContent = "Vosk model not found on the Pi — install vosk-model-small-de-0.15 under models/ to enable callsign detection.";
@@ -3017,9 +3017,24 @@ function rxApplyMute() {
 // DROP: blanks the transmission in progress, releases itself on the busy edge
 function sqSetMute(on) {
   sqMuted = on;
+  sqQuietSince = Date.now();
   const b = $("#sq-mute");
   if (b) { b.classList.toggle("armed", on); b.setAttribute("aria-pressed", String(on)); }
   rxApplyMute();
+}
+// Second release path, for a carrier that never drops: a repeater keeps BUSY
+// asserted for its whole over (and its tail), so the falling edge alone would
+// leave the audio muted long after anyone stopped talking. Watch the AF level
+// instead — measured on the Pi, so muting the browser side does not blind it —
+// and release once it has stayed at the noise floor for SQ_QUIET_MS.
+const SQ_SPEECH_DB = -55;            // above this counts as "someone is talking"
+const SQ_QUIET_MS = 3000;
+let sqQuietSince = 0;
+function sqQuietCheck(db) {
+  if (!sqMuted) return;
+  const now = Date.now();
+  if (db == null || db > SQ_SPEECH_DB) { sqQuietSince = now; return; }
+  if (now - sqQuietSince >= SQ_QUIET_MS) { sqSetMute(false); threeToneChime(); }
 }
 // MUTE: plain, permanent — stays until it is pressed again
 function permSetMute(on) {
