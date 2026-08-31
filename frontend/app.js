@@ -2958,10 +2958,11 @@ function showRxCall(m) {
 
 // Fill the logbook form and submit it. Used by the title-bar LOG button and by
 // the per-card button; no QRZ lookup, the name comes from the offline list.
-async function logCallDirect(call, name) {
+async function logCallDirect(call, name, qth) {
   if (!call) { toast("No callsign detected", "err"); return false; }
   const inp = $("#log-call"); if (inp) inp.value = call;
   const nm = $("#log-name"); if (nm) nm.value = name || "";
+  const qt = $("#log-qth"); if (qt) qt.value = qth || "";
   // clear any stale details so the bare call (+ auto band/freq/mode) is logged
   ["#log-grid", "#log-comment"].forEach(s => { const el = $(s); if (el) el.value = ""; });
   toast("📖 Logging " + call + "…", "ok");
@@ -3155,7 +3156,7 @@ function asrCardBuild(e) {
     ev.stopPropagation();
     if (log.disabled) return;
     log.disabled = true;
-    const ok = await logCallDirect(e.call, e.name || "");
+    const ok = await logCallDirect(e.call, e.name || "", e.city || "");
     log.disabled = false;
     card.classList.toggle("logged", !!ok);           // marks it as already logged
   });
@@ -3506,6 +3507,7 @@ async function logLookup() {
     lastLookup = { ...r, call };          // cache for the QSO we're about to log
     if (r.name && !$("#log-name").value.trim()) $("#log-name").value = r.name;
     if (r.gridsquare && !$("#log-grid").value.trim()) $("#log-grid").value = r.gridsquare;
+    if (r.qth && !$("#log-qth").value.trim()) $("#log-qth").value = r.qth;
     const bits = [r.name, r.gridsquare, r.qth, r.country, r.email, r.dxcc]
       .filter(Boolean).join(" · ");
     toast(bits ? `${call}: ${bits}${r.worked_before ? " · worked before" : ""}`
@@ -3529,13 +3531,15 @@ async function logQso() {
       rst_rcvd: $("#log-rst-r").value.trim() || "59",
       gridsquare: $("#log-grid").value.trim() || lk.gridsquare || "",
       comment: $("#log-comment").value.trim(),
-      email: lk.email || "", qth: lk.qth || "", country: lk.country || "",
+      qth: $("#log-qth").value.trim() || lk.qth || "",
+      email: lk.email || "", country: lk.country || "",
     });
     if (r.ok) {
       ok = true;
       toast(`Logged ${call}`, "ok");
       lastLookup = null;
-      ["#log-call", "#log-name", "#log-grid", "#log-comment"].forEach(s => ($(s).value = ""));
+      ["#log-call", "#log-name", "#log-grid", "#log-qth", "#log-comment"]
+        .forEach(s => ($(s).value = ""));
       $("#log-rst-s").value = "59"; $("#log-rst-r").value = "59";
     } else {
       const msg = Object.values(r.targets || {}).map(t => t.message).filter(Boolean).join("; ");

@@ -2201,6 +2201,7 @@ body.theme-light .hrf-graph{border-color:var(--edge)}
 .log-f-rst{flex:0 0 60px}
 .log-f-grid{flex:0 0 96px}
 .log-f-name{flex:1 1 160px; max-width:260px}
+.log-f-qth{flex:1 1 140px; max-width:220px}
 .log-f-cmt{flex:1 1 200px}
 /* Wavelog connection indicator in the title bar */
 .log-online{display:inline-flex; align-items:center; gap:6px; flex:none;
