@@ -188,6 +188,11 @@ class AsrConfigRequest(BaseModel):
     enabled: Optional[bool] = None
 
 
+class AsrManualRequest(BaseModel):
+    """Add a contact card by hand, for when the recognition misses one."""
+    call: str = Field(min_length=3, max_length=12)
+
+
 class AudioRecordRequest(BaseModel):
     """Start/stop the raw RX audio recorder."""
     on: Optional[bool] = None

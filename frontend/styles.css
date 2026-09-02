@@ -447,6 +447,30 @@ body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}}
 .scan-zone{grid-area:scan}
 .debug-zone{grid-area:debug}
 /* ---- ASR contact cards -------------------------------------------------- */
+/* manual callsign entry in the panel head, next to CLEAR */
+/* same metrics as the CLEAR button beside it, so the head row lines up */
+.asr-manual{
+  font-family:var(--font-ui); font-size:11px; letter-spacing:.12em;
+  width:104px; padding:6px 10px; border-radius:7px; margin-left:6px;
+  color:var(--text); background:var(--field-bg);
+  border:1px solid var(--edge); outline:none; transition:.15s;
+}
+/* the LOG button belongs to the field, so it sits closer than the CLEAR button,
+   which is a separate control (.scan-clear brings margin-left:6px) */
+#asr-manual-add{margin-left:3px}
+.asr-manual::placeholder{color:var(--text-dim); opacity:.55}
+/* Highlights inside this panel stay in its own neutral family (the same greys
+   the licence-class chips use). .scan-clear brings an amber hover from the scan
+   panel, which is the Band-A colour and belongs to neither panel. */
+.debug-zone .asr-manual:focus{border-color:#9fb4c2; box-shadow:0 0 0 1px #9fb4c2}
+@media (hover:hover){
+  .debug-zone .scan-clear:hover{color:#9fb4c2; border-color:#9fb4c2}
+}
+body.theme-light .debug-zone .asr-manual:focus{border-color:#435b69; box-shadow:0 0 0 1px #435b69}
+@media (hover:hover){
+  body.theme-light .debug-zone .scan-clear:hover{color:#435b69; border-color:#435b69}
+}
+
 /* Card tray. Empty slots are real grid items rather than a background raster:
    they are placed by the same layout pass as the cards, so the grid can never
    drift out of alignment (a gradient would have to re-derive the track pitch,

@@ -3200,6 +3200,7 @@ function asrTipShow(card) {
 function asrTipHide() { if (asrTip) asrTip.hidden = true; }
 
 function asrCardDebug(e) {
+  if (e.manual) return "von Hand eingetragen";
   const bits = [];
   if (e.conf != null) bits.push("Konfidenz " + Number(e.conf).toFixed(2));
   if (e.s) bits.push("Signal " + e.s);
@@ -3308,6 +3309,36 @@ function asrLog(e, fresh = true) {
   }
   if (fresh) asrFillSlots();       // history tops up once, after the whole batch
 }
+// Manual entry, for when the recognition misses a call: goes to the backend so
+// the card is created by the same broadcast as a recognised one — it lands in
+// the history, reaches every client and can be deleted like any other.
+const asrManual = $("#asr-manual");
+// a callsign is upper-case letters and digits only — filter while typing rather
+// than rejecting on submit, so the field can never hold something unusable
+asrManual?.addEventListener("input", () => {
+  const clean = asrManual.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (clean !== asrManual.value) {
+    const pos = asrManual.selectionStart;
+    asrManual.value = clean;
+    asrManual.setSelectionRange(pos, pos);          // keep the caret put
+  }
+});
+async function asrManualAdd() {
+  const call = (asrManual?.value || "").trim();
+  if (call.length < 3) { asrManual?.focus(); return; }
+  asrManual.value = "";
+  try {
+    const r = await api("POST", "/api/asr/log", { call });
+    // say whether the BNetzA list knew the call: a card without name and town
+    // otherwise looks like the lookup failed rather than "not a German call"
+    toast(r.known ? `Karte ${r.call} angelegt`
+                  : `Karte ${r.call} angelegt — nicht in der Rufzeichenliste`,
+          r.known ? "ok" : "");
+  } catch (err) { toast("Karte: " + err.message, "err"); }
+}
+asrManual?.addEventListener("keydown", ev => { if (ev.key === "Enter") asrManualAdd(); });
+$("#asr-manual-add")?.addEventListener("click", asrManualAdd);
+
 $("#asr-log-clear")?.addEventListener("click", () => {
   const box = $("#asr-log"); if (box) box.textContent = "";
   asrCards.clear(); asrTipHide(); asrFillSlots();

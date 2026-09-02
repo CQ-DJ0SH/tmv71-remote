@@ -22,7 +22,8 @@ from fastapi.staticfiles import StaticFiles
 
 from . import memory as memory_io
 from .config import APP_VERSION, save_runtime, settings
-from .models import (AudioDeviceRequest, AudioGainRequest, AutoPowerOffRequest,
+from .models import (AsrManualRequest, AudioDeviceRequest, AudioGainRequest,
+                     AutoPowerOffRequest,
                      BandDisplayRequest, BandModeRequest, CallsignRequest,
                      ThemeRequest,
                      ControlBandRequest, DataBandRequest,
@@ -493,7 +494,8 @@ class CallsignService:
     def _add_log(self, line: str, call: str = None, valid: bool = None,
                  klass: str = None, conf: float = None, s: str = None,
                  band: str = None, text: str = None, nbest: list = None,
-                 name: str = None, city: str = None, event: str = None) -> None:
+                 name: str = None, city: str = None, event: str = None,
+                 manual: bool = False) -> None:
         """Append an entry to the ASR log (ring buffer for the debug panel) and push
         it live to subscribers. The panel renders each contact as a card, so the
         holder's name and town travel as their own fields rather than pre-joined
@@ -505,6 +507,8 @@ class CallsignService:
                  "date": time.strftime("%Y-%m-%d"), "line": line}
         if event:
             entry["event"] = event
+        if manual:
+            entry["manual"] = True
         if name:
             entry["name"] = name
         if city:
@@ -532,6 +536,25 @@ class CallsignService:
 
     def log_history(self) -> list:
         return list(self._log)
+
+    def add_manual(self, call: str) -> dict:
+        """Add a contact card by hand — for when the recognition missed a call
+        or got it wrong. Goes through the same log entry as a recognised one, so
+        the card, the history and the delete button all behave identically.
+
+        The call is NOT checked against the BNetzA list for validity: the whole
+        point is that a human typed it, and a foreign or special call would be
+        flagged VOID for no good reason. The list is still consulted to fill in
+        name, town and licence class when it knows the call."""
+        call = "".join(c for c in (call or "").upper() if c.isalnum())
+        if len(call) < 3:
+            raise HTTPException(400, "callsign too short")
+        info = self._calls.get(call) or {}
+        self._seen[call] = time.monotonic()      # don't re-announce it right away
+        self._add_log("manuell eingetragen", call=call, valid=True,
+                      klass=info.get("class", ""), name=info.get("name", ""),
+                      city=info.get("city", ""), event="shown", manual=True)
+        return {"call": call, "known": bool(info)}
 
     def drop_call(self, call: str) -> int:
         """Forget a misrecognised callsign: drop its entries from the log ring
@@ -1695,6 +1718,12 @@ async def asr_config_set(req: AsrConfigRequest) -> dict:
     if req.enabled is not None:
         return await callsign_svc.set_enabled(req.enabled)
     return callsign_svc.status()
+
+
+@app.post("/api/asr/log")
+async def asr_log_add(req: AsrManualRequest) -> dict:
+    """Add a contact card by hand (recognition missed or mangled the call)."""
+    return callsign_svc.add_manual(req.call)
 
 
 @app.delete("/api/asr/log/{call}")

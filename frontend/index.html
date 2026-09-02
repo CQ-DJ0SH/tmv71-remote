@@ -589,7 +589,13 @@
   <section class="debug-zone collapsed" id="debug-zone">
     <div class="panel-head">
       <h2>ASR · KONTAKTE</h2>
-      <button class="scan-clear" id="asr-log-clear" type="button" title="Clear the contact cards">CLEAR</button>
+      <input class="asr-manual" id="asr-manual" type="text" maxlength="12"
+             placeholder="RUFZEICHEN" autocomplete="off" spellcheck="false"
+             autocapitalize="characters" inputmode="text"
+             title="Rufzeichen von Hand eintragen, wenn die Erkennung es verpasst hat">
+      <button class="scan-clear" id="asr-manual-add" type="button"
+              title="Rufzeichen als Karte eintragen (oder Eingabetaste)">LOG</button>
+      <button class="scan-clear" id="asr-log-clear" type="button" title="Alle Kontaktkarten aus der Ansicht entfernen">CLEAR ALL</button>
       <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="debug-body" title="Show / hide the recognised contacts">▲</button>
     </div>
     <div class="panel-body" id="debug-body">
