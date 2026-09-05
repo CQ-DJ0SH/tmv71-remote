@@ -1539,8 +1539,11 @@ async def clear_audio_record() -> dict:
 async def download_audio_record() -> Response:
     """The recorded raw RX buffer as a 16-bit mono 48 kHz WAV."""
     data = await asyncio.to_thread(radio_audio.rec_wav_bytes)
+    # same stamped name as the download button builds client-side, so fetching
+    # the URL directly does not produce a differently named file
+    name = time.strftime("tmv71-rx-%Y-%m-%d_%H%M%S.wav")
     return Response(data, media_type="audio/wav", headers={
-        "Content-Disposition": 'attachment; filename="tmv71-rx-recording.wav"'})
+        "Content-Disposition": f'attachment; filename="{name}"'})
 
 
 @app.post("/api/audio/buffer")
