@@ -4,6 +4,8 @@
 Pure-Python via fpdf2 (no LaTeX). Run:  .venv/bin/python docs/gen_docs.py
 """
 import os
+import time
+
 from fpdf import FPDF
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -19,15 +21,49 @@ CODEBG = (244, 246, 248)
 VERSION = "3.2"
 
 
+RULE = (206, 216, 222)        # hairlines for header/footer
+HALF = 87                     # half the type area (174 mm), for L/R cells
+
+
 class Doc(FPDF):
-    title_txt = ""
+    """A4 with a running head: product left, current chapter right.
+
+    The chapter caption is what makes a long manual navigable — on any page it
+    says which of the fourteen chapters you are in. Cover and contents carry no
+    furniture (running_head stays False there)."""
+    title_txt = ""            # document title, shown in the footer
+    chapter = ""              # current chapter, shown in the running head
+    running_head = False      # off for the cover
+    opening = False           # this page opens a chapter -> no caption
+
+    def header(self):
+        if self.page_no() <= 1 or not self.running_head:
+            return
+        self.set_y(11)
+        self.set_font("DV", "", 7.6)
+        self.set_text_color(*GREY)
+        self.cell(HALF, 4, "TM-V71 REMOTE", align="L")
+        # A page that opens a chapter carries no caption: the title stands right
+        # below it in 22 pt, and repeating it is the classic redundancy.
+        self.cell(HALF, 4, "" if self.opening else self.chapter,
+                  align="R", new_x="LMARGIN", new_y="NEXT")
+        self.set_draw_color(*RULE)
+        self.set_line_width(0.2)
+        self.line(18, 16.4, 192, 16.4)
+        self.set_y(22)
 
     def footer(self):
-        self.set_y(-12)
-        self.set_font("DV", "", 8)
+        if self.page_no() <= 1:      # the cover carries no furniture; the flag
+            return                   # is already back on when this page closes
+        self.set_draw_color(*RULE)
+        self.set_line_width(0.2)
+        self.line(18, self.h - 15, 192, self.h - 15)
+        self.set_y(-13)
+        self.set_font("DV", "", 7.6)
         self.set_text_color(*GREY)
-        self.cell(0, 8, self.title_txt, align="L")
-        self.cell(0, 8, f"{self.page_no()}", align="R", new_x="LMARGIN", new_y="TOP")
+        self.cell(HALF, 5, f"{self.title_txt} · Version {VERSION}", align="L")
+        self.cell(HALF, 5, f"{self.page_no()} / {{nb}}", align="R",
+                  new_x="LMARGIN", new_y="TOP")
 
 
 def new_pdf(title):
@@ -37,39 +73,105 @@ def new_pdf(title):
     pdf.add_font("DV", "B", FONTB)
     pdf.add_font("DV", "I", FONTI)
     pdf.add_font("MN", "", MONO)
-    pdf.set_margins(18, 18, 18)
-    pdf.set_auto_page_break(True, margin=16)
+    pdf.set_margins(18, 22, 18)          # top margin clears the running head
+    pdf.set_auto_page_break(True, margin=20)
+    pdf.alias_nb_pages()                 # "{nb}" in the footer = total pages
+    pdf.set_title("TM-V71 Remote — " + title)
+    pdf.set_author("CQ-DJ0SH")
+    pdf.set_creator("gen_docs.py (fpdf2)")
     return pdf
 
 
 def cover(pdf, title, subtitle, lang):
+    """Title page: an accent band, the wordmark, what the thing is, and when
+    this copy was generated. No running head — a cover carries no furniture."""
+    pdf.running_head = False
     pdf.add_page()
-    pdf.ln(40)
-    img = os.path.join(HERE, "preview.png")
-    pdf.set_font("DV", "B", 30)
+    pdf.set_fill_color(*ACCENT)
+    pdf.rect(0, 0, 210, 6, style="F")                 # band across the head
+    pdf.ln(34)
+    pdf.set_font("DV", "B", 32)
     pdf.set_text_color(*ACCENT)
-    pdf.cell(0, 16, "TM-V71 Remote", align="C", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_font("DV", "", 14)
+    pdf.cell(0, 17, "TM-V71 Remote", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_draw_color(*ACCENT)
+    pdf.set_line_width(0.5)
+    pdf.line(78, pdf.get_y() + 1, 132, pdf.get_y() + 1)
+    pdf.ln(7)
+    pdf.set_font("DV", "", 15)
     pdf.set_text_color(*DARK)
-    pdf.cell(0, 10, title, align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 9, title, align="C", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("DV", "", 11)
     pdf.set_text_color(*GREY)
-    pdf.cell(0, 8, subtitle, align="C", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 8, f"Version {VERSION}", align="C", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(8)
+    pdf.cell(0, 7, subtitle, align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(6)
+    img = os.path.join(HERE, "preview.png")
     if os.path.exists(img):
         try:
             pdf.image(img, x=33, w=144)
         except Exception:
             pass
-    pdf.ln(6)
-    pdf.set_font("DV", "I", 9)
+    pdf.ln(7)
+    pdf.set_font("DV", "I", 9.5)
     pdf.set_text_color(*GREY)
     note = ("Kenwood TM-V71(A/E) web remote + WebRTC audio + HackRF panadapter, "
             "for a Raspberry Pi.") if lang == "en" else \
            ("Web-Fernsteuerung für Kenwood TM-V71(A/E) mit WebRTC-Audio und "
             "HackRF-Panadapter, für den Raspberry Pi.")
     pdf.multi_cell(0, 5, note, align="C")
+    # foot of the cover: version, date, source
+    pdf.set_y(-32)
+    pdf.set_draw_color(*RULE)
+    pdf.set_line_width(0.2)
+    pdf.line(60, pdf.get_y(), 150, pdf.get_y())
+    pdf.ln(3)
+    pdf.set_font("DV", "", 9)
+    pdf.set_text_color(*DARK)
+    stamp = ("Version %s · %s" % (VERSION, time.strftime("%d.%m.%Y"))) if lang == "de" \
+            else ("Version %s · %s" % (VERSION, time.strftime("%Y-%m-%d")))
+    pdf.cell(0, 5, stamp, align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("DV", "", 8)
+    pdf.set_text_color(*GREY)
+    pdf.cell(0, 4, "github.com/CQ-DJ0SH/tmv71-remote", align="C",
+             new_x="LMARGIN", new_y="NEXT")
+
+
+def toc(pdf, outline, lang):
+    """Contents, rendered into the placeholder reserved after the cover.
+
+    Chapters in dark, sections indented and grey, page numbers flush right with
+    a dotted leader — the reader can find a chapter without paging through."""
+    pdf.set_font("DV", "B", 17)
+    pdf.set_text_color(*ACCENT)
+    pdf.cell(0, 11, "Inhalt" if lang == "de" else "Contents",
+             new_x="LMARGIN", new_y="NEXT")
+    pdf.set_draw_color(*ACCENT)
+    pdf.set_line_width(0.4)
+    y = pdf.get_y() + 1
+    pdf.line(18, y, 192, y)
+    pdf.ln(6)
+    for e in outline:
+        chapter = e.level == 0
+        pdf.set_font("DV", "B" if chapter else "", 10.5 if chapter else 9.5)
+        pdf.set_text_color(*(DARK if chapter else GREY))
+        if chapter:
+            pdf.ln(1.6)
+        x0 = 18 if chapter else 24
+        pdf.set_x(x0)
+        label = e.name
+        num = str(e.page_number)
+        wl = pdf.get_string_width(label)
+        wn = pdf.get_string_width(num)
+        pdf.cell(wl + 1, 5.4, label)
+        # dotted leader, drawn rather than typed: dots that always land on the
+        # same baseline and never wrap
+        pdf.set_draw_color(*RULE)
+        pdf.set_line_width(0.2)
+        pdf.set_dash_pattern(dash=0.4, gap=1.1)
+        ly = pdf.get_y() + 3.6
+        pdf.line(x0 + wl + 2, ly, 192 - wn - 2, ly)
+        pdf.set_dash_pattern()
+        pdf.set_x(192 - wn - 1)
+        pdf.cell(wn + 1, 5.4, num, align="R", new_x="LMARGIN", new_y="NEXT")
 
 
 # ---------------------------------------------------------------------------
@@ -351,21 +453,52 @@ DIAGRAMS = {"system": draw_system, "audio": draw_audio}
 def render(pdf, blocks):
     for kind, *rest in blocks:
         if kind == "h1":
-            pdf.add_page()
-            pdf.set_font("DV", "B", 18)
+            # both are set BEFORE the page break: header() runs while the new
+            # page is created, so it would otherwise print the previous chapter
+            pdf.chapter = rest[0]
+            pdf.opening = True
+            # a chapter starts on its own page — unless the current one is still
+            # untouched, which is the case for the page the ToC placeholder left
+            if pdf.get_y() > pdf.t_margin + 0.5:
+                pdf.add_page()
+            pdf.opening = False
+            pdf.start_section(rest[0], 0)     # PDF outline + table of contents
+            # the chapter number is set in the accent colour and the title in
+            # dark, so the eye finds the number when leafing through
+            num, _, name = rest[0].partition("  ")
+            pdf.set_font("DV", "B", 22)
             pdf.set_text_color(*ACCENT)
-            pdf.multi_cell(0, 9, rest[0])
-            pdf.set_draw_color(*ACCENT)
-            pdf.set_line_width(0.4)
-            y = pdf.get_y() + 1
-            pdf.line(18, y, 192, y)
-            pdf.ln(4)
-        elif kind == "h2":
-            pdf.ln(2)
-            pdf.set_font("DV", "B", 13)
+            w = pdf.get_string_width(num + " ")
+            pdf.cell(w, 11, num + " ")
             pdf.set_text_color(*DARK)
-            pdf.multi_cell(0, 7, rest[0])
-            pdf.ln(1)
+            # left-aligned, and continuation lines hang under the title rather
+            # than under the number
+            pdf.set_left_margin(18 + w)
+            pdf.multi_cell(0, 11, name, align="L")
+            pdf.set_left_margin(18)
+            pdf.set_draw_color(*ACCENT)
+            pdf.set_line_width(0.5)
+            y = pdf.get_y() + 1.5
+            pdf.line(18, y, 192, y)
+            pdf.ln(6)
+        elif kind == "h2":
+            pdf.ln(3)
+            # Keep the heading with what follows. Without this a section title
+            # can land at the very bottom of a page — and worse, its accent tick
+            # is drawn before the text flows, so the tick stayed behind on the
+            # previous page while the heading moved to the next one.
+            if pdf.get_y() > pdf.h - pdf.b_margin - 24:
+                pdf.add_page()
+            pdf.start_section(rest[0], 1)
+            # a short accent tick marks the section without shouting
+            y = pdf.get_y()
+            pdf.set_fill_color(*ACCENT)
+            pdf.rect(18, y + 1.4, 1.6, 4.6, style="F")
+            pdf.set_x(22)
+            pdf.set_font("DV", "B", 12.5)
+            pdf.set_text_color(*DARK)
+            pdf.multi_cell(0, 7, rest[0], align="L")
+            pdf.ln(1.5)
         elif kind == "p":
             pdf.set_font("DV", "", 10.5)
             pdf.set_text_color(*DARK)
@@ -1474,6 +1607,13 @@ DE = [
 def build(path, title, subtitle, lang, blocks):
     pdf = new_pdf(title)
     cover(pdf, title, subtitle, lang)
+    pdf.running_head = True
+    pdf.chapter = ""          # the contents page needs no caption either
+    pdf.add_page()
+    # The placeholder renders onto the CURRENT page and then adds `pages` more,
+    # so after this call we already stand on a fresh page — chapter 1 must not
+    # open another one (see the h1 branch in render()).
+    pdf.insert_toc_placeholder(lambda p, outline: toc(p, outline, lang), pages=1)
     render(pdf, blocks)
     pdf.output(path)
     print("wrote", path)
