@@ -3086,8 +3086,223 @@ function sqMuteCheck(st) {
   const band = st.bands.find(b => b.band === ab);
   const busy = !!(band && band.squelch_open);
   if (sqMuted && sqPrevBusy && !busy) { sqSetMute(false); threeToneChime(); }
+  overEdge(busy);                      // card timer rides the same signal
   sqPrevBusy = busy;                   // tracked even while not muted, so arming
 }                                      // mid-transmission already sees the edge
+
+// ---- over timer -----------------------------------------------------------
+// How long the station transmitted, taken from the audio band's BUSY signal.
+// Timed from the RISING edge, not from the moment the callsign was recognised:
+// recognition only happens once the call has been spoken, several seconds into
+// the over. The card that is currently marked carries the reading.
+//
+// The total belongs to the CARD, not to the clock: every card keeps its own
+// figure in data-dur-ms, and the running clock only adds to it. Switching focus
+// or stopping and starting again therefore never discards what was timed — the
+// count simply continues where that card left off.
+let overAcc = 0;                     // ms already counted for overCard
+let overStart = 0;                   // start of the running stretch, 0 = stopped
+let overBusy = false, overCard = null;
+// The clock runs exactly while overStart is set — one condition, so a focus
+// switch can stop it even though the carrier is still up.
+function overRunning() { return overStart !== 0; }
+function overElapsed() {
+  return overAcc + (overStart ? Date.now() - overStart : 0);
+}
+function overStop() {                // fold the running stretch into the total
+  if (!overStart) return;            // not running -> leave the card untouched
+  overAcc += Date.now() - overStart;
+  overStart = 0;
+  overSave();
+}
+// The clock face is inline SVG, not a glyph: the self-hosted fonts carry no
+// ⏱/⌚, and a missing glyph would show as a blank box or nothing at all.
+const CLOCK_SVG =
+  '<svg class="ac-clk" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+  + ' stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"'
+  + ' aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+const durSet = (card, ms) => {
+  const v = card?.querySelector(".ac-dv");
+  if (v) v.textContent = overFmt(ms);
+};
+function overSave() {                // persist the total on the card itself
+  if (!overCard) return;
+  overCard.dataset.durMs = String(Math.round(overAcc));
+  durSet(overCard, overAcc);
+  overCard.querySelector(".ac-dur")?.classList.remove("live");
+  overTotalPaint();
+}
+// Sum of every card's talk time. The focused card's stored value is stale while
+// its clock runs, so that one is taken live instead of from the dataset.
+function overTotalPaint() {
+  const el = $("#asr-total");
+  if (!el) return;
+  let sum = 0;
+  document.querySelectorAll("#asr-log .asr-card").forEach(c => {
+    if (isMod(c)) return;                      // moderator counts nowhere
+    sum += (c === overCard) ? overElapsed() : (Number(c.dataset.durMs) || 0);
+  });
+  el.textContent = "Σ " + overFmt(sum);
+}
+// Point the clock at another card: bank what the old one had, then pick up that
+// card's own total so a start continues it instead of restarting at zero.
+// The focused card is gone (deleted, or the tray was cleared): drop the running
+// stretch on the floor rather than banking it into a detached element.
+function overForget() {
+  overStart = 0; overAcc = 0; overCard = null;
+  asrModSync();
+}
+function overFocus(card) {
+  if (overCard === card) return;
+  overStop();
+  overCard = card;
+  overAcc = Number(card?.dataset.durMs) || 0;
+  asrModSync();                      // MOD in the head reflects the focused card
+}
+function overEdge(busy) {
+  if (busy && !overBusy) overStart = Date.now();     // carrier up -> clock runs
+  else if (!busy && overBusy) overStop();
+  overBusy = busy;
+  overPaint();
+}
+// Always hh:mm:ss — a format that changes length (7s -> 12s -> 1:23) resizes the
+// button on almost every tick; with tabular figures this one never moves.
+function overFmt(ms) {
+  const t = Math.max(0, Math.round(ms / 1000));
+  const p2 = n => String(n).padStart(2, "0");
+  return `${p2(Math.floor(t / 3600))}:${p2(Math.floor(t / 60) % 60)}:${p2(t % 60)}`;
+}
+function overPaint() {
+  // Only a RUNNING clock writes to a card. Otherwise switching the focus would
+  // stamp a stale reading over the duration the newly picked card already has.
+  if (!overRunning() || !overCard) return;
+  const el = overCard.querySelector(".ac-dur");
+  if (!el) return;
+  durSet(overCard, overElapsed());
+  el.classList.add("live");
+  overTotalPaint();
+}
+// The status push only arrives on a change, so the running value needs its own
+// tick; it costs nothing once the clock is stopped.
+setInterval(() => { if (overRunning()) overPaint(); }, 500);
+
+// ---- talk-time evaluation -------------------------------------------------
+// STATS in the panel head opens a ranking of every card in the tray by
+// accumulated talk time. The focused card's stored value is stale while its
+// clock runs, so that one is read live — the same rule overTotalPaint() uses.
+function overStatsRows() {
+  const rows = [];
+  document.querySelectorAll("#asr-log .asr-card").forEach(c => {
+    rows.push({
+      call: c.dataset.call || c.querySelector(".ac-call")?.textContent || "",
+      name: c.querySelector(".ac-name")?.textContent || "",
+      ms: (c === overCard) ? overElapsed() : (Number(c.dataset.durMs) || 0),
+      mod: isMod(c),
+    });
+  });
+  // longest over first; ties (typically the untimed cards) fall back to the
+  // call, which keeps the tail of the list still instead of in tray order
+  rows.sort((a, b) => b.ms - a.ms || a.call.localeCompare(b.call));
+  return rows;
+}
+
+function overStatsPaint() {
+  const body = $("#asr-stats-rows");
+  if (!body) return;
+  const rows = overStatsRows();
+  // the moderator keeps its own row, but below the ranking and out of every
+  // figure: it neither sets the bar scale nor adds to the sum
+  const rank = rows.filter(r => !r.mod);
+  const mods = rows.filter(r => r.mod);
+  const max = rank.length ? rank[0].ms : 0;
+  const total = rank.reduce((s, r) => s + r.ms, 0);
+  const empty = $("#asr-stats-empty");
+  if (empty) empty.hidden = rows.length > 0;
+  // an empty tray would otherwise leave a bare column header standing
+  const tab = $("#asr-stats-dlg .stats-tab");
+  if (tab) tab.hidden = rows.length === 0;
+  body.textContent = "";
+  const td = (cls, txt) => {
+    const c = document.createElement("td");
+    c.className = cls;
+    c.textContent = txt;
+    return c;
+  };
+  const addRow = (r, pos) => {
+    const tr = document.createElement("tr");
+    if (r.mod) tr.className = "st-mod";
+    else if (!r.ms) tr.className = "st-zero";        // heard, but never timed
+    const bar = document.createElement("td");
+    bar.className = "st-bar";
+    if (r.mod) {
+      bar.className = "st-bar st-note";
+      bar.textContent = "nicht gewertet";
+    } else {
+      // The bar is scaled against the LONGEST over, not against the sum: with
+      // one dominant station every other bar would collapse to a sliver.
+      const fill = document.createElement("i");
+      fill.style.width = (max > 0 ? (r.ms / max) * 100 : 0).toFixed(1) + "%";
+      bar.appendChild(fill);
+    }
+    tr.append(td("st-n", pos), td("st-call", callDisp(r.call)),
+              td("st-name", r.name), bar, td("st-t", overFmt(r.ms)));
+    body.appendChild(tr);
+  };
+  rank.forEach((r, i) => addRow(r, i + 1));
+  mods.forEach(r => addRow(r, "M"));
+  const sum = $("#asr-stats-sum"); if (sum) sum.textContent = overFmt(total);
+  const cnt = $("#asr-stats-cnt");
+  if (cnt) cnt.textContent = (rank.length === 1 ? "1 Station" : rank.length + " Stationen")
+    + (mods.length ? " · " + mods.length + " Moderator" : "");
+}
+
+let statsTimer = 0;
+const statsKey = ev => {
+  if (ev.key === "Escape") { ev.preventDefault(); overStatsClose(); }
+};
+function overStatsOpen() {
+  const m = $("#asr-stats-dlg");
+  if (!m) return;
+  overStatsPaint();
+  m.classList.add("open");
+  // keep the list ticking while the carrier is up, so the dialog can stay open
+  // through an over instead of having to be reopened for a current figure
+  clearInterval(statsTimer);
+  statsTimer = setInterval(() => { if (overRunning()) overStatsPaint(); }, 1000);
+  document.addEventListener("keydown", statsKey);
+  $("#asr-stats-close")?.focus();
+}
+function overStatsClose() {
+  $("#asr-stats-dlg")?.classList.remove("open");
+  clearInterval(statsTimer);
+  statsTimer = 0;
+  document.removeEventListener("keydown", statsKey);
+}
+$("#asr-stats")?.addEventListener("click", overStatsOpen);
+$("#asr-stats-close")?.addEventListener("click", overStatsClose);
+$("#asr-stats-dlg")?.addEventListener("mousedown", ev => {
+  if (ev.target.id === "asr-stats-dlg") overStatsClose();
+});
+// plain-text copy of the ranking, for pasting into a net log or a mail
+$("#asr-stats-copy")?.addEventListener("click", async () => {
+  const rows = overStatsRows();
+  if (!rows.length) { toast("Keine Kontakte zum Kopieren", "err"); return; }
+  const line = (pos, r, tail = "") =>
+    `${String(pos).padStart(2)}. ${r.call.padEnd(8)} ${overFmt(r.ms)}`
+    + (r.name ? "  " + r.name : "") + tail;
+  const rank = rows.filter(r => !r.mod);
+  const txt = rank.map((r, i) => line(i + 1, r)).join("\n")
+    + "\n" + " ".repeat(13)            // line the sum up under the times
+    + overFmt(rank.reduce((s, r) => s + r.ms, 0)) + "  (Summe)"
+    + rows.filter(r => r.mod)
+        .map(r => "\n" + line("M", r, "  (Moderator, nicht gewertet)")).join("");
+  try {
+    await navigator.clipboard.writeText(txt);
+    toast("Auswertung kopiert", "ok");
+  } catch { toast("Zwischenablage nicht verfügbar", "err"); }
+});
+
+
 // Every state change is confirmed by the chime — switching on, switching off by
 // hand, and the automatic release (sqMuteCheck). The click doubles as the user
 // gesture browsers require before an AudioContext may start.
@@ -3103,6 +3318,51 @@ $("#sq-mute")?.addEventListener("click", () => {
 // band, what Vosk actually heard, the rejected N-best candidates) lives in the
 // hover tooltip so the card itself stays readable.
 const asrCards = new Map();                          // callsign -> card element
+
+// ---- moderator flag -------------------------------------------------------
+// Net control holds the frequency for most of a round, so counting its overs
+// would swamp the ranking. A flagged card keeps its own timer running and
+// visible, it is only left out of the sums. The flag lives in localStorage
+// rather than on the server: it belongs to whoever is watching this round, and
+// it has to survive the history rebuild after a reload, which recreates every
+// card object from scratch.
+const MOD_KEY = "tmv71.asrMods";
+let asrMods = new Set();
+try { asrMods = new Set(JSON.parse(localStorage.getItem(MOD_KEY) || "[]")); } catch {}
+const isMod = card => card?.dataset.mod === "1";
+const asrModSave = () => {
+  try { localStorage.setItem(MOD_KEY, JSON.stringify([...asrMods])); } catch {}
+};
+function asrSetMod(card, on) {
+  if (!card) return;
+  const call = card.dataset.call || "";
+  card.classList.toggle("mod", on);
+  card.dataset.mod = on ? "1" : "";
+  const had = asrMods.has(call);
+  if (on) asrMods.add(call); else asrMods.delete(call);
+  if (had !== on) asrModSave();      // building a card must not rewrite the list
+  asrModSync();
+  overTotalPaint();
+  if (statsTimer) overStatsPaint();          // ranking is open -> reshuffle now
+}
+// MOD in the panel head acts on the card the talk timer is pointed at — the one
+// clicked last, or the station currently being heard. Keeping the button out of
+// the card leaves the tight bottom row (time · duration · count · log) alone.
+function asrModSync() {
+  const b = $("#asr-mod");
+  if (!b) return;
+  const call = overCard?.dataset.call || "";
+  const on = isMod(overCard);
+  b.disabled = !overCard;
+  b.classList.toggle("on", on);
+  b.setAttribute("aria-pressed", on ? "true" : "false");
+  b.title = !call ? "Karte anklicken, dann als Moderator kennzeichnen"
+    : on ? call + " ist Moderator — Redezeit wird nicht gewertet (Klick hebt auf)"
+         : call + " als Moderator kennzeichnen — Redezeit wird nicht gewertet";
+}
+$("#asr-mod")?.addEventListener("click", () => {
+  if (overCard) asrSetMod(overCard, !isMod(overCard));
+});
 
 // Avatar: derived from the CALLSIGN, which is what tells two contacts apart.
 // The letters after the region digit are the distinguishing part (DL7AF -> AF),
@@ -3125,6 +3385,7 @@ function asrSetKlass(card, klass) {
 function asrCardBuild(e) {
   const card = document.createElement("div");
   card.className = "asr-card";
+  card.dataset.call = e.call;      // real value: .ac-call is slashed for display
   const av = asrAvatar(e.call);
   const mk = (tag, cls, txt) => {
     const n = document.createElement(tag); n.className = cls;
@@ -3144,7 +3405,20 @@ function asrCardBuild(e) {
   card.appendChild(mk("div", "ac-name", e.name || ""));
   card.appendChild(mk("div", "ac-city", e.city || ""));
   const foot = mk("div", "ac-foot");
-  foot.append(mk("span", "ac-date"), mk("span", "ac-time"));
+  // the duration doubles as the start/stop control for this card's talk timer —
+  // a separate glyph button would clash with the ▶ that logs to Wavelog
+  const dur = mk("button", "ac-dur");
+  dur.innerHTML = CLOCK_SVG + '<span class="ac-dv">00:00:00</span>';
+  dur.type = "button";
+  dur.title = "Redezeit dieser Station starten / stoppen";
+  dur.addEventListener("click", ev => {
+    ev.stopPropagation();
+    overFocus(card);
+    if (overRunning()) overStop();
+    else overStart = Date.now();     // resumes this card's own total
+    overPaint();
+  });
+  foot.append(mk("span", "ac-time"), dur);
   card.appendChild(foot);
   // log this contact to Wavelog — same path as the title-bar LOG button, but
   // with the name from the BNetzA list pre-filled
@@ -3160,11 +3434,21 @@ function asrCardBuild(e) {
     log.disabled = false;
     card.classList.toggle("logged", !!ok);           // marks it as already logged
   });
-  // bottom row: date · time … [count] [log]; .ac-count carries margin-left:auto,
+  // bottom row: time … [count] [log]; .ac-count carries margin-left:auto,
   // so it and the button that follows it are pushed to the right edge
   foot.append(mk("span", "ac-count"), log);
+  asrSetMod(card, asrMods.has(e.call));              // restore a remembered flag
   // remove a misrecognised contact — server-side, so it cannot come back from
   // the history when the panel is reopened
+  // clicking the card itself moves the "current" mark — and with it the over
+  // timer — onto this contact, for when the wrong one is marked or the ASR
+  // attributed the over to the previous station
+  card.addEventListener("click", () => {
+    const box = $("#asr-log");
+    box?.querySelectorAll(".asr-card.marked").forEach(c => c.classList.remove("marked"));
+    card.classList.add("marked");
+    overFocus(card);            // deliberately no repaint — see overPaint()
+  });
   const del = mk("button", "ac-del", "✕");
   del.type = "button";
   del.title = "Falsch erkannt — Karte entfernen";
@@ -3239,6 +3523,7 @@ function asrFillSlots() {
   }
   for (let i = have - 1; i >= want - cards; i--) slots[i].remove();
   box.classList.toggle("no-cards", cards === 0);
+  overTotalPaint();                  // cards added, dropped or cleared
 }
 addEventListener("resize", asrFillSlots);
 // the debug panel starts collapsed (clientHeight 0), so a plain resize listener
@@ -3254,6 +3539,8 @@ function asrCardDrop(call) {
   if (!card) return;
   asrCards.delete(call);
   card.remove();
+  if (asrMods.delete(call)) asrModSave();      // the flag goes with the card
+  if (overCard === card) overForget();         // do not keep timing a dead card
   asrTipHide();
   asrFillSlots();
 }
@@ -3284,7 +3571,6 @@ function asrLog(e, fresh = true) {
   if (e.klass) asrSetKlass(card, e.klass);
   const n = Number(card.dataset.count) + 1;
   card.dataset.count = String(n);
-  card.querySelector(".ac-date").textContent = e.date || "";
   card.querySelector(".ac-time").textContent = e.time || "";
   const cnt = card.querySelector(".ac-count");
   cnt.textContent = n > 1 ? "×" + n : "";              // repeat marker
@@ -3300,6 +3586,8 @@ function asrLog(e, fresh = true) {
     card.classList.remove("flash");
     void card.offsetWidth;                             // restart the animation
     card.classList.add("flash");
+    overFocus(card);                                   // this over's duration
+    overPaint();
     if (box.scrollTop < 24) box.scrollTop = 0;
   }
   while (box.childElementCount > 120) {                // drop the oldest card
@@ -3341,7 +3629,7 @@ $("#asr-manual-add")?.addEventListener("click", asrManualAdd);
 
 $("#asr-log-clear")?.addEventListener("click", () => {
   const box = $("#asr-log"); if (box) box.textContent = "";
-  asrCards.clear(); asrTipHide(); asrFillSlots();
+  asrCards.clear(); asrTipHide(); overForget(); asrFillSlots();
 });
 
 function connectCallsignWS() {
@@ -3358,8 +3646,11 @@ function connectCallsignWS() {
       // history arrives oldest-first; each entry is inserted at the front, so
       // the newest ends up on top and repeat counts add up on the way
       (m.lines || []).forEach(l => asrLog(l, false));
-      // mark the most recent contact of the restored history
+      // mark the most recent contact of the restored history, and point the
+      // timer (and with it MOD) at it, as a live sighting would
       box?.firstElementChild?.classList.add("marked");
+      overFocus(box?.firstElementChild?.classList.contains("asr-card")
+                ? box.firstElementChild : null);
       asrFillSlots();
       return;
     }
@@ -3439,7 +3730,14 @@ function bindRecorder() {
       if (b.size < 64) { toast("Nothing recorded yet", "err"); return; }
       const url = URL.createObjectURL(b);
       const a = document.createElement("a");
-      a.href = url; a.download = "tmv71-rx-recording.wav";
+      a.href = url;
+      // stamp the moment of download — the buffer is a sliding window that ends
+      // "now", so this is the recording's end, and it keeps successive downloads
+      // from overwriting each other in the download folder
+      const d = new Date(), p2 = n => String(n).padStart(2, "0");
+      a.download = `tmv71-rx-${d.getFullYear()}-${p2(d.getMonth() + 1)}-`
+                 + `${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}`
+                 + `${p2(d.getSeconds())}.wav`;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 4000);
     } catch (e) { toast("Download: " + e.message, "err"); }

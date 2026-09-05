@@ -458,6 +458,30 @@ body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}}
 /* the LOG button belongs to the field, so it sits closer than the CLEAR button,
    which is a separate control (.scan-clear brings margin-left:6px) */
 #asr-manual-add{margin-left:3px}
+/* talk-time readout + manual start; lit while the clock is running */
+/* running total of all talk timers, in the panel head */
+/* MOD marks the focused card as net control; lit while that card is flagged.
+   Neutral panel grey, like the licence chips — not a band colour. */
+#asr-mod.on{color:#dbe7ef; border-color:#9fb4c2; background:#ffffff12}
+body.theme-light #asr-mod.on{color:#1b2731; border-color:#7d8f9c; background:#0000000a}
+#asr-mod:disabled{opacity:.4; cursor:default}
+/* CLEAR ALL wipes the whole tray — dark red says so before it is pressed. The
+   id beats the panel's neutral .scan-clear:hover, so the hover brightens into
+   the TX red used for the ✕ on the cards instead of falling back to grey. */
+#asr-log-clear{color:#b0342a}
+@media (hover:hover){
+  #asr-log-clear:hover{color:#ff3b30; border-color:#ff3b30}
+}
+body.theme-light #asr-log-clear{color:#9c2018}
+@media (hover:hover){
+  body.theme-light #asr-log-clear:hover{color:#d32f2f; border-color:#d32f2f}
+}
+.asr-total{
+  font-family:var(--font-mono); font-size:11px; letter-spacing:.04em;
+  /* the running total is a reading, not a label — brighter than the dim head
+     furniture around it so it can be taken in at a glance */
+  color:var(--text); font-variant-numeric:tabular-nums; white-space:nowrap;
+}
 .asr-manual::placeholder{color:var(--text-dim); opacity:.55}
 /* Highlights inside this panel stay in its own neutral family (the same greys
    the licence-class chips use). .scan-clear brings an amber hover from the scan
@@ -564,11 +588,30 @@ body.theme-light .asr-card .ac-klass .ack.on{color:#1b2731}
 /* margin-top:auto pins the bottom row to the bottom edge of the (fixed-height)
    card, so it stays put on contacts with no name or town, where .ac-name /
    .ac-city collapse to display:none and would otherwise pull it up */
+/* time · duration · count · log fit into 146px of card width with very little
+   to spare, so: never wrap, and let the wall-clock time (the least important
+   item — it is in the hover tooltip too) give way if a font renders wider. */
 .asr-card .ac-foot{
-  display:flex; align-items:center; gap:5px; margin-top:auto;
+  display:flex; align-items:center; gap:5px; margin-top:auto; flex-wrap:nowrap;
   font-family:var(--font-mono); font-size:9px; color:var(--text-dim); opacity:.75;
 }
-.asr-card .ac-count{margin-left:auto; font-weight:700; color:#d9b84a; opacity:1}
+.asr-card .ac-time{flex:0 1 auto; min-width:0; white-space:nowrap; overflow:hidden}
+/* over duration — also the start/stop button for this card's talk timer */
+.asr-card .ac-dur{
+  flex:0 0 auto; display:inline-flex; align-items:center; gap:3px;
+  font-variant-numeric:tabular-nums;
+  font-family:inherit; font-size:inherit; color:inherit;
+  background:transparent; border:1px solid transparent; border-radius:4px;
+  padding:0 2px; cursor:pointer; transition:.12s;
+}
+.asr-card .ac-clk{width:9px; height:9px; flex:0 0 auto; opacity:.8}
+@media (hover:hover){
+  .asr-card .ac-dur:hover{border-color:currentColor}
+}
+.asr-card .ac-dur.live{color:#3ec98a; opacity:1}
+body.theme-light .asr-card .ac-dur.live{color:#137a4a}
+.asr-card .ac-count{margin-left:auto; flex:0 0 auto; padding-left:2px;
+  font-weight:700; color:#d9b84a; opacity:1}
 body.theme-light .asr-card .ac-count{color:#8a6510}
 
 /* the newest / most recently heard contact stays marked until another takes over */
@@ -599,6 +642,11 @@ body.theme-light .asr-card .ac-count{color:#8a6510}
 .asr-card:hover .ac-del, .asr-card .ac-del:focus-visible{opacity:.8}
 @media (hover:hover){
 .asr-card .ac-del:hover{color:#ff3b30; border-color:#ff3b30; opacity:1}}
+
+/* A card flagged as moderator wears a ring on its avatar — the toggle itself
+   sits in the panel head (MOD), because the card's bottom row has no room. */
+.asr-card.mod .ac-avatar{box-shadow:0 0 0 2px #9fb4c2aa}
+body.theme-light .asr-card.mod .ac-avatar{box-shadow:0 0 0 2px #7d8f9caa}
 
 /* the most recently heard contact -- marked in the TX red used elsewhere for
    "live right now", so it reads as activity rather than as a status colour */
@@ -2002,6 +2050,62 @@ body.theme-light .mixer-row .mx-mute input{color-scheme:light}
    when triggered from inside them (memory delete, update) */
 #confirm-dialog{z-index:60}
 .confirm-card{width:min(420px,94vw)}
+
+/* ---------------- ASR talk-time evaluation (STATS) ---------------- */
+/* Ranking of the contact cards by accumulated over time. Wider than the
+   confirm dialog because a bar next to call + name needs the room. */
+.stats-card{width:min(600px,94vw)}
+.stats-tab{width:100%; border-collapse:collapse; table-layout:fixed}
+.stats-tab th{
+  font-family:var(--font-ui); font-size:9px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--text-dim); text-align:left; font-weight:400;
+  padding:0 8px 6px; border-bottom:1px solid var(--edge);
+  /* the card itself is the scroll container (max-height:90vh), so the header
+     rides along with a long list instead of scrolling out of sight */
+  position:sticky; top:0; z-index:1; background:var(--panel-2);
+}
+.stats-tab td{padding:5px 8px; border-bottom:1px solid var(--edge); font-size:12px}
+.stats-tab tr:last-child td{border-bottom:none}
+.stats-tab .st-n{width:26px; text-align:right; padding-right:4px;
+  font-family:var(--font-mono); font-size:10px; color:var(--text-dim)}
+.stats-tab .st-call{width:86px; font-family:var(--font-mono); font-weight:600;
+  letter-spacing:.06em; color:var(--text)}
+.stats-tab .st-name{color:var(--text-dim); overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap}
+.stats-tab .st-t{width:74px; text-align:right; font-family:var(--font-mono);
+  font-variant-numeric:tabular-nums; color:var(--text)}
+/* the bar cell is a track; the <i> inside is the fill */
+.stats-tab td.st-bar{width:34%; padding-right:12px}
+.stats-tab td.st-bar i{
+  display:block; height:8px; min-width:2px; border-radius:4px;
+  background:linear-gradient(90deg,#5d7180,#9fb4c2);
+  box-shadow:0 0 8px -3px #9fb4c2;
+  transition:width .3s ease;
+}
+/* leader gets the full accent, the rest stay quieter */
+.stats-tab tbody tr:first-child td.st-bar i{background:linear-gradient(90deg,#7d94a4,#cfe0ea)}
+.stats-tab tbody tr.st-zero{opacity:.45}
+/* moderator: listed for completeness, below the ranking, without a bar and
+   without a rank number — it is in no sum either (see overStatsPaint) */
+.stats-tab tbody tr.st-mod{opacity:.6}
+.stats-tab tbody tr:not(.st-mod) + tr.st-mod td{border-top:1px dashed var(--edge-hi)}
+.stats-tab tbody tr.st-mod .st-n{color:var(--text); font-weight:700}
+.stats-tab td.st-note{
+  font-family:var(--font-ui); font-size:9px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--text-dim);
+}
+.stats-tab tbody tr.st-zero td.st-bar i{background:var(--edge-hi); box-shadow:none}
+.stats-empty{font-family:var(--font-ui); font-size:12px; color:var(--text-dim);
+  padding:16px 4px; text-align:center}
+.stats-foot{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  margin-top:10px; font-family:var(--font-mono); font-size:11px; color:var(--text-dim);
+}
+.stats-foot .stats-sum b{color:var(--text); font-weight:600;
+  font-variant-numeric:tabular-nums}
+body.theme-light .stats-tab td.st-bar i{background:linear-gradient(90deg,#7c95a3,#435b69)}
+body.theme-light .stats-tab tbody tr:first-child td.st-bar i{
+  background:linear-gradient(90deg,#5a7482,#22323c)}
 .confirm-msg{font-family:var(--font-ui); font-size:13px; line-height:1.5; color:var(--text)}
 #mem-new{color:var(--amber)!important}
 @media (hover:hover){

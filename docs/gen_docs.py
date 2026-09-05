@@ -180,6 +180,7 @@ API_DIGI = (
     "POST /api/digi/decode-recording  decode the RX buffer\n"
     "WS   /ws/digi               decoded text stream\n"
     "GET/POST /api/asr/config    callsign recognition (Vosk)\n"
+    "POST /api/asr/log           add a callsign by hand\n"
     "DELETE /api/asr/log/{call}  drop a misrecognised contact\n"
     "WS   /ws/callsign           recognised-callsign events\n"
     "GET  /api/selcall           5-tone status\n"
@@ -377,6 +378,10 @@ EN = [
         "because the channel is quiet: arming it on an idle channel keeps the "
         "audio muted until the end of the next transmission, rather than "
         "un-muting again on the next status update.",
+        "DROP also lifts after three seconds without speech, even while BUSY "
+        "is still up — the permanent carrier of a repeater would otherwise "
+        "keep the audio muted indefinitely. The threshold is on the AF level, "
+        "so a quiet carrier counts as silence while an over does not.",
         "Muting is done in the browser, on the audio element. The S-meter, the "
         "raw RX recorder and the callsign recognition keep receiving the signal — "
         "only what you hear is silenced.",
@@ -393,7 +398,8 @@ EN = [
           "without keying, records while on and replays your audio over RX when "
           "switched off; RX is muted during the test), AGC (automatic TX level), "
           "and a small recorder — ● REC / ▶ PLAY plus a WAV download of the raw, "
-          "un-squelched RX feed (up to 60 min; e.g. to build ASR training data). "
+          "un-squelched RX feed (up to 60 min; e.g. to build ASR training data; the "
+          "downloaded file is named with the date and time it was saved). "
           "TX timing (buffer / trail) and the USB card mixer are in Settings > "
           "Audio. The link auto-reconnects after a network glitch and is restored "
           "on the next launch."),
@@ -475,7 +481,7 @@ EN = [
           "an index card, so the last overs are readable at a glance instead of "
           "as a scrolling log. Cards sit in a tray of empty slots, newest first. "
           "The last 200 entries are kept on the Pi and restored when the panel "
-          "opens; CLEAR empties the view. In the mobile deck the panel has no "
+          "opens; CLEAR ALL empties the view. In the mobile deck the panel has no "
           "tab — swipe to it past the band scan."),
     ("p", "Each card carries:"),
     ("ul", [
@@ -492,7 +498,7 @@ EN = [
         "BNetzA list.",
         "Name and town of the holder from the offline BNetzA list — never from "
         "QRZ.com, which the ASR does not query.",
-        "Date and time of the last time the station was heard, pinned to the "
+        "The time the station was last heard and its talk timer, pinned to the "
         "bottom edge of the card.",
     ]),
     ("p", "A station heard again does not get a second card. The existing one "
@@ -514,6 +520,41 @@ EN = [
           "would return the next time the panel opens), every connected client "
           "loses it at once, and the callsign is released from the 90-second "
           "de-dupe window so a corrected reading can be reported immediately."),
+    ("p", "Talk time. The clock face in the bottom row of a card is the "
+          "start/stop button for that station's timer — and the count also runs "
+          "by itself: it starts on the rising edge of BUSY and stops on the "
+          "falling one, so an over is timed without touching anything. The clock "
+          "always belongs to exactly one card, the marked one. Clicking a card "
+          "moves the mark, and with it the timer, onto that contact — for when "
+          "the recognition attributed an over to the wrong station. Every card "
+          "keeps its own total: switching the focus banks the running stretch on "
+          "the card it came from and picks up the new card's figure, so nothing "
+          "is lost or counted twice. The display is fixed at hh:mm:ss, otherwise "
+          "the button would change width as it counts."),
+    ("p", "The panel head carries the sum of all timers (Σ) and four controls:"),
+    ("ul", [
+        "The input field takes a callsign by hand when the recognition misses "
+        "one — upper-case letters and digits only, filtered while typing. LOG "
+        "(or Enter) creates the card through the backend exactly like a "
+        "recognised one, so it lands in the history and reaches every connected "
+        "client. A message says whether the BNetzA list knew the call.",
+        "MOD marks the focused card as net control. Its timer keeps running and "
+        "stays readable on the card, but it is left out of every figure: neither "
+        "the Σ total nor the ranking counts it, and it does not set the scale "
+        "of the bars — without that, the station holding the round together "
+        "would flatten every other bar. A flagged card wears a ring around its "
+        "avatar. The flag lives in the browser (local storage), not on the Pi: it "
+        "belongs to whoever is listening to this round, and it survives a reload.",
+        "STATS opens the evaluation: every card by talk time, longest first, "
+        "with callsign, name, a bar and the time. The bar is scaled against the "
+        "longest over rather than against the sum. Moderators are listed below "
+        "the ranking, without a bar and without a rank. COPY puts the list on the "
+        "clipboard as plain text. The dialog keeps counting while a station is "
+        "being heard, so it can stay open through an over.",
+        "CLEAR ALL empties the tray — in dark red, because it takes every card "
+        "at once. It clears the view only; the cross on a single card also "
+        "deletes that contact on the Pi.",
+    ]),
     ("h2", "Logbook (Wavelog + QRZ.com)"),
     ("p", "Logs QSOs to a locally installed Wavelog instance. Enter just the "
           "callsign (and optionally a name) — frequency, band, mode, date/time and "
@@ -731,6 +772,10 @@ DE = [
         "deshalb, weil der Kanal gerade frei ist: Auf einem stillen Kanal "
         "aktiviert, bleibt der Ton bis zum Ende der nächsten Aussendung stumm, "
         "statt beim nächsten Statuswechsel sofort wieder aufzugehen.",
+        "DROP gibt außerdem nach drei Sekunden ohne Sprache frei, auch wenn "
+        "BUSY noch ansteht — der Dauerträger eines Relais hielte den Ton sonst "
+        "unbegrenzt stumm. Die Schwelle liegt auf dem NF-Pegel: Ein stiller "
+        "Träger gilt als Stille, eine Aussendung nicht.",
         "Stummgeschaltet wird im Browser, am Audio-Element. S-Meter, "
         "Roh-Rekorder und Rufzeichenerkennung bekommen das Signal weiterhin — "
         "still ist nur, was man hört.",
@@ -748,7 +793,8 @@ DE = [
           "misst ohne zu tasten, nimmt im Betrieb auf und spielt beim Ausschalten "
           "über RX zurück; RX ist dabei stumm), AGC (automatischer TX-Pegel) sowie "
           "ein kleiner Rekorder — ● REC / ▶ PLAY plus WAV-Download des rohen, "
-          "un-gesquelchten RX-Signals (bis 60 min; z. B. für ASR-Trainingsdaten). "
+          "un-gesquelchten RX-Signals (bis 60 min; z. B. für ASR-Trainingsdaten; der "
+          "Dateiname des Downloads trägt Datum und Uhrzeit der Sicherung). "
           "TX-Timing (Buffer/Trail) und der USB-Mixer liegen unter Einstellungen > "
           "Audio. Die Verbindung verbindet sich nach einer Netzstörung automatisch "
           "neu und wird beim nächsten Start wiederhergestellt."),
@@ -836,7 +882,7 @@ DE = [
           "lesbar statt als durchlaufendes Protokoll. Die Karten liegen in einem "
           "Kartenkasten aus leeren Fächern, die neueste vorn. Die letzten 200 "
           "Einträge hält der Pi und stellt sie beim Öffnen des Panels wieder "
-          "her; CLEAR leert die Ansicht. Im mobilen Deck hat das Panel keinen "
+          "her; CLEAR ALL leert die Ansicht. Im mobilen Deck hat das Panel keinen "
           "Tab — dorthin hinter dem Bandscan wischen."),
     ("p", "Jede Karte trägt:"),
     ("ul", [
@@ -853,8 +899,8 @@ DE = [
         "keine, steht das Rufzeichen nicht in der BNetzA-Liste.",
         "Name und Ort des Inhabers aus der Offline-Liste der BNetzA — nie von "
         "QRZ.com, das die ASR nicht abfragt.",
-        "Datum und Uhrzeit der letzten Nennung, fest an der Unterkante der "
-        "Karte.",
+        "Die Uhrzeit der letzten Nennung und die Redezeit der Station, fest an "
+        "der Unterkante der Karte.",
     ]),
     ("p", "Eine erneut gehörte Station bekommt keine zweite Karte. Die "
           "vorhandene leuchtet auf, wird markiert und zählt hoch (×2, ×3 …) — "
@@ -879,6 +925,46 @@ DE = [
           "gleichzeitig, und das Rufzeichen wird aus dem 90-Sekunden-"
           "Dedupe-Fenster entlassen, damit eine korrigierte Erkennung sofort "
           "wieder gemeldet werden darf."),
+    ("p", "Redezeit. Die Uhr in der Fußzeile einer Karte ist der Start/Stopp-"
+          "Knopf für den Zeitzähler dieser Station — und der Zähler läuft auch "
+          "von allein: Er startet auf der steigenden Flanke von BUSY und hält "
+          "auf der fallenden, ein Durchgang wird also ohne Zutun erfasst. Die "
+          "Uhr gehört immer genau einer Karte, der markierten. Ein Klick auf "
+          "eine Karte verschiebt die Markierung und mit ihr den Zähler dorthin "
+          "— für den Fall, dass die Erkennung einen Durchgang der falschen "
+          "Station zugeschrieben hat. Jede Karte führt ihre eigene Summe: Beim "
+          "Fokuswechsel wird der laufende Abschnitt auf der bisherigen Karte "
+          "verbucht und der Wert der neuen übernommen, es geht also nichts "
+          "verloren und nichts wird doppelt gezählt. Die Anzeige steht fest auf "
+          "hh:mm:ss, sonst änderte der Knopf im Zählen seine Breite."),
+    ("p", "Die Titelzeile des Panels trägt die Summe aller Zähler (Σ) und vier "
+          "Bedienelemente:"),
+    ("ul", [
+        "Das Eingabefeld nimmt ein Rufzeichen von Hand auf, wenn die Erkennung "
+        "eines verpasst — nur Großbuchstaben und Ziffern, bereits beim Tippen "
+        "gefiltert. LOG (oder die Eingabetaste) legt die Karte über das Backend "
+        "an, genau wie bei einer erkannten Station: Sie landet in der Historie "
+        "und erreicht alle verbundenen Clients. Eine Meldung sagt, ob die "
+        "BNetzA-Liste das Rufzeichen kannte.",
+        "MOD kennzeichnet die markierte Karte als Moderator. Deren Zeit läuft "
+        "weiter und bleibt auf der Karte ablesbar, wird aber nirgends gewertet: "
+        "weder in der Σ-Summe noch in der Rangliste, und sie bestimmt auch nicht "
+        "den Maßstab der Balken — sonst drückte die Station, die die Runde "
+        "zusammenhält, alle anderen Balken flach. Eine gekennzeichnete Karte "
+        "trägt einen Ring um den Avatar. Die Kennzeichnung liegt im Browser "
+        "(Local Storage), nicht auf dem Pi: Sie gehört dem, der diese Runde "
+        "mithört, und übersteht einen Reload.",
+        "STATS öffnet die Auswertung: alle Karten nach Redezeit, die längste "
+        "zuerst, mit Rufzeichen, Name, Balken und Zeit. Der Balken bezieht sich "
+        "auf die längste Redezeit, nicht auf die Summe. Moderatoren stehen ohne "
+        "Balken und ohne Rang unter der Rangliste. COPY legt die Liste als "
+        "Klartext in die Zwischenablage. Der Dialog zählt weiter, solange eine "
+        "Station zu hören ist, kann also über einen Durchgang hinweg offen "
+        "bleiben.",
+        "CLEAR ALL leert den Kartenkasten — in Dunkelrot, weil es alle Karten "
+        "auf einmal betrifft. Es räumt nur die Ansicht; das ✕ auf einer "
+        "einzelnen Karte löscht den Kontakt zusätzlich auf dem Pi.",
+    ]),
     ("h2", "Logbuch (Wavelog + QRZ.com)"),
     ("p", "Protokolliert QSOs in eine lokal installierte Wavelog-Instanz. Es "
           "genügt, das Rufzeichen (und optional einen Namen) einzugeben — Frequenz, "
