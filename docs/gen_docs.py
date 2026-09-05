@@ -72,6 +72,282 @@ def cover(pdf, title, subtitle, lang):
     pdf.multi_cell(0, 5, note, align="C")
 
 
+# ---------------------------------------------------------------------------
+# Block diagrams. Drawn with fpdf primitives rather than embedded as an image:
+# they stay sharp at any zoom, cost no file, and the labels are searchable text.
+# ---------------------------------------------------------------------------
+BOX_BG = (240, 244, 247)
+BOX_ED = (152, 168, 178)
+ACC_BG = (226, 240, 234)
+LINE = (96, 112, 122)
+
+
+def _box(pdf, x, y, w, h, title, sub=(), accent=False):
+    pdf.set_line_width(0.3)
+    pdf.set_draw_color(*(ACCENT if accent else BOX_ED))
+    pdf.set_fill_color(*(ACC_BG if accent else BOX_BG))
+    pdf.rect(x, y, w, h, style="DF", round_corners=True, corner_radius=1.2)
+    pdf.set_xy(x + 1, y + 1.3)
+    pdf.set_font("DV", "B", 7)
+    pdf.set_text_color(*(ACCENT if accent else DARK))
+    pdf.multi_cell(w - 2, 3.1, title, align="C")
+    if sub:
+        pdf.set_x(x + 1)
+        pdf.set_font("DV", "", 5.8)
+        pdf.set_text_color(*GREY)
+        pdf.multi_cell(w - 2, 2.6, "\n".join(sub), align="C")
+
+
+def _frame(pdf, x, y, w, h, label):
+    """Dashed enclosure with a caption — one physical machine."""
+    pdf.set_dash_pattern(dash=1.2, gap=1.2)
+    pdf.set_draw_color(*BOX_ED)
+    pdf.set_line_width(0.25)
+    pdf.rect(x, y, w, h, style="D", round_corners=True, corner_radius=2)
+    pdf.set_dash_pattern()
+    pdf.set_xy(x + 2, y + 1)
+    pdf.set_font("DV", "B", 6.4)
+    pdf.set_text_color(*GREY)
+    pdf.cell(w - 4, 3.4, label)
+
+
+def _arrow(pdf, x1, y1, x2, y2, label="", both=False, above=True):
+    import math
+    pdf.set_draw_color(*LINE)
+    pdf.set_fill_color(*LINE)
+    pdf.set_line_width(0.3)
+    pdf.line(x1, y1, x2, y2)
+    a = math.atan2(y2 - y1, x2 - x1)
+    for ax, ay, ang in (((x2, y2, a),) if not both
+                        else ((x2, y2, a), (x1, y1, a + math.pi))):
+        pdf.polygon([(ax, ay),
+                     (ax - 1.9 * math.cos(ang) + 1.0 * math.sin(ang),
+                      ay - 1.9 * math.sin(ang) - 1.0 * math.cos(ang)),
+                     (ax - 1.9 * math.cos(ang) - 1.0 * math.sin(ang),
+                      ay - 1.9 * math.sin(ang) + 1.0 * math.cos(ang))], style="F")
+    if label:
+        pdf.set_font("DV", "", 5.6)
+        pdf.set_text_color(*GREY)
+        mx, my = (x1 + x2) / 2, (y1 + y2) / 2
+        pdf.set_xy(mx - 14, my - (3.2 if above else -0.6))
+        pdf.cell(28, 2.6, label, align="C")
+
+
+def _chain(pdf, y, x0, items, w, gap, h, accent=(), labels=()):
+    """A left-to-right row of boxes joined by arrows. Returns their x spans."""
+    xs = []
+    x = x0
+    for i, (title, sub) in enumerate(items):
+        _box(pdf, x, y, w, h, title, sub, accent=(i in accent))
+        xs.append((x, x + w))
+        x += w + gap
+    for i in range(len(items) - 1):
+        lbl = labels[i] if i < len(labels) else ""
+        _arrow(pdf, xs[i][1] + 0.5, y + h / 2, xs[i + 1][0] - 0.5, y + h / 2, lbl)
+    return xs
+
+
+def _diagram(pdf, height, fn):
+    """Reserve the space, keep it on one page, then draw."""
+    if pdf.get_y() + height > pdf.h - 18:
+        pdf.add_page()
+    pdf.set_auto_page_break(False)
+    y0 = pdf.get_y() + 2
+    fn(pdf, y0)
+    pdf.set_auto_page_break(True, margin=16)
+    pdf.set_y(y0 + height)
+    pdf.set_text_color(*DARK)
+
+
+def _cap(pdf, x, y, w, text):
+    pdf.set_xy(x, y)
+    pdf.set_font("DV", "I", 6.6)
+    pdf.set_text_color(*GREY)
+    pdf.multi_cell(w, 3, text, align="C")
+
+
+def draw_system(pdf, lang):
+    de = lang == "de"
+    def go(pdf, y0):
+        gx, gw = 58, 100
+        _frame(pdf, gx, y0, gw, 92, "Raspberry Pi 5")
+        bx, bw, bh, gap = gx + 4, gw - 8, 12, 2.6
+        rows = [
+            ("tmv71" + ("-Treiber" if de else " driver"),
+             ["Serial 57600 Bd · Kenwood PC-" + ("Protokoll" if de else "protocol")]),
+            ("Audio-Engine" if de else "Audio engine",
+             ["sounddevice 48 kHz · aiortc/Opus",
+              ("Squelch · S-Meter · Roger-Beep" if de
+               else "squelch · S-meter · roger beep")]),
+            ("Decoder & SDR",
+             ["CW/RTTY/POCSAG · 5-" + ("Ton" if de else "tone") + " · HackRF"]),
+            (("Rufzeichen-ASR" if de else "Callsign ASR"),
+             ["Vosk " + ("Grammatik" if de else "grammar") + " + "
+              + ("Sprechermodell" if de else "speaker model")]),
+            (("Logbuch" if de else "Logbook"), ["Wavelog · QRZ.com"]),
+            ("FastAPI + uvicorn",
+             ["REST · WebSocket · WebRTC · PWA", "HTTPS 8443"]),
+        ]
+        ys = []
+        y = y0 + 6
+        for i, (t, sub) in enumerate(rows):
+            _box(pdf, bx, y, bw, bh, t, sub, accent=(i in (3, 5)))
+            ys.append(y)
+            y += bh + gap
+        # radio, left, spanning the serial and audio rows
+        ry, rh = ys[0], ys[1] + bh - ys[0]
+        _box(pdf, 18, ry, 34, rh, "Kenwood TM-V71",
+             ["CAT (USB-Seriell)" if de else "CAT (USB serial)",
+              ("Datenbuchse 9600" if de else "data port 9600"),
+              ("Mic + PTT · GPIO-Netz" if de else "mic + PTT · GPIO power")])
+        _arrow(pdf, 52.5, ys[0] + bh / 2, bx - 0.5, ys[0] + bh / 2, both=True)
+        _arrow(pdf, 52.5, ys[1] + bh / 2, bx - 0.5, ys[1] + bh / 2, both=True)
+        _box(pdf, 18, ys[2], 34, bh, "HackRF One",
+             ["USB · " + ("Spektrum" if de else "spectrum")])
+        _arrow(pdf, 52.5, ys[2] + bh / 2, bx - 0.5, ys[2] + bh / 2)
+        # clients, right
+        _box(pdf, 164, ys[5], 28, bh, "Browser / PWA",
+             [("Bedienung · Audio" if de else "control · audio"), "WebRTC"])
+        # no caption on this arrow either: 28 mm of centred text over a 5 mm
+        # link lands on the frame and on both boxes
+        _arrow(pdf, gx + gw + 0.5, ys[5] + bh / 2, 163.5, ys[5] + bh / 2, both=True)
+        _box(pdf, 164, ys[4], 28, bh, "Wavelog", ["QRZ.com"])
+        _arrow(pdf, gx + gw + 0.5, ys[4] + bh / 2, 163.5, ys[4] + bh / 2)
+        _cap(pdf, 18, y0 + 94, 174,
+             ("Alles läuft auf dem Pi; der Browser bekommt Steuerung, Status und "
+              "Audio über eine einzige HTTPS-Adresse."
+              if de else
+              "Everything runs on the Pi; the browser gets control, status and "
+              "audio over one HTTPS address."))
+    _diagram(pdf, 100, go)
+
+
+def draw_audio(pdf, lang):
+    de = lang == "de"
+    def go(pdf, y0):
+        W, G, H = 30.8, 5, 14
+        x0 = 18
+        # --- RX playback -----------------------------------------------------
+        pdf.set_xy(18, y0)
+        pdf.set_font("DV", "B", 7.4)
+        pdf.set_text_color(*DARK)
+        pdf.cell(0, 4, "RX " + ("(Empfang)" if de else "(receive)"))
+        y = y0 + 5
+        rx = _chain(pdf, y, x0, [
+            (("Datenbuchse" if de else "Data port"),
+             ["TM-V71 · 9600",
+              ("Diskriminator" if de else "discriminator")]),
+            ("USB-" + ("Soundkarte" if de else "sound card"),
+             ["48 kHz · 16 bit", "mono"]),
+            ("Audio-Callback",
+             ["webrtc_audio.py",
+              ("Tiefpass · Abgriffe" if de else "low-pass · taps")]),
+            (("Aufbereitung" if de else "Conditioning"),
+             ["de-emph 75 µs · BUSY-" + ("Gate" if de else "gate"),
+              ("Pegel → S-Meter" if de else "level → S-meter")]),
+            ("aiortc · Opus",
+             ["WebRTC → Browser",
+              "MUTE / DROP"]),
+        ], W, G, H)
+        # --- taps ------------------------------------------------------------
+        ty = y + H + 12
+        cb = rx[2]                                    # the callback box feeds them
+        cx = (cb[0] + cb[1]) / 2
+        pdf.set_draw_color(*LINE)
+        pdf.set_line_width(0.3)
+        pdf.line(cx, y + H, cx, ty - 6)               # drop from the callback
+        pdf.line(x0 + W / 2, ty - 6, x0 + 4 * (W + G) + W / 2, ty - 6)   # bus
+        pdf.set_font("DV", "", 5.6)
+        pdf.set_text_color(*GREY)
+        pdf.set_xy(cx + 2, ty - 10.2)
+        pdf.cell(60, 2.6, ("Abgriffe — immer das rohe, un-gesquelchte Signal"
+                           if de else "taps — always the raw, un-squelched signal"))
+        taps = [
+            (("Digimodes" if de else "Digimodes"), ["CW · RTTY · POCSAG"]),
+            ("5-" + ("Ton-Selcall" if de else "tone selcall"), ["ZVEI/CCIR"]),
+            (("Roh-Rekorder" if de else "Raw recorder"), ["WAV · 60 min"]),
+            (("Rufzeichen-ASR" if de else "Callsign ASR"), ["Vosk"]),
+            (("Stimmerkennung" if de else "Voice ID"), ["Vosk " + ("Sprecher" if de else "speaker")]),
+        ]
+        tw = 30.8
+        for i, (t, sub) in enumerate(taps):
+            tx = x0 + i * (tw + G)
+            _box(pdf, tx, ty, tw, 10, t, sub, accent=(i >= 3))
+            _arrow(pdf, tx + tw / 2, ty - 6, tx + tw / 2, ty - 0.5)
+        # --- the Vosk chains --------------------------------------------------
+        ay = ty + 16
+        pdf.set_xy(18, ay - 5)
+        pdf.set_font("DV", "B", 7.4)
+        pdf.set_text_color(*ACCENT)
+        pdf.cell(0, 4, ("Rufzeichenerkennung (Vosk, grammatikgebunden)"
+                        if de else "Callsign recognition (Vosk, grammar-constrained)"))
+        _chain(pdf, ay, x0, [
+            (("0,25-s-Blöcke" if de else "0.25 s blocks"),
+             ["48 kHz · " + ("Squelch offen" if de else "squelch open")]),
+            ("48 → 16 kHz",
+             ["FIR + " + ("Dezimation" if de else "decimation"),
+              "de-emph · 250 Hz HP"]),
+            ("Vosk KaldiRecognizer",
+             [("Grammatik: Alphabet" if de else "grammar: alphabet"),
+              ("+ Ziffern · N-best" if de else "+ digits · N-best")]),
+            (("Prüfung & Votum" if de else "Verify & vote"),
+             ["BNetzA-" + ("Liste" if de else "list"), "de-dupe 90 s"]),
+            (("Panel / WebSocket" if de else "Panel / WebSocket"),
+             ["/ws/callsign", ("Kontaktkarte" if de else "contact card")]),
+        ], W, G, H, accent=(2,))
+        # --- speaker branch ---------------------------------------------------
+        sy = ay + H + 11
+        pdf.set_xy(18, sy - 5)
+        pdf.set_font("DV", "B", 7.4)
+        pdf.set_text_color(*ACCENT)
+        pdf.cell(0, 4, ("Stimmerkennung (Vosk-Sprechermodell)"
+                        if de else "Voice ID (Vosk speaker model)"))
+        _chain(pdf, sy, x0, [
+            (("Über-Segmentierer" if de else "Over segmenter"),
+             ["50 ms · −55 dBFS",
+              ("Pause 0,6 s = Ende" if de else "0.6 s pause = end")]),
+            ("Vosk SpkModel",
+             ["x-vector · 128",
+              ("8-kHz-Modell" if de else "8 kHz model")]),
+            (("Profilbuch" if de else "Profile book"),
+             ["speakers.json",
+              ("Mittel je Rufzeichen" if de else "mean per callsign")]),
+            (("Einlernen / Zuordnen" if de else "Enrol / match"),
+             ["≥ 0,55 · " + ("Abstand" if de else "margin") + " ≥ 0,10"]),
+            (("Panel / WebSocket" if de else "Panel / WebSocket"),
+             ["/ws/callsign",
+              ("Marke + Redezeit" if de else "mark + talk timer")]),
+        ], W, G, H, accent=(1,))
+        # --- TX ---------------------------------------------------------------
+        xy = sy + H + 11
+        pdf.set_xy(18, xy - 5)
+        pdf.set_font("DV", "B", 7.4)
+        pdf.set_text_color(*DARK)
+        pdf.cell(0, 4, "TX " + ("(Senden)" if de else "(transmit)"))
+        _chain(pdf, xy, x0, [
+            (("Browser-Mikrofon" if de else "Browser microphone"),
+             ["getUserMedia · Opus"]),
+            ("aiortc",
+             [("Dekodierung" if de else "decode") + " · 48 kHz"]),
+            ("TX-" + ("Puffer" if de else "buffer"),
+             [("Vorlauf + PTT-Nachlauf" if de else "lead-in + PTT tail"),
+              ("Roger-Beep · AGC" if de else "roger beep · AGC")]),
+            (("Mic-Leitung" if de else "Mic line"),
+             ["USB-" + ("Soundkarte" if de else "sound card")]),
+            ("Kenwood TM-V71", [("PTT über CAT" if de else "PTT over CAT")]),
+        ], W, G, H)
+        _cap(pdf, 18, xy + H + 3, 174,
+             ("Die Decoder hängen immer am rohen Signal — Squelch, MUTE und DROP "
+              "wirken nur auf das, was der Browser hört."
+              if de else
+              "The decoders always sit on the raw signal — squelch, MUTE and DROP "
+              "only affect what the browser hears."))
+    _diagram(pdf, 122, go)
+
+
+DIAGRAMS = {"system": draw_system, "audio": draw_audio}
+
+
 def render(pdf, blocks):
     for kind, *rest in blocks:
         if kind == "h1":
@@ -121,24 +397,12 @@ def render(pdf, blocks):
                     pdf.ln(2)
                 except Exception:
                     pass
+        elif kind == "diagram":
+            DIAGRAMS[rest[0]](pdf, rest[1])
         elif kind == "space":
             pdf.ln(rest[0] if rest else 3)
 
 
-ARCH = (
-    "                       Raspberry Pi\n"
-    " /dev/ttyUSB0 (57600) -- tmv71 driver --+\n"
-    "                                        v\n"
-    "  FastAPI backend -- REST + WebSocket (live status)\n"
-    "    - control (freq/mode/band/PTT)  - memory CRUD + CSV\n"
-    "    - CW/RTTY + 5-tone selcall      - HackRF spectrum\n"
-    "    - Wavelog logbook (QSO log)     - callsign lookup\n"
-    "                                                       \n"
-    "  USB sound -- aiortc WebRTC <-> browser (Opus, PTT)\n"
-    "  FastAPI serves the SPA / PWA at \"/\" (HTTPS/TLS)\n"
-    "        ^ LAN (HTTPS)\n"
-    "   Browser  -  installable PWA (control + audio)\n"
-)
 
 API_CORE = (
     "GET  /api/status            live radio state\n"
@@ -301,7 +565,21 @@ EN = [
         "Two themes (dark/light); no build step for the UI.",
     ]),
     ("h1", "3  Architecture"),
-    ("code", ARCH),
+    ("p", "Everything below runs on the Pi. The radio is reached over two "
+          "independent paths — CAT commands on the serial line, and audio on the "
+          "data port through a USB sound card — and the browser sees only the one "
+          "HTTPS address the backend serves."),
+    ("diagram", "system", "en"),
+    ("h2", "Audio path"),
+    ("p", "One capture callback owns the received audio. What the browser hears "
+          "is conditioned and squelched; every decoder is fed from a tap taken "
+          "BEFORE that, on the raw signal, which is why the S-meter, the "
+          "recorder and both Vosk chains keep working while MUTE or DROP is on. "
+          "Vosk appears twice on purpose: the grammar-constrained decoder reads "
+          "spoken callsigns, and a second, plain recognizer with the speaker "
+          "model turns a whole over into a voiceprint (the grammar decoder runs "
+          "with N-best alternatives, and in that mode Vosk returns no x-vector)."),
+    ("diagram", "audio", "en"),
     ("p", "The backend owns the serial port directly (backend/app/tmv71.py). One "
           "FastAPI process serves the SPA/PWA, the REST control endpoints, the "
           "live-status WebSocket, and the WebRTC audio signalling — no extra "
@@ -745,7 +1023,23 @@ DE = [
         "Zwei Themes (dunkel/hell); kein Build-Schritt für die Oberfläche.",
     ]),
     ("h1", "3  Architektur"),
-    ("code", ARCH),
+    ("p", "Alles Folgende läuft auf dem Pi. Das Funkgerät hängt über zwei "
+          "getrennte Wege daran — CAT-Befehle auf der seriellen Leitung, Audio "
+          "über die Datenbuchse und eine USB-Soundkarte —, und der Browser sieht "
+          "nur die eine HTTPS-Adresse, die das Backend ausliefert."),
+    ("diagram", "system", "de"),
+    ("h2", "Audiopfad"),
+    ("p", "Ein einziger Aufnahme-Callback verwaltet das Empfangssignal. Was der "
+          "Browser hört, ist aufbereitet und gesquelcht; jeder Decoder bekommt "
+          "seinen Abgriff DAVOR, vom rohen Signal — deshalb arbeiten S-Meter, "
+          "Rekorder und beide Vosk-Ketten weiter, während MUTE oder DROP aktiv "
+          "ist. Vosk steht mit Absicht zweimal im Bild: Der grammatikgebundene "
+          "Dekoder liest gesprochene Rufzeichen, ein zweiter, schlichter "
+          "Erkenner mit dem Sprechermodell macht aus einem ganzen Durchgang "
+          "einen Stimmabdruck (der Grammatik-Dekoder läuft mit N-best-"
+          "Alternativen, und in dieser Betriebsart liefert Vosk keinen "
+          "X-Vektor)."),
+    ("diagram", "audio", "de"),
     ("p", "Das Backend besitzt die serielle Schnittstelle direkt "
           "(backend/app/tmv71.py). Ein einziger FastAPI-Prozess liefert die "
           "SPA/PWA, die REST-Steuerendpunkte, den Live-Status-WebSocket und die "

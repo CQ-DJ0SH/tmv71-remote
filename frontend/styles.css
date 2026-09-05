@@ -496,6 +496,13 @@ body.theme-light #asr-voice.act{color:#eef4f7; background:#435b69; border-color:
 body.theme-light #asr-voice.act::before{
   background:#59d98b; box-shadow:0 0 6px #59d98b, inset 0 0 2px #fff8;
 }
+/* number of learned voices, dimmer than the label so it reads as a count rather
+   than as part of the button's name */
+#asr-voice .vn{
+  font-family:var(--font-mono); font-size:10px; letter-spacing:0;
+  opacity:.65; margin-left:1px;
+}
+#asr-voice .vn:empty{display:none}
 #asr-voice:disabled{opacity:.4; cursor:default}
 /* the collapse arrow keeps its place at the very end, but VOICE is the element
    that claims the free space now — two auto margins would share it and leave
@@ -536,7 +543,7 @@ body.theme-light .debug-zone .asr-manual:focus{border-color:#435b69; box-shadow:
    drift out of alignment (a gradient would have to re-derive the track pitch,
    the centring offset and the scroll position by hand). */
 .asr-cards{
-  --ac-w:162px; --ac-h:84px; --ac-gap:8px; --ac-rows:5; --ac-pad:9px;
+  --ac-w:162px; --ac-h:84px; --ac-gap:8px; --ac-rows:7; --ac-pad:9px;
   position:relative;
   /* height derived from the slot geometry (border-box: padding + border count),
      so the tray always shows exactly --ac-rows full rows and never a half one */

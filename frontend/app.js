@@ -3329,14 +3329,24 @@ $("#sq-mute")?.addEventListener("click", () => {
   threeToneChime(sqMuted);            // muting = descending, release = ascending
 });
 
+// Learned voices, shown on the button they belong to; blank at zero, so an
+// unused feature does not put a bare "0" into the panel head. Every message that
+// changes the profile set carries the new count, because a status push only
+// happens on a mode change and the number would otherwise stand still.
+function spkCountPaint(n) {
+  const vn = $("#asr-spk-n");
+  if (vn) vn.textContent = n ? String(n) : "";
+  const st = $("#spk-profiles");
+  if (st) st.textContent = n ?? 0;
+}
+
 function reflectSpk(k) {
   const sel = $("#set-spk-mode");
   if (sel) {
     sel.value = !k.enabled ? "off" : (k.act ? "act" : "observe");
     sel.disabled = !k.available;
   }
-  const n = $("#spk-profiles");
-  if (n) n.textContent = k.profiles ?? 0;
+  spkCountPaint(k.profiles);        // panel button + the figure in Settings
   // the panel button switches the recognition on and off; WHICH stage it runs
   // in stays with the selector in Settings, so one click here never silently
   // promotes "observe" to "assign"
@@ -3368,6 +3378,7 @@ $("#asr-voice")?.addEventListener("click", async () => {
 function asrVoice(m) {
   if (m.event === "start") { overPin = false; return; }   // new over
   if (m.event === "enrol") {
+    spkCountPaint(m.profiles);
     const card = asrCards.get(m.call);
     if (card) {
       card.dataset.vprof = m.n;                            // overs behind the profile
@@ -3830,9 +3841,17 @@ function connectCallsignWS() {
     let m; try { m = JSON.parse(ev.data); } catch { return; }
     if (m.t === "status") { reflectAsr(m); return; }
     if (m.t === "asrlog") { asrLog(m); return; }
-    if (m.t === "asrdrop" && m.call) { asrCardDrop(m.call); return; }
+    if (m.t === "asrdrop" && m.call) {
+      asrCardDrop(m.call);
+      if (m.profiles != null) spkCountPaint(m.profiles);
+      return;
+    }
     if (m.t === "asrvoice") { asrVoice(m); return; }
-    if (m.t === "asrrename" && m.old) { asrRenameCard(m); return; }
+    if (m.t === "asrrename" && m.old) {
+      asrRenameCard(m);
+      if (m.profiles != null) spkCountPaint(m.profiles);
+      return;
+    }
     if (m.t === "asrloghist") {
       const box = $("#asr-log"); if (box) box.textContent = "";
       asrCards.clear();                              // rebuild the card set

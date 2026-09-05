@@ -610,7 +610,8 @@ class CallsignService:
         self._marks = [(t, c) for (t, c) in self._marks if c != call]
         # a card removed as "misrecognised" must not leave its voiceprint behind
         self._spk.forget(call)
-        self._broadcast({"t": "asrdrop", "call": call})
+        self._broadcast({"t": "asrdrop", "call": call,
+                         "profiles": self._spk.stats()["profiles"]})
         return before - len(self._log)
 
     def rename_call(self, old: str, new: str) -> dict:
@@ -641,7 +642,8 @@ class CallsignService:
         self._spk.rename(old, new)
         self._broadcast({"t": "asrrename", "old": old, "new": new,
                          "name": info.get("name", ""), "city": info.get("city", ""),
-                         "klass": info.get("class", "")})
+                         "klass": info.get("class", ""),
+                         "profiles": self._spk.stats()["profiles"]})
         return {"call": new, "renamed": n, "known": bool(info)}
 
     @staticmethod
@@ -800,8 +802,11 @@ class CallsignService:
         if len(calls) == 1:
             call = calls.pop()
             n = await asyncio.to_thread(self._spk.enrol, call, vec)
+            # the panel shows the number of learned voices, so every change to
+            # the profile set carries the new count with it
             self._broadcast({"t": "asrvoice", "event": "enrol", "call": call,
-                             "n": n, "dur": round(speech, 1)})
+                             "n": n, "dur": round(speech, 1),
+                             "profiles": self._spk.stats()["profiles"]})
             return
         if calls:
             return          # two stations in one segment: labelling it would
