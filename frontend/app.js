@@ -2897,6 +2897,7 @@ function reflectAsr(s) {
   if (!s) return;
   const tgl = $("#set-asr-callsign");
   if (tgl) { tgl.checked = !!s.enabled; tgl.disabled = !s.available; }
+  if (s.spk) reflectSpk(s.spk);
   // The detected-callsign field stays on screen too — it is the place a call
   // appears, and an empty frame says that more clearly than a gap in the bar.
   const rc = $("#rx-call");
@@ -2992,6 +2993,17 @@ function bindCallsign() {
     clearRxCall();
   });
   $("#rx-call-log")?.addEventListener("click", logRxCall);
+  const spkSel = $("#set-spk-mode");
+  if (spkSel) spkSel.addEventListener("change", async e => {
+    const v = e.target.value;
+    try {
+      reflectAsr(await api("POST", "/api/asr/speaker",
+                           { enabled: v !== "off", act: v === "act" }));
+      toast(v === "act" ? "Stimmerkennung: zuordnen"
+          : v === "observe" ? "Stimmerkennung: beobachten"
+                            : "Stimmerkennung aus", v === "off" ? "" : "ok");
+    } catch (err) { toast("Stimmerkennung: " + err.message, "err"); }
+  });
   const tgl = $("#set-asr-callsign");
   if (tgl) tgl.addEventListener("change", async e => {
     const on = e.target.checked;
@@ -3152,7 +3164,13 @@ function overForget() {
   overStart = 0; overAcc = 0; overCard = null;
   asrModSync();
 }
-function overFocus(card) {
+// A card picked by hand outranks the voice recognition — always. The pin is
+// released when the next over starts (the backend says so), so the correction
+// applies to the over it was made in and normal operation resumes afterwards.
+// A callsign actually HEARD still moves the mark: that is evidence, not a guess.
+let overPin = false;
+function overFocus(card, byVoice = false) {
+  if (byVoice && overPin) return;
   if (overCard === card) return;
   overStop();
   overCard = card;
@@ -3311,6 +3329,90 @@ $("#sq-mute")?.addEventListener("click", () => {
   threeToneChime(sqMuted);            // muting = descending, release = ascending
 });
 
+function reflectSpk(k) {
+  const sel = $("#set-spk-mode");
+  if (sel) {
+    sel.value = !k.enabled ? "off" : (k.act ? "act" : "observe");
+    sel.disabled = !k.available;
+  }
+  const n = $("#spk-profiles");
+  if (n) n.textContent = k.profiles ?? 0;
+  // the panel button switches the recognition on and off; WHICH stage it runs
+  // in stays with the selector in Settings, so one click here never silently
+  // promotes "observe" to "assign"
+  const b = $("#asr-voice");
+  if (b) {
+    b.disabled = !k.available;
+    b.classList.toggle("on", !!k.enabled);
+    b.classList.toggle("act", !!(k.enabled && k.act));
+    b.setAttribute("aria-pressed", k.enabled ? "true" : "false");
+    b.title = !k.available ? "Stimmerkennung: Sprechermodell fehlt auf dem Pi"
+      : !k.enabled ? "Stimmerkennung aus — einschalten"
+      : k.act ? `Stimmerkennung ordnet zu (${k.profiles} Stimmprofile) — ausschalten`
+              : `Stimmerkennung beobachtet nur (${k.profiles} Stimmprofile) — ausschalten`;
+  }
+  spkOn = !!k.enabled;
+}
+let spkOn = false;
+$("#asr-voice")?.addEventListener("click", async () => {
+  try {
+    reflectAsr(await api("POST", "/api/asr/speaker", { enabled: !spkOn }));
+    toast(spkOn ? "Stimmerkennung an" : "Stimmerkennung aus", spkOn ? "ok" : "");
+  } catch (err) { toast("Stimmerkennung: " + err.message, "err"); }
+});
+
+// ---- speaker recognition (voice) ------------------------------------------
+// The backend embeds every over and either files it under the callsign the ASR
+// heard (enrolment, free) or matches it against the profiles. Stage 1 only
+// reports what it would have decided; stage 2 moves the mark and the timer.
+function asrVoice(m) {
+  if (m.event === "start") { overPin = false; return; }   // new over
+  if (m.event === "enrol") {
+    const card = asrCards.get(m.call);
+    if (card) {
+      card.dataset.vprof = m.n;                            // overs behind the profile
+      asrVoiceNote(card, `Stimmprofil: ${m.n} Durchgang${m.n === 1 ? "" : "e"}`);
+    }
+    return;
+  }
+  if (m.event !== "match") return;
+  const card = m.call ? asrCards.get(m.call) : null;
+  const line = !m.call ? "Stimme: kein Profil"
+    : `Stimme: ${callDisp(m.call)} ${m.score.toFixed(2)}`
+      + (m.second ? ` (vor ${callDisp(m.second)}, Abstand ${m.margin.toFixed(2)})` : "")
+      + (m.accept ? (m.act ? " — zugeordnet" : " — würde zuordnen") : " — zu unsicher");
+  // Stage 1 annotates and stops there, so the decision can be compared with what
+  // actually happened before anything is allowed to act on it.
+  if (card) asrVoiceNote(card, line);
+  voiceLast = line;
+  voicePaint();
+  // A card picked by hand outranks the voice: while the pin holds, the mark is
+  // not moved either, so what is highlighted and what the timer counts on can
+  // never drift apart.
+  if (!m.accept || !m.act || !card || overPin) return;
+  const box = $("#asr-log");
+  box?.querySelectorAll(".asr-card.marked").forEach(c => c.classList.remove("marked"));
+  box?.querySelectorAll(".asr-card.byvoice").forEach(c => c.classList.remove("byvoice"));
+  card.classList.add("marked");
+  card.classList.add("byvoice");                 // mark WHY this card is current
+  overFocus(card, true);                         // no-op while a manual pin holds
+  overPaint();
+}
+// the last decision, shown above the card tray so stage 1 is visible without
+// hovering every card
+let voiceLast = "";
+function voicePaint() {
+  const el = $("#asr-voice-note");
+  if (el) el.textContent = voiceLast;
+}
+function asrVoiceNote(card, line) {
+  card.dataset.vdbg = line;
+  const dbg = card.dataset.dbg || "";
+  const base = dbg.split("\nStimme")[0].split("\nStimmprofil")[0];
+  card.dataset.dbg = base + "\n" + line;
+  if (asrTip && asrTip.dataset.for === card.dataset.call) asrTipShow(card);
+}
+
 // ---- ASR contact cards (debug panel under band scan) ----------------------
 // Every recognised contact becomes one index card, newest first. A call heard
 // again does NOT add a second card: the existing one is refreshed, moved back to
@@ -3395,7 +3497,10 @@ function asrCardBuild(e) {
   const avatar = mk("span", "ac-avatar", av.text);
   card.style.setProperty("--ac-hue", av.hue);        // avatar AND card tint
   const head = mk("div", "ac-head");
-  head.append(avatar, mk("span", "ac-call", callDisp(e.call)));
+  const callEl = mk("span", "ac-call", callDisp(e.call));
+  callEl.title = "Rufzeichen korrigieren";
+  callEl.addEventListener("click", ev => { ev.stopPropagation(); asrEditCall(card); });
+  head.append(avatar, callEl);
   // all three licence classes are shown; the holder's own one is lit
   const kl = mk("span", "ac-klass");
   for (const k of KLASSEN) kl.appendChild(mk("i", "ack", k));
@@ -3413,6 +3518,7 @@ function asrCardBuild(e) {
   dur.title = "Redezeit dieser Station starten / stoppen";
   dur.addEventListener("click", ev => {
     ev.stopPropagation();
+    overPin = true;                  // starting a timer by hand is a manual pick
     overFocus(card);
     if (overRunning()) overStop();
     else overStart = Date.now();     // resumes this card's own total
@@ -3446,7 +3552,9 @@ function asrCardBuild(e) {
   card.addEventListener("click", () => {
     const box = $("#asr-log");
     box?.querySelectorAll(".asr-card.marked").forEach(c => c.classList.remove("marked"));
+    box?.querySelectorAll(".asr-card.byvoice").forEach(c => c.classList.remove("byvoice"));
     card.classList.add("marked");
+    overPin = true;             // hand-picked: the voice must not move it again
     overFocus(card);            // deliberately no repaint — see overPaint()
   });
   const del = mk("button", "ac-del", "✕");
@@ -3461,6 +3569,88 @@ function asrCardBuild(e) {
   return card;
 }
 
+// Correct a wrongly recognised callsign in place. The card keeps its talk time,
+// its repeat count and its position; the backend renames it in the log for every
+// client AND moves the voice profile, so a mis-heard call does not leave a
+// voiceprint behind under a name that never existed.
+function asrEditCall(card) {
+  const el = card.querySelector(".ac-call");
+  if (!el || el.querySelector("input")) return;
+  const old = card.dataset.call || "";
+  const inp = document.createElement("input");
+  inp.className = "ac-edit";
+  inp.type = "text";
+  inp.value = old;
+  inp.maxLength = 12;
+  inp.spellcheck = false;
+  let done = false;
+  const close = () => { if (!done) { done = true; el.textContent = callDisp(old); } };
+  const commit = async () => {
+    const nu = inp.value.trim();
+    done = true;
+    el.textContent = callDisp(nu.length >= 3 ? nu : old);
+    if (nu.length < 3 || nu === old) { el.textContent = callDisp(old); return; }
+    try {
+      // the "asrrename" broadcast that follows updates this card like any other
+      await api("PATCH", "/api/asr/log/" + encodeURIComponent(old), { call: nu });
+    } catch (err) {
+      el.textContent = callDisp(old);
+      toast("Rufzeichen: " + err.message, "err");
+    }
+  };
+  inp.addEventListener("input", () => {
+    inp.value = inp.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  });
+  inp.addEventListener("click", ev => ev.stopPropagation());
+  inp.addEventListener("keydown", ev => {
+    ev.stopPropagation();
+    if (ev.key === "Enter") { ev.preventDefault(); commit(); }
+    else if (ev.key === "Escape") { ev.preventDefault(); close(); }
+  });
+  inp.addEventListener("blur", close);          // clicking away cancels, never renames
+  el.textContent = "";
+  el.appendChild(inp);
+  inp.focus();
+  inp.select();
+}
+
+// Apply a rename that came back from the backend (this client or another one).
+function asrRenameCard(m) {
+  const card = asrCards.get(m.old);
+  if (!card) return;
+  asrCards.delete(m.old);
+  const twin = asrCards.get(m.new);
+  if (twin && twin !== card) {
+    // the corrected call already has a card: fold this one into it rather than
+    // leaving two cards for one station
+    if (overCard === card) overStop();      // bank the running stretch FIRST,
+                                            // or it would go down with the card
+    twin.dataset.durMs = String((Number(twin.dataset.durMs) || 0)
+                              + (Number(card.dataset.durMs) || 0));
+    twin.dataset.count = String((Number(twin.dataset.count) || 0)
+                              + (Number(card.dataset.count) || 0));
+    const cnt = twin.querySelector(".ac-count");
+    if (cnt) cnt.textContent = Number(twin.dataset.count) > 1
+      ? "×" + twin.dataset.count : "";
+    if (overCard === card) { overCard = null; overFocus(twin); }
+    durSet(twin, Number(twin.dataset.durMs) || 0);
+    card.remove();
+    asrTipHide(); asrFillSlots(); overTotalPaint();
+    return;
+  }
+  card.dataset.call = m.new;
+  const av = asrAvatar(m.new);
+  card.style.setProperty("--ac-hue", av.hue);
+  const avEl = card.querySelector(".ac-avatar"); if (avEl) avEl.textContent = av.text;
+  const cEl = card.querySelector(".ac-call"); if (cEl) cEl.textContent = callDisp(m.new);
+  const nEl = card.querySelector(".ac-name"); if (nEl) nEl.textContent = m.name || "";
+  const tEl = card.querySelector(".ac-city"); if (tEl) tEl.textContent = m.city || "";
+  asrSetKlass(card, m.klass);
+  asrCards.set(m.new, card);
+  if (asrMods.delete(m.old)) { asrMods.add(m.new); asrModSave(); }   // flag follows
+  asrModSync();
+}
+
 // the hover tooltip is a single shared, fixed-positioned node: inside the
 // scrolling card grid an absolutely positioned one would be clipped
 let asrTip = null;
@@ -3473,6 +3663,7 @@ function asrTipShow(card) {
     document.body.appendChild(asrTip);
   }
   asrTip.textContent = txt;
+  asrTip.dataset.for = card.dataset.call || "";   // so a live note can refresh it
   asrTip.hidden = false;
   const r = card.getBoundingClientRect(), t = asrTip.getBoundingClientRect();
   let top = r.top - t.height - 8;
@@ -3640,6 +3831,8 @@ function connectCallsignWS() {
     if (m.t === "status") { reflectAsr(m); return; }
     if (m.t === "asrlog") { asrLog(m); return; }
     if (m.t === "asrdrop" && m.call) { asrCardDrop(m.call); return; }
+    if (m.t === "asrvoice") { asrVoice(m); return; }
+    if (m.t === "asrrename" && m.old) { asrRenameCard(m); return; }
     if (m.t === "asrloghist") {
       const box = $("#asr-log"); if (box) box.textContent = "";
       asrCards.clear();                              // rebuild the card set

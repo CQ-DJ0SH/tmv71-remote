@@ -181,6 +181,8 @@ API_DIGI = (
     "WS   /ws/digi               decoded text stream\n"
     "GET/POST /api/asr/config    callsign recognition (Vosk)\n"
     "POST /api/asr/log           add a callsign by hand\n"
+    "PATCH /api/asr/log/{call}   correct a callsign (profile follows)\n"
+    "GET/POST /api/asr/speaker   voice ID: on/off, stage, limits\n"
     "DELETE /api/asr/log/{call}  drop a misrecognised contact\n"
     "WS   /ws/callsign           recognised-callsign events\n"
     "GET  /api/selcall           5-tone status\n"
@@ -531,7 +533,7 @@ EN = [
           "the card it came from and picks up the new card's figure, so nothing "
           "is lost or counted twice. The display is fixed at hh:mm:ss, otherwise "
           "the button would change width as it counts."),
-    ("p", "The panel head carries the sum of all timers (Σ) and four controls:"),
+    ("p", "The panel head carries the sum of all timers (Σ) and five controls:"),
     ("ul", [
         "The input field takes a callsign by hand when the recognition misses "
         "one — upper-case letters and digits only, filtered while typing. LOG "
@@ -554,7 +556,64 @@ EN = [
         "CLEAR ALL empties the tray — in dark red, because it takes every card "
         "at once. It clears the view only; the cross on a single card also "
         "deletes that contact on the Pi.",
+        "VOICE, at the right-hand end, switches the speaker recognition on and "
+        "off (see below). Its lamp pulses green while it is listening; an "
+        "outlined button means it only observes, a filled one that it acts.",
     ]),
+    ("p", "Correcting a callsign: click the call on the card and type over it "
+          "(Enter applies, Escape and clicking away cancel). The card keeps its "
+          "talk time, its repeat count and its place, name and town are re-read "
+          "for the corrected call, and the change reaches every open client. If "
+          "the corrected call already has a card, the two are merged and their "
+          "times added. The voice profile is renamed with it — otherwise a "
+          "mis-heard call would keep collecting a voiceprint under a name that "
+          "never existed while the real station never gets one."),
+    ("h2", "Voice ID — an over without a callsign"),
+    ("p", "Not every over carries a spoken callsign, and the talk timer then "
+          "counts onto whoever was marked last. Speaker recognition closes that "
+          "gap: the voiceprint of an over is compared against the stations whose "
+          "callsign HAS been heard. Enrolment costs nothing — every recognised "
+          "call labels its own audio, so the profiles build themselves while the "
+          "panel is simply used."),
+    ("ul", [
+        "An over ends at the PAUSE in speech, not at the carrier. Through a "
+        "repeater BUSY stays up for the whole QSO, so the falling edge never "
+        "comes and every station would land in one segment with their voices "
+        "averaged together. The pause boundary works in simplex too, where the "
+        "carrier drop simply arrives first.",
+        "Under about 3 s of speech nothing is guessed at: the over is skipped. "
+        "An over in which two callsigns were heard is skipped as well, because "
+        "labelling it would spoil both profiles.",
+        "Two stages. Observe only decides and reports — the verdict appears "
+        "above the card tray and in the card's hover detail, and nothing moves. "
+        "Assign additionally moves the mark and the talk timer onto the "
+        "recognised station; such a card is drawn with a dashed border so it is "
+        "never confused with the solid red of \u201cjust heard saying its call\u201d. "
+        "The stage is chosen in Settings > Audio > Voice ID.",
+        "A card picked BY HAND always wins: while a manual selection holds, the "
+        "voice moves neither the mark nor the timer. It is released when the "
+        "next over begins, so the correction applies to the over it was made in. "
+        "A callsign actually heard still moves the mark — that is evidence, not "
+        "a guess.",
+        "It needs the callsign recognition switched on (it listens to the same "
+        "audio tap), and it costs about 1.3 s of one core per over, afterwards.",
+    ]),
+    ("p", "Measured on two off-air recordings of the same round (14 + 11 overs, "
+          "four stations in both): the same station across recordings scored "
+          "0.62–0.79 cosine, different stations 0.33 on average and 0.64 at "
+          "worst. At a threshold of 0.55 with a 0.05 margin over the runner-up, "
+          "3 of the 4 known stations were identified, none wrongly, and none of "
+          "the 7 stations unknown to the profile set was mistaken for a known "
+          "one. The margin does the real work: a stranger's best match is flat "
+          "(0.01–0.08 ahead of the second), a true match stands clear "
+          "(0.20–0.34). Treat it as an assistant that may abstain, not as proof "
+          "— and never log a QSO on a voice match alone."),
+    ("p", "The model is Vosk's own speaker model (vosk-model-spk-0.4, ~14 MB), "
+          "an x-vector trained on 8 kHz telephone speech — narrowband, noisy, "
+          "channel-varied, which is far closer to FM off a repeater than a "
+          "wideband model would be. A voiceprint is biometric data: the profiles "
+          "stay on the Pi in speakers.json (gitignored, never uploaded) and a "
+          "profile is dropped with its card."),
     ("h2", "Logbook (Wavelog + QRZ.com)"),
     ("p", "Logs QSOs to a locally installed Wavelog instance. Enter just the "
           "callsign (and optionally a name) — frequency, band, mode, date/time and "
@@ -937,7 +996,7 @@ DE = [
           "verbucht und der Wert der neuen übernommen, es geht also nichts "
           "verloren und nichts wird doppelt gezählt. Die Anzeige steht fest auf "
           "hh:mm:ss, sonst änderte der Knopf im Zählen seine Breite."),
-    ("p", "Die Titelzeile des Panels trägt die Summe aller Zähler (Σ) und vier "
+    ("p", "Die Titelzeile des Panels trägt die Summe aller Zähler (Σ) und fünf "
           "Bedienelemente:"),
     ("ul", [
         "Das Eingabefeld nimmt ein Rufzeichen von Hand auf, wenn die Erkennung "
@@ -964,7 +1023,70 @@ DE = [
         "CLEAR ALL leert den Kartenkasten — in Dunkelrot, weil es alle Karten "
         "auf einmal betrifft. Es räumt nur die Ansicht; das ✕ auf einer "
         "einzelnen Karte löscht den Kontakt zusätzlich auf dem Pi.",
+        "VOICE am rechten Ende schaltet die Stimmerkennung ein und aus (siehe "
+        "unten). Die Lampe pulst grün, solange sie zuhört; ein umrandeter Knopf "
+        "bedeutet, dass sie nur beobachtet, ein gefüllter, dass sie eingreift.",
     ]),
+    ("p", "Rufzeichen korrigieren: auf das Rufzeichen der Karte klicken und "
+          "überschreiben (Eingabetaste übernimmt, Escape und Wegklicken "
+          "verwerfen). Die Karte behält Redezeit, Zähler und Platz, Name und Ort "
+          "werden für das korrigierte Rufzeichen neu gelesen, und die Änderung "
+          "erreicht jeden offenen Client. Hat das korrigierte Rufzeichen schon "
+          "eine Karte, werden beide verschmolzen und ihre Zeiten addiert. Das "
+          "Stimmprofil zieht mit um — sonst sammelte ein verhörtes Rufzeichen "
+          "weiter einen Stimmabdruck unter einem Namen, den es nie gab, während "
+          "die wirkliche Station nie einen bekommt."),
+    ("h2", "Stimmerkennung — ein Durchgang ohne Rufzeichen"),
+    ("p", "Nicht in jedem Durchgang fällt ein Rufzeichen, und die Redezeit "
+          "zählt dann auf die zuletzt markierte Karte. Die Sprechererkennung "
+          "schließt diese Lücke: Der Stimmabdruck eines Durchgangs wird mit den "
+          "Stationen verglichen, deren Rufzeichen schon einmal zu hören war. Das "
+          "Einlernen kostet nichts — jeder erkannte Ruf beschriftet seine eigene "
+          "Aufnahme, die Profile bauen sich also im laufenden Betrieb auf."),
+    ("ul", [
+        "Ein Durchgang endet an der SPRECHPAUSE, nicht am Träger. Über ein "
+        "Relais bleibt BUSY die ganze Verbindung stehen, die fallende Flanke "
+        "kommt also nie, und alle Stationen lägen in einem Segment mit zu Brei "
+        "gemittelten Stimmen. Die Pausengrenze trägt auch im Simplexbetrieb, wo "
+        "der Trägerabfall schlicht früher kommt.",
+        "Unter etwa 3 s Sprache wird nichts geraten, der Durchgang entfällt. "
+        "Ebenso ein Durchgang, in dem zwei Rufzeichen fielen — ihn zu "
+        "beschriften würde beide Profile verderben.",
+        "Zwei Stufen. Beobachten entscheidet und meldet nur — das Urteil steht "
+        "über dem Kartenkasten und in den Detailangaben der Karte, bewegt wird "
+        "nichts. Zuordnen verschiebt zusätzlich Marke und Redezeit auf die "
+        "erkannte Station; eine solche Karte wird gestrichelt umrandet und ist "
+        "damit nie mit dem durchgezogenen Rot von „hat gerade sein Rufzeichen "
+        "genannt“ zu verwechseln. Die Stufe wird unter Einstellungen > Audio > "
+        "Voice ID gewählt.",
+        "Eine VON HAND gewählte Kachel hat immer Vorrang: Solange sie gilt, "
+        "verschiebt die Stimme weder Marke noch Timer. Sie wird mit dem Beginn "
+        "des nächsten Durchgangs frei, die Korrektur gilt also für den "
+        "Durchgang, in dem sie gemacht wurde. Ein tatsächlich gehörtes "
+        "Rufzeichen verschiebt die Marke weiterhin — das ist Beleg, keine "
+        "Vermutung.",
+        "Sie setzt die eingeschaltete Rufzeichenerkennung voraus (sie hört am "
+        "selben Audio-Abgriff mit) und kostet je Durchgang etwa 1,3 s auf einem "
+        "Kern, im Anschluss.",
+    ]),
+    ("p", "Gemessen an zwei Mitschnitten derselben Runde (14 + 11 Durchgänge, "
+          "vier Stationen in beiden): dieselbe Station über zwei Aufnahmen "
+          "hinweg 0,62–0,79 Kosinus, verschiedene Stationen im Mittel 0,33 und "
+          "im schlechtesten Fall 0,64. Bei Schwelle 0,55 mit 0,05 Abstand zum "
+          "Zweitplatzierten wurden 3 der 4 bekannten Stationen erkannt, keine "
+          "falsch, und keine der 7 dem Profilbestand fremden Stationen mit einer "
+          "bekannten verwechselt. Der Abstand leistet dabei die eigentliche "
+          "Arbeit: Bei einer fremden Stimme liegt der beste Treffer flach vorn "
+          "(0,01–0,08), bei einer echten deutlich (0,20–0,34). Also ein "
+          "Assistent, der sich enthalten darf — kein Beweis, und nie Grundlage "
+          "für einen Logbucheintrag allein."),
+    ("p", "Das Modell ist Vosks eigenes Sprechermodell (vosk-model-spk-0.4, "
+          "~14 MB), ein X-Vektor, trainiert auf 8-kHz-Telefonsprache: "
+          "schmalbandig, verrauscht, kanalvariabel — und damit dem FM-Signal "
+          "über ein Relais viel näher als ein Breitbandmodell. Ein Stimmabdruck "
+          "ist ein biometrisches Merkmal: Die Profile bleiben in speakers.json "
+          "auf dem Pi (gitignored, kein Upload), und mit der Karte verschwindet "
+          "auch das Profil."),
     ("h2", "Logbuch (Wavelog + QRZ.com)"),
     ("p", "Protokolliert QSOs in eine lokal installierte Wavelog-Instanz. Es "
           "genügt, das Rufzeichen (und optional einen Namen) einzugeben — Frequenz, "

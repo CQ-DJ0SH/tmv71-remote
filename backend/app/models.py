@@ -193,6 +193,19 @@ class AsrManualRequest(BaseModel):
     call: str = Field(min_length=3, max_length=12)
 
 
+class AsrRenameRequest(BaseModel):
+    """Correct the callsign on a contact card (the voice profile follows it)."""
+    call: str = Field(min_length=3, max_length=12)
+
+
+class AsrSpeakerRequest(BaseModel):
+    """Speaker recognition: on/off, observe vs. act, and the decision limits."""
+    enabled: bool | None = None
+    act: bool | None = None
+    threshold: float | None = Field(default=None, ge=0.0, le=1.0)
+    margin: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
 class AudioRecordRequest(BaseModel):
     """Start/stop the raw RX audio recorder."""
     on: Optional[bool] = None

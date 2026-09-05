@@ -7,12 +7,15 @@ from __future__ import annotations
 import asyncio
 import glob
 import logging
+import math
 import mimetypes
 import os
 import re
 import time
 import urllib.request
 from contextlib import asynccontextmanager
+
+import numpy as np
 
 from fastapi import (FastAPI, HTTPException, Response, UploadFile, WebSocket,
                      WebSocketDisconnect)
@@ -39,8 +42,9 @@ from .models import (AsrManualRequest, AudioDeviceRequest, AudioGainRequest,
                      SquelchRequest, StepRequest, VfoUpdate, WebRTCOffer,
                      HackRFConfig,
                      LogConfigRequest, LogLookupRequest, LogQsoRequest,
-                     LogDeleteRequest)
+                     LogDeleteRequest, AsrRenameRequest, AsrSpeakerRequest)
 from . import mixer
+from . import speaker_id
 from . import system_info
 from . import updater
 from .power_switch import PowerSwitch
@@ -400,6 +404,13 @@ class CallsignService:
         self._calls: dict = {}                 # call -> {class,name,city} (empty = unverified)
         self._suspended = False                # off because the radio is powered down
         self._lock = asyncio.Lock()
+        # --- speaker segmentation (see speaker_id.py) ---
+        self._spk = speaker_id.SpeakerBook(self._model_dir)
+        self._seg: list = []          # 48 kHz chunks of the over being collected
+        self._seg_t0 = 0.0            # monotonic start of that over
+        self._seg_speech = 0.0        # seconds of speech in it
+        self._seg_quiet = 0.0         # seconds since speech last stopped
+        self._marks: list = []        # (ts, call) the ASR heard, for labelling
 
     def _model_dir(self) -> str:
         if settings.asr_model_dir:
@@ -418,7 +429,35 @@ class CallsignService:
 
     def status(self) -> dict:
         return {"enabled": self.enabled, "available": self.available,
-                "ready": self._rec is not None, "suspended": self._suspended}
+                "ready": self._rec is not None, "suspended": self._suspended,
+                "spk": self.spk_status()}
+
+    def spk_status(self) -> dict:
+        return {"available": self._spk.available,
+                "enabled": bool(settings.spk_enabled),
+                "act": bool(settings.spk_act),
+                "threshold": settings.spk_threshold,
+                "margin": settings.spk_margin,
+                **self._spk.stats()}
+
+    def spk_config(self, enabled=None, act=None, threshold=None,
+                   margin=None) -> dict:
+        if enabled is not None:
+            settings.spk_enabled = bool(enabled)
+        if act is not None:
+            settings.spk_act = bool(act)
+        if threshold is not None:
+            settings.spk_threshold = float(threshold)
+        if margin is not None:
+            settings.spk_margin = float(margin)
+        save_runtime(spk_enabled=settings.spk_enabled, spk_act=settings.spk_act,
+                     spk_threshold=settings.spk_threshold,
+                     spk_margin=settings.spk_margin)
+        if not settings.spk_enabled:                 # drop a half-collected over
+            self._seg, self._seg_speech, self._seg_quiet = [], 0.0, 0.0
+        st = self.status()
+        self._broadcast({"t": "status", **st})
+        return st
 
     async def suspend(self) -> None:
         """Stop listening while the radio is powered down — there is no RX audio
@@ -568,8 +607,42 @@ class CallsignService:
         self._log = [e for e in self._log if e.get("call") != call]
         self._seen.pop(call, None)                 # allow an immediate re-report
         self._recent = [(t, c) for (t, c) in self._recent if c != call]
+        self._marks = [(t, c) for (t, c) in self._marks if c != call]
+        # a card removed as "misrecognised" must not leave its voiceprint behind
+        self._spk.forget(call)
         self._broadcast({"t": "asrdrop", "call": call})
         return before - len(self._log)
+
+    def rename_call(self, old: str, new: str) -> dict:
+        """Correct the callsign on a card.
+
+        The voice profile moves with it: a mis-heard call would otherwise keep a
+        profile under a callsign that never existed, while the station that
+        actually spoke never accumulates one. Name, town and licence class are
+        re-read from the BNetzA list for the corrected call."""
+        old = (old or "").strip().upper()
+        new = "".join(c for c in (new or "").upper() if c.isalnum())
+        if len(new) < 3:
+            raise HTTPException(400, "callsign too short")
+        if old == new:
+            return {"call": new, "renamed": 0, "known": bool(self._calls.get(new))}
+        info = self._calls.get(new) or {}
+        n = 0
+        for e in self._log:
+            if e.get("call") == old:
+                e["call"] = new
+                e["name"], e["city"] = info.get("name", ""), info.get("city", "")
+                e["klass"] = info.get("class", "")
+                e["valid"] = True          # a human typed it — see add_manual()
+                n += 1
+        self._seen[new] = self._seen.pop(old, time.monotonic())
+        self._recent = [(t, new if c == old else c) for (t, c) in self._recent]
+        self._marks = [(t, new if c == old else c) for (t, c) in self._marks]
+        self._spk.rename(old, new)
+        self._broadcast({"t": "asrrename", "old": old, "new": new,
+                         "name": info.get("name", ""), "city": info.get("city", ""),
+                         "klass": info.get("class", "")})
+        return {"call": new, "renamed": n, "known": bool(info)}
 
     @staticmethod
     def _s_label(s: float) -> str:
@@ -616,6 +689,8 @@ class CallsignService:
             # mic audio too, regardless of the radio's busy state).
             active = self.audio.rx_busy or self.audio.mic_test
             pcm = self.audio.pop_asr_rx()
+            if settings.spk_enabled and self._spk.available:
+                self._seg_tick(pcm, active)
             calls = []
             try:
                 # Keep feeding for a couple of chunks after the over ends: the
@@ -634,6 +709,107 @@ class CallsignService:
                 calls = []
             for call, conf, text, nbest in calls:
                 await self._emit(call, conf, text, nbest)
+
+    # ---- speaker segmentation ---------------------------------------------
+    # An over is bounded by the PAUSE in speech, not by the carrier. Through a
+    # repeater BUSY stays up for the whole QSO — often for the whole round — so
+    # the falling edge never comes, and everyone would land in one segment with
+    # their voices averaged into mush. The pause is the only boundary that
+    # survives repeater operation, and it works in simplex too (where the
+    # carrier drop simply arrives first and closes the segment as well).
+    SPEECH_DB = -55.0     # same level that releases DROP after 3 s of silence
+    # Measured on the two training recordings: the gaps between overs run from
+    # 0.62 s upwards, and anything above that merged two stations into one
+    # segment. 0.6 s split both recordings exactly (11/11 and 14/14 overs) with
+    # no piece falling under the 2.5 s minimum. Splitting one over in two is
+    # harmless — both halves match the same profile — merging two is not.
+    PAUSE_S = 0.6
+    FRAME_S = 0.05        # level resolution; see _seg_tick
+    MAX_SEG_S = speaker_id.MAX_SEG_S
+    def _seg_tick(self, pcm, active: bool) -> None:
+        """Run the segmenter over one popped block, in 50 ms frames.
+
+        The block is ~0.25 s long, and judging it as a whole smeared the
+        boundaries: a frame that is half speech and half silence still reads as
+        speech, which ate enough of the 1.1–1.2 s gap between overs that two
+        stations landed in one segment. Two voices averaged into one vector is
+        the one error that must not happen — it poisons a profile — so the level
+        is measured finely enough to see the gap."""
+        n = int(48000 * self.FRAME_S)
+        if pcm is None or not len(pcm):
+            self._seg_step(None, active, 0.25)     # no audio = silence
+            return
+        for i in range(0, len(pcm), n):
+            f = pcm[i:i + n]
+            self._seg_step(f, active, len(f) / 48000.0)
+
+    def _seg_step(self, frame, active: bool, dt: float) -> None:
+        speech = False
+        if frame is not None and len(frame):
+            rms = float(np.sqrt(np.mean(np.asarray(frame, dtype=np.float64) ** 2)))
+            db = 20.0 * math.log10(rms / 32768.0) if rms >= 1.0 else -90.0
+            speech = active and db > self.SPEECH_DB
+        if speech:
+            if not self._seg:
+                self._seg_t0 = time.monotonic()
+                # a new over has started: the panel uses this to release a manual
+                # card selection, which only ever overrides the over it was made in
+                self._broadcast({"t": "asrvoice", "event": "start"})
+            if self._seg_speech < self.MAX_SEG_S:
+                self._seg.append(np.asarray(frame).copy())
+            self._seg_speech += dt
+            self._seg_quiet = 0.0
+            return
+        if not self._seg:
+            return
+        self._seg_quiet += dt
+        # a short pause is part of the same over — keep it, it carries breath and
+        # room tone the x-vector is happy to see
+        if self._seg_quiet < self.PAUSE_S and active:
+            if self._seg_speech < self.MAX_SEG_S and frame is not None and len(frame):
+                self._seg.append(np.asarray(frame).copy())
+            return
+        self._seg_close()
+
+    def _seg_close(self) -> None:
+        """The over ended (pause long enough, or the carrier dropped)."""
+        buf, speech, t0 = self._seg, self._seg_speech, self._seg_t0
+        self._seg, self._seg_speech, self._seg_quiet = [], 0.0, 0.0
+        # Below ~3 s of speech the x-vector is not worth trusting (measured:
+        # d' 2.2 on 1.5–3 s pieces against 3.8 on whole overs), so a short
+        # over is dropped rather than guessed at.
+        if speech < speaker_id.MIN_SPEECH_S or not buf:
+            return
+        pcm = np.concatenate([b for b in buf if len(b)])
+        asyncio.create_task(self._speaker_job(pcm, t0, time.monotonic(), speech))
+
+    async def _speaker_job(self, pcm, t0: float, t1: float, speech: float) -> None:
+        # Vosk commits an utterance a moment after it ends, so a callsign spoken
+        # at the very end of this over can still be emitted after the segment
+        # closed. Waiting briefly is what lets that over count as labelled.
+        await asyncio.sleep(0.7)
+        lo, hi = t0 - 0.3, t1 + 0.8
+        calls = {c for (t, c) in self._marks if lo <= t <= hi}
+        # consume them: the window of the NEXT over overlaps this one (it may
+        # start 0.6 s after this one closed), and a call counted twice would file
+        # the next speaker's voice under this speaker's callsign
+        self._marks = [(t, c) for (t, c) in self._marks if not lo <= t <= hi]
+        vec = await asyncio.to_thread(self._spk.embed, pcm)
+        if vec is None:
+            return
+        if len(calls) == 1:
+            call = calls.pop()
+            n = await asyncio.to_thread(self._spk.enrol, call, vec)
+            self._broadcast({"t": "asrvoice", "event": "enrol", "call": call,
+                             "n": n, "dur": round(speech, 1)})
+            return
+        if calls:
+            return          # two stations in one segment: labelling it would
+                            # poison both profiles, so this over is skipped
+        m = await asyncio.to_thread(self._spk.match, vec,
+                                    settings.spk_threshold, settings.spk_margin)
+        self._broadcast({"t": "asrvoice", "event": "match", "act": settings.spk_act,
+                         "dur": round(speech, 1), **m})
 
     def _snap(self, calls):
         """Attach the recognizer's raw text / N-best to each call *now*.
@@ -671,6 +847,13 @@ class CallsignService:
         s_lbl, band_lbl = self._rx_context()
         nbest = nbest or []
         now = time.monotonic()
+        if valid:
+            # Label for the speaker segmenter: this over carries a real callsign,
+            # so its voiceprint can be filed under it. Recorded here rather than
+            # after the de-dupe test, because a station repeating its call in a
+            # later over is exactly the material a profile should grow on.
+            self._marks.append((now, call))
+            self._marks = [(t, c) for (t, c) in self._marks if now - t <= 60.0]
         # Repetition voting: OMs send their call 2-3x. A list-valid call is trusted
         # at once; an unlisted (VOID) hit must be heard >=VOID_MIN_VOTES times in
         # the window before it is shown, which suppresses one-off mishears (e.g. a
@@ -1727,6 +1910,23 @@ async def asr_config_set(req: AsrConfigRequest) -> dict:
 async def asr_log_add(req: AsrManualRequest) -> dict:
     """Add a contact card by hand (recognition missed or mangled the call)."""
     return callsign_svc.add_manual(req.call)
+
+
+@app.patch("/api/asr/log/{call}")
+async def asr_log_rename(call: str, req: AsrRenameRequest) -> dict:
+    """Correct the callsign on a contact card — the voice profile follows."""
+    return callsign_svc.rename_call(call, req.call)
+
+
+@app.get("/api/asr/speaker")
+async def asr_speaker() -> dict:
+    """Speaker recognition state + the voice profiles collected so far."""
+    return callsign_svc.spk_status()
+
+
+@app.post("/api/asr/speaker")
+async def asr_speaker_set(req: AsrSpeakerRequest) -> dict:
+    return callsign_svc.spk_config(req.enabled, req.act, req.threshold, req.margin)
 
 
 @app.delete("/api/asr/log/{call}")

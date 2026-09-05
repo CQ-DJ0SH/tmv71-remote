@@ -465,6 +465,42 @@ body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}}
 #asr-mod.on{color:#dbe7ef; border-color:#9fb4c2; background:#ffffff12}
 body.theme-light #asr-mod.on{color:#1b2731; border-color:#7d8f9c; background:#0000000a}
 #asr-mod:disabled{opacity:.4; cursor:default}
+/* VOICE: on/off for the speaker recognition, pushed to the right-hand end of
+   the panel head (only the collapse arrow follows it). Lit while it listens;
+   the filled state means it is actually moving the mark (stage 2) rather than
+   only reporting what it would do — the same neutral family as MOD. */
+#asr-voice{display:inline-flex; align-items:center; gap:6px; margin-left:auto}
+/* the LED is always in the layout, only its state changes: a dot that appears
+   and disappears would resize the button */
+#asr-voice::before{
+  content:""; width:7px; height:7px; border-radius:50%; flex:0 0 auto;
+  background:var(--text-dim); opacity:.4;
+}
+/* pulsing green, the same language the ASR lamp in the title bar speaks: the
+   pulse is what says "listening right now" */
+#asr-voice.on::before{
+  background:var(--ok); opacity:1;
+  box-shadow:0 0 8px var(--ok), inset 0 0 2px #fff8;
+  animation:asrPulse 1.6s ease-in-out infinite;
+}
+/* Outline = listening, solid = intervening. Stage 2 is filled the way the app
+   marks an engaged segment switch (50 W / 10 W / 5 W), because a faint tint was
+   not a readable difference. */
+#asr-voice.on{color:#dbe7ef; border-color:#9fb4c2}
+#asr-voice.act{color:#0d151b; background:#9fb4c2; border-color:#9fb4c2}
+/* on the filled button the LED needs a dark green to stay a lamp rather than a
+   bright hole; it keeps pulsing, which is what carries "listening" */
+#asr-voice.act::before{background:#0d6b3d; box-shadow:inset 0 0 2px #ffffff55}
+body.theme-light #asr-voice.on{color:#1b2731; border-color:#7d8f9c}
+body.theme-light #asr-voice.act{color:#eef4f7; background:#435b69; border-color:#435b69}
+body.theme-light #asr-voice.act::before{
+  background:#59d98b; box-shadow:0 0 6px #59d98b, inset 0 0 2px #fff8;
+}
+#asr-voice:disabled{opacity:.4; cursor:default}
+/* the collapse arrow keeps its place at the very end, but VOICE is the element
+   that claims the free space now — two auto margins would share it and leave
+   the button floating in the middle */
+.debug-zone .panel-head .panel-toggle{margin-left:6px}
 /* CLEAR ALL wipes the whole tray — dark red says so before it is pressed. The
    id beats the panel's neutral .scan-clear:hover, so the hover brightens into
    the TX red used for the ✕ on the cards instead of falling back to grey. */
@@ -500,7 +536,7 @@ body.theme-light .debug-zone .asr-manual:focus{border-color:#435b69; box-shadow:
    drift out of alignment (a gradient would have to re-derive the track pitch,
    the centring offset and the scroll position by hand). */
 .asr-cards{
-  --ac-w:162px; --ac-h:84px; --ac-gap:8px; --ac-rows:3; --ac-pad:9px;
+  --ac-w:162px; --ac-h:84px; --ac-gap:8px; --ac-rows:5; --ac-pad:9px;
   position:relative;
   /* height derived from the slot geometry (border-box: padding + border count),
      so the tray always shows exactly --ac-rows full rows and never a half one */
@@ -647,6 +683,28 @@ body.theme-light .asr-card .ac-count{color:#8a6510}
    sits in the panel head (MOD), because the card's bottom row has no room. */
 .asr-card.mod .ac-avatar{box-shadow:0 0 0 2px #9fb4c2aa}
 body.theme-light .asr-card.mod .ac-avatar{box-shadow:0 0 0 2px #7d8f9caa}
+
+/* callsign correction: the call itself is the edit target, so the card needs no
+   extra button in a row that has no room for one */
+.asr-card .ac-call{cursor:text}
+.asr-card .ac-edit{
+  width:100%; min-width:0; padding:0; margin:0;
+  font-family:var(--font-mono); font-size:13px; font-weight:700; letter-spacing:.10em;
+  color:var(--text); background:transparent;
+  border:none; border-bottom:1px solid #9fb4c2; outline:none;
+}
+/* attributed by voice rather than by a heard callsign — a dotted mark, so it is
+   never mistaken for the solid red of "just heard saying its call" */
+.asr-card.byvoice{border-style:dashed}
+.asr-card.byvoice .ac-avatar{border-style:dashed}
+/* the last voice decision, above the tray: stage 1 ("observe") is only visible
+   here, and an empty line must not reserve height */
+.asr-voice-note{
+  font-family:var(--font-mono); font-size:10px; color:var(--text-dim);
+  padding:0 2px 5px; letter-spacing:.02em;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.asr-voice-note:empty{display:none}
 
 /* the most recently heard contact -- marked in the TX red used elsewhere for
    "live right now", so it reads as activity rather than as a status colour */

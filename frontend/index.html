@@ -595,14 +595,17 @@
              title="Rufzeichen von Hand eintragen, wenn die Erkennung es verpasst hat">
       <button class="scan-clear" id="asr-manual-add" type="button"
               title="Rufzeichen als Karte eintragen (oder Eingabetaste)">LOG</button>
-      <span class="asr-total" id="asr-total" title="Summe der Redezeiten in diesem Panel — ohne als Moderator (M) gekennzeichnete Stationen">Σ 00:00:00</span>
       <button class="scan-clear" id="asr-mod" type="button" aria-pressed="false" disabled
               title="Karte anklicken, dann als Moderator kennzeichnen">MOD</button>
       <button class="scan-clear" id="asr-stats" type="button" title="Redezeiten auswerten — Rangliste aller Stationen">STATS</button>
+      <span class="asr-total" id="asr-total" title="Summe der Redezeiten in diesem Panel — ohne als Moderator (M) gekennzeichnete Stationen">Σ 00:00:00</span>
       <button class="scan-clear" id="asr-log-clear" type="button" title="Alle Kontaktkarten aus der Ansicht entfernen">CLEAR ALL</button>
+      <button class="scan-clear" id="asr-voice" type="button" aria-pressed="false"
+              title="Stimmerkennung">VOICE</button>
       <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="debug-body" title="Show / hide the recognised contacts">▲</button>
     </div>
     <div class="panel-body" id="debug-body">
+      <div class="asr-voice-note" id="asr-voice-note"></div>
       <div class="asr-cards" id="asr-log" aria-live="polite" role="log"
            data-empty="(noch keine erkannten Rufzeichen)"></div>
     </div>
@@ -807,6 +810,17 @@
           <span>Auto-detect callsigns (Vosk)</span>
         </label>
         <p class="pane-hint" id="asr-hint">Listens to the RX audio while the squelch is open and recognises spoken German callsigns (international &amp; German phonetic alphabet plus German letter names — "Delta Bravo null Sierra Papa" or "de-be-null-es-pe"). A hit is shown in the title bar next to your callsign and as a toast with QRZ.com details; your own callsign is ignored. Best-effort assist on voice — expect occasional misses/false hits. Needs the Vosk model on the Pi.</p>
+      </div>
+      <div class="mixer-field">
+        <span class="logo-label">Voice ID</span>
+        <label>Stimmerkennung
+          <select id="set-spk-mode">
+            <option value="off">Aus</option>
+            <option value="observe">Beobachten (nur melden)</option>
+            <option value="act">Zuordnen (Marke + Timer)</option>
+          </select>
+        </label>
+        <p class="pane-hint">Ordnet einen Durchgang <em>ohne</em> genanntes Rufzeichen einer Station zu, deren Stimme schon einmal mit Rufzeichen zu hören war. Das Einlernen läuft nebenbei: Jeder erkannte Ruf beschriftet seine eigene Aufnahme. Ein Durchgang endet an der <em>Sprechpause</em>, nicht am Träger — über ein Relais bleibt BUSY sonst die ganze Runde stehen. Gemessen an zwei Mitschnitten derselben Runde: gleiche Station 0,62–0,79 Kosinus, fremde 0,33 im Mittel; bei Schwelle 0,55 und 0,10 Abstand 3 von 4 richtig, keine Fehlzuordnung, keine der 7 fremden Stationen verwechselt. Unter ~3 s Sprache wird nichts geraten. „Beobachten" entscheidet und meldet nur; erst „Zuordnen" verschiebt Marke und Redezeit — eine <em>von Hand</em> gewählte Kachel hat immer Vorrang. Die Stimmprofile bleiben auf dem Pi (<span id="spk-profiles">0</span> gespeichert) und werden mit der Karte gelöscht.</p>
       </div>
       <div class="mixer-field">
         <span class="logo-label">TX voice filter</span>

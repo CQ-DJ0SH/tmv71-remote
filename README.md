@@ -248,7 +248,12 @@ mkdir -p models && cd models
 curl -LO https://alphacephei.com/vosk/models/vosk-model-small-de-0.15.zip
 unzip vosk-model-small-de-0.15.zip && rm vosk-model-small-de-0.15.zip && cd ..
 
-# 2) callsign list (optional — enables name/town/class + VOID verification)
+# 2) speaker model (optional — voice ID for overs with no spoken callsign, ~14 MB)
+cd models
+curl -LO https://alphacephei.com/vosk/models/vosk-model-spk-0.4.zip
+unzip vosk-model-spk-0.4.zip && rm vosk-model-spk-0.4.zip && cd ..
+
+# 3) callsign list (optional — enables name/town/class + VOID verification)
 backend/.venv/bin/pip install pypdf
 # place the current BNetzA Rufzeichenliste PDF at /opt/rufzeichenliste_afu.pdf, then
 # run the converter once to build the cache (~700 pages, a few minutes):

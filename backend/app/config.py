@@ -94,6 +94,17 @@ class Settings(BaseSettings):
     # Neither the PDF nor its extracted cache is committed (gitignored).
     asr_calllist_pdf: str = ""
 
+    # Speaker recognition ("voice"): attribute an over that carries no spoken
+    # callsign to a station whose voice has already been heard. Profiles build
+    # themselves from the overs the ASR did recognise (see speaker_id.py).
+    #   spk_act False = stage 1, observe only: decide and report, change nothing.
+    #   spk_act True  = stage 2, act: move the mark and the talk timer.
+    # Thresholds are the measured operating point (0.55 score, 0.10 margin).
+    spk_enabled: bool = False     # off by default — switched on with VOICE in the panel
+    spk_act: bool = False
+    spk_threshold: float = 0.55
+    spk_margin: float = 0.10
+
     # UI colour theme ("light" | "dark"). Persisted server-side so the choice
     # survives across browsers/devices and storage clears.
     theme: str = "light"
@@ -141,7 +152,8 @@ _RUNTIME_KEYS = ("serial_port", "serial_baud", "gpio_power_pin",
                  "wavelog_url", "wavelog_key", "wavelog_station_id",
                  "qrz_api_key", "qrz_username", "qrz_password",
                  "selcall_own", "selcall_code",
-                 "boot_mem_a", "boot_mem_b", "boot_control_band")
+                 "boot_mem_a", "boot_mem_b", "boot_control_band",
+                 "spk_enabled", "spk_act", "spk_threshold", "spk_margin")
 
 
 def _load_runtime() -> dict:
