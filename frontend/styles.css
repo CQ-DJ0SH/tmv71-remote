@@ -921,6 +921,23 @@ body.theme-light .asr-tip{background:#ffffffF2; border-color:#c5cfd8; box-shadow
      so the bodies (graphs/decoders) actually render in the deck. */
   .console .collapsed .panel-body{display:block}
   .panel-head .panel-toggle{display:none}
+  /* ---- ASR panel in the deck ----
+     The head has room for two controls, so it carries the two that matter on
+     the move: entering a callsign by hand (out portable the recognition misses
+     more) and VOICE. The talk-time total and the STATS ranking are desk work —
+     hidden here, which is also what keeps the head on one line. VOICE loses its
+     margin-left:auto: in a wrapping head that pushes it onto a line of its own
+     at the far right, where it reads as missing. */
+  .debug-zone .asr-total, .debug-zone #asr-stats{display:none}
+  .debug-zone .panel-head{gap:8px; flex-wrap:wrap}
+  .debug-zone #asr-voice{margin-left:0}
+  .debug-zone .asr-manual{width:96px; margin-left:0}
+  /* the panel title may shrink and clip — the controls next to it must not */
+  .debug-zone .panel-head h2{flex:0 1 auto; min-width:0; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap}
+  .debug-zone .panel-head .asr-manual,
+  .debug-zone .panel-head .scan-clear{flex:0 0 auto}
+
   /* keep the logbook title on one line: don't wrap; let the last-QSO info shrink
      and clip instead of pushing the buttons onto a second row */
   .log-zone .panel-head{flex-wrap:nowrap}
