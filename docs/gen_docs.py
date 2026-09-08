@@ -564,7 +564,7 @@ API_AUDIO = (
     "GET  /api/audio/devices     list sound devices\n"
     "POST /api/audio/device      pick device\n"
     "POST /api/audio/gain        rx/tx gain + TX AGC\n"
-    "POST /api/audio/buffer      tx buffer / ptt tail\n"
+    "POST /api/audio/buffer      tx buffer / ptt tail / rx buffer\n"
     "POST /api/audio/tones       roger/test/mic/lowpass/de-emph/squelch\n"
     "POST /api/audio/record[/clear]  raw RX recorder\n"
     "GET  /api/audio/record.wav  download recording (WAV)\n"
@@ -814,9 +814,25 @@ EN = [
           "and a small recorder — ● REC / ▶ PLAY plus a WAV download of the raw, "
           "un-squelched RX feed (up to 60 min; e.g. to build ASR training data; the "
           "downloaded file is named with the date and time it was saved). "
-          "TX timing (buffer / trail) and the USB card mixer are in Settings > "
-          "Audio. The link auto-reconnects after a network glitch and is restored "
-          "on the next launch."),
+          "Audio timing (TX buffer / TX trail / RX buffer) and the USB card mixer "
+          "are in Settings > Audio. The link auto-reconnects after a network "
+          "glitch and is restored on the next launch."),
+    ("p", "The RX buffer (Settings > Audio, 60 ms by default) is a jitter buffer "
+          "between the sound card and the WebRTC track, and it is worth knowing "
+          "why it exists. The card produces a 20 ms block on its own clock; the "
+          "track emits a frame every 20 ms on the backend's clock. Two "
+          "independent clocks sampling each other means that whenever one runs a "
+          "few milliseconds early or late, a block goes out twice or is skipped "
+          "— and every such seam is an audible click. Under load (the callsign "
+          "recogniser runs continuously, and each over costs another ~1.3 s for "
+          "its voiceprint) that is frequent enough to sound like crackle. Three "
+          "20 ms blocks absorb it; the delay they add is not noticeable in a "
+          "QSO. Raise it if the received audio still crackles, lower it for the "
+          "shortest possible delay. Each listening browser gets its own queue, "
+          "capped so a client that falls behind loses its oldest blocks instead "
+          "of accumulating delay; a queue that runs dry refills to the target "
+          "before playing out again, because limping along one block deep means "
+          "the next hiccup clicks as well."),
     ("p", "RX conditioning (Settings > Audio): a RX de-emphasis (adjustable time "
           "constant, on by default) restores natural voice tone when the audio "
           "comes from a flat discriminator / 9600-baud data output; a fixed ~180 Hz "
@@ -1044,7 +1060,7 @@ EN = [
     ("h2", "Settings"),
     ("p", "Tabs: General (callsign, API backend URL, serial port/baud, GPIO power, "
           "auto power-off, logo, GitHub self-update, Root-CA download), Audio "
-          "(device, USB mixer, voice filters, test tone, TX timing), Rig-Info, "
+          "(device, USB mixer, voice filters, test tone, audio timing), Rig-Info, "
           "Rig-Memory, Rig-DTMF, Logging (Wavelog + QRZ.com), and Pi-Hardware "
           "(host metrics)."),
     ("h1", "8  Mobile App (PWA)"),
@@ -1284,9 +1300,27 @@ DE = [
           "ein kleiner Rekorder — ● REC / ▶ PLAY plus WAV-Download des rohen, "
           "un-gesquelchten RX-Signals (bis 60 min; z. B. für ASR-Trainingsdaten; der "
           "Dateiname des Downloads trägt Datum und Uhrzeit der Sicherung). "
-          "TX-Timing (Buffer/Trail) und der USB-Mixer liegen unter Einstellungen > "
-          "Audio. Die Verbindung verbindet sich nach einer Netzstörung automatisch "
-          "neu und wird beim nächsten Start wiederhergestellt."),
+          "Audio-Timing (TX-Buffer / TX-Trail / RX-Buffer) und der USB-Mixer "
+          "liegen unter Einstellungen > Audio. Die Verbindung verbindet sich nach "
+          "einer Netzstörung automatisch neu und wird beim nächsten Start "
+          "wiederhergestellt."),
+    ("p", "Der RX-Buffer (Einstellungen > Audio, standardmäßig 60 ms) ist ein "
+          "Jitterpuffer zwischen Soundkarte und WebRTC-Track — und es lohnt zu "
+          "wissen, warum es ihn gibt. Die Karte liefert alle 20 ms einen Block "
+          "auf ihrer eigenen Uhr; der Track gibt alle 20 ms einen Rahmen auf der "
+          "Uhr des Backends aus. Zwei unabhängige Uhren, die einander abtasten: "
+          "Läuft eine ein paar Millisekunden vor oder nach, geht ein Block "
+          "zweimal hinaus oder fällt aus — und jede dieser Nahtstellen ist ein "
+          "hörbarer Klick. Unter Last (die Rufzeichenerkennung läuft dauernd, je "
+          "Durchgang kommen ~1,3 s für den Stimmabdruck dazu) passiert das oft "
+          "genug, um als Knattern durchzugehen. Drei 20-ms-Blöcke fangen das ab; "
+          "die zusätzliche Verzögerung fällt im QSO nicht auf. Höher stellen, "
+          "wenn der Empfangston weiterhin knattert, niedriger für die kürzeste "
+          "Verzögerung. Jeder zuhörende Browser bekommt seine eigene "
+          "Warteschlange, gedeckelt, damit ein hängender Client seine ältesten "
+          "Blöcke verliert statt Verzögerung anzuhäufen; eine leergelaufene "
+          "Schlange füllt erst wieder auf die Solltiefe, denn einen Block tief "
+          "weiterzuhumpeln hieße, dass der nächste Aussetzer ebenfalls klickt."),
     ("p", "RX-Aufbereitung (Einstellungen > Audio): eine RX-De-emphasis "
           "(einstellbare Zeitkonstante, standardmäßig an) stellt den natürlichen "
           "Klang her, wenn das Audio vom flachen Diskriminator-/9600-Baud-Ausgang "
@@ -1537,7 +1571,7 @@ DE = [
     ("h2", "Einstellungen"),
     ("p", "Reiter: Allgemein (Rufzeichen, API-Backend-URL, serieller Port/Baud, "
           "GPIO-Power, Auto-Abschaltung, Logo, GitHub-Update, Root-CA-Download), "
-          "Audio (Gerät, USB-Mixer, Sprachfilter, Testton, TX-Timing), Rig-Info, "
+          "Audio (Gerät, USB-Mixer, Sprachfilter, Testton, Audio-Timing), Rig-Info, "
           "Rig-Speicher, Rig-DTMF, Logging (Wavelog + QRZ.com) und Pi-Hardware "
           "(Host-Metriken)."),
     ("h1", "8  Mobile App (PWA)"),
