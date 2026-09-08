@@ -164,9 +164,10 @@ class AudioDeviceRequest(BaseModel):
 
 
 class AudioBufferRequest(BaseModel):
-    """TX path timing: mic backlog cap and the post-release transmit tail."""
+    """Audio path timing: mic backlog cap, transmit tail, RX jitter buffer."""
     tx_buffer_ms: Optional[int] = Field(default=None, ge=20, le=1000)
     ptt_tail_ms: Optional[int] = Field(default=None, ge=0, le=1000)
+    rx_buffer_ms: Optional[int] = Field(default=None, ge=20, le=300)
 
 
 class TonesRequest(BaseModel):

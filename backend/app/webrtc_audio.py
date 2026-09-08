@@ -31,6 +31,10 @@ log = logging.getLogger("tmv71.audio")
 SAMPLE_RATE = 48000
 BLOCK = 960          # 20 ms @ 48 kHz
 DEF_TX_BUFFER_MS = 250    # default mic backlog cap — bounds TX latency vs jitter
+# RX jitter buffer: three 20 ms blocks. Enough to absorb the drift between the
+# sound-card clock and the event loop (which is what made the playback crackle),
+# little enough that the added delay is not noticeable in a QSO.
+DEF_RX_BUFFER_MS = 60
 DEF_PTT_TAIL_MS = 250     # default post-release transmit tail (drain settle)
 TX_LP_CUTOFF = 3500.0     # voice low-pass cutoff (Hz) for the TX mic path
 RX_LP_CUTOFF = 3500.0     # voice low-pass cutoff (Hz) for the RX path (de-hiss)
@@ -184,7 +188,8 @@ class RadioAudio:
                  ptt_tail_ms: int = DEF_PTT_TAIL_MS, tx_lowpass: bool = False,
                  rx_lowpass: bool = False, tx_auto_gain: bool = False,
                  rx_deemph: bool = False, rx_squelch: bool = False,
-                 rx_deemph_us: float = DEEMPH_TAU_US):
+                 rx_deemph_us: float = DEEMPH_TAU_US,
+                 rx_buffer_ms: int = DEF_RX_BUFFER_MS):
         self.device = device
         self.rx_gain = rx_gain
         self.tx_gain = tx_gain
@@ -225,6 +230,10 @@ class RadioAudio:
         # the block goes stale and the track emits silence instead of freezing.
         self._latest: Optional[bytes] = None
         self._latest_ts: float = 0.0
+        # RX jitter buffer, one queue per listening peer (see rx_subscribe)
+        self._rx_subs: list = []
+        self._rx_lock = threading.Lock()
+        self.rx_buffer_ms: int = int(rx_buffer_ms)
         self._playback: deque = deque()
         self._pb_lock = threading.Lock()
         self._ptt_open = False
@@ -470,8 +479,20 @@ class RadioAudio:
         # still get the raw signal via the taps above.
         self.rx_db = _level(pub, self.rx_db)
         # publish the latest block; the clock-paced RX track(s) pick it up.
-        self._latest = pub.tobytes()
+        blk = pub.tobytes()
+        self._latest = blk
         self._latest_ts = time.monotonic()
+        # Hand the block to every listening peer's own queue. A shared queue
+        # would let two browsers steal blocks from each other; a shared "latest
+        # block" (what this used to be) makes both of them resample the capture
+        # on their own clock — which is where the crackle came from.
+        if self._rx_subs:
+            cap = self.rx_depth() * 3
+            with self._rx_lock:
+                for q in self._rx_subs:
+                    q.append(blk)
+                    while len(q) > cap:      # peer fell behind -> drop the oldest
+                        q.popleft()
         # TX: radio mic source. The two-tone test is emitted continuously on the
         # mic line regardless of PTT (so deviation can be set without holding the
         # key); the roger beep and queued browser mic only play while keyed.
@@ -604,6 +625,29 @@ class RadioAudio:
 
     def stop_digi_tx(self) -> None:
         self._digi_tx = None
+
+    def rx_depth(self) -> int:
+        """Target queue depth in blocks (20 ms each)."""
+        return max(1, int(round(self.rx_buffer_ms / 20.0)))
+
+    def rx_subscribe(self) -> deque:
+        q: deque = deque()
+        with self._rx_lock:
+            self._rx_subs.append(q)
+        return q
+
+    def rx_unsubscribe(self, q) -> None:
+        with self._rx_lock:
+            if q in self._rx_subs:
+                self._rx_subs.remove(q)
+
+    def set_rx_buffer(self, ms: Optional[int]) -> None:
+        if ms is None:
+            return
+        self.rx_buffer_ms = max(20, min(300, int(ms)))
+        with self._rx_lock:                 # start over at the new depth
+            for q in self._rx_subs:
+                q.clear()
 
     def latest_block(self) -> Optional[bytes]:
         """Most recent RX block, or None if the capture has gone stale
@@ -785,6 +829,7 @@ class RadioAudio:
                 "tx_auto_gain": self.tx_auto_gain,
                 "agc_gain": round(self._agc_gain, 2),   # live AGC factor (display)
                 "tx_buffer_ms": self.tx_buffer_ms, "ptt_tail_ms": self.ptt_tail_ms,
+                "rx_buffer_ms": self.rx_buffer_ms,
                 "device": self.device, "peers": self.peers,
                 "test_tone": self.test_tone, "tone_1750": self.tone_1750,
                 "roger_beep": self.roger_beep,
@@ -805,11 +850,18 @@ class RadioRxTrack(MediaStreamTrack):
     """Outgoing track: radio RX audio -> browser.
 
     Clock-paced: emits one 20 ms frame every 20 ms of wall time, independent of
-    the PortAudio callback. It reads the radio's most recent capture block; if
-    the capture has stalled (block stale) it emits silence. This keeps the
-    WebRTC media timeline locked to real time, so a capture glitch produces a
-    short gap of silence instead of a frozen stream that the browser jitter
-    buffer can never recover from. When capture resumes, audio returns seamless.
+    the PortAudio callback. That keeps the WebRTC media timeline locked to real
+    time, so a capture glitch becomes a short gap of silence instead of a frozen
+    stream the browser's jitter buffer can never recover from.
+
+    Between the two clocks sits a small queue. Reading the "most recent block"
+    instead — which is what this did — means two independent clocks sampling
+    each other: whenever the event loop was a few ms late or early against the
+    sound card, the same 20 ms went out twice or one was skipped, and each of
+    those seams is an audible click. Under load (the Vosk decode, an x-vector)
+    that happens often enough to sound like crackle. The queue absorbs that
+    jitter; only a real drift between the two clocks still costs a block, and
+    then rarely and boundedly: the queue is capped, so latency cannot grow.
     """
     kind = "audio"
 
@@ -819,6 +871,8 @@ class RadioRxTrack(MediaStreamTrack):
         self._pts = 0
         self._start: Optional[float] = None
         self._silence = np.zeros((1, BLOCK), dtype=np.int16)
+        self._q = radio.rx_subscribe()      # this peer's own block queue
+        self._fill = True                   # refill before playing out
 
     async def recv(self) -> AudioFrame:
         loop = asyncio.get_event_loop()
@@ -828,7 +882,7 @@ class RadioRxTrack(MediaStreamTrack):
             # pace to wall clock: frame N is due at start + N*20ms
             target = self._start + (self._pts + BLOCK) / SAMPLE_RATE
             await asyncio.sleep(max(0.0, target - loop.time()))
-        data = self._radio.latest_block()
+        data = self._next_block()
         if data is None:
             arr = self._silence
         else:
@@ -842,7 +896,26 @@ class RadioRxTrack(MediaStreamTrack):
         self._pts += BLOCK
         return frame
 
+    def _next_block(self) -> Optional[bytes]:
+        """One block from the queue, or None (silence) while it is filling.
+
+        Running dry means the capture stalled or the loop overran; rather than
+        limping along one block deep — where every further hiccup is another
+        click — the buffer is refilled to its target first. A short silence at
+        the start of an over is cheaper than continuous crackle.
+        """
+        q = self._q
+        if self._fill:
+            if len(q) < self._radio.rx_depth():
+                return None
+            self._fill = False
+        if not q:
+            self._fill = True
+            return None
+        return q.popleft()
+
     def stop(self) -> None:
+        self._radio.rx_unsubscribe(self._q)
         super().stop()
 
 

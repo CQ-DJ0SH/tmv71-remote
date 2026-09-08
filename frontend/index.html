@@ -839,18 +839,22 @@
         <p class="pane-hint">Replaces the mic with a continuous 700 + 1900 Hz signal — for setting deviation; use a dummy load. The tone is emitted whether or not PTT is pressed; a ⚠ warning shows in the PTT panel while it is active.</p>
       </div>
       <div class="mixer-field">
-        <span class="logo-label">TX timing</span>
+        <span class="logo-label">Audio timing</span>
         <div class="audio-ctl">
-          <label class="acg">BUFFER
+          <label class="acg">TX BUFFER
             <input type="range" id="tx-buffer" min="40" max="500" step="5" value="250" style="--def-pct:13.04%">
             <span class="gv" id="tx-buffer-val">250 ms</span>
           </label>
-          <label class="acg">TRAIL
+          <label class="acg">TX TRAIL
             <input type="range" id="ptt-tail" min="0" max="500" step="10" value="250" style="--def-pct:22%">
             <span class="gv" id="ptt-tail-val">250 ms</span>
           </label>
+          <label class="acg">RX BUFFER
+            <input type="range" id="rx-buffer" min="20" max="300" step="20" value="60" style="--def-pct:14.3%">
+            <span class="gv" id="rx-buffer-val">60 ms</span>
+          </label>
         </div>
-        <p class="pane-hint">BUFFER: mic backlog cap — lower = less TX latency, higher = more tolerant of network jitter (tick = recommended 100 ms). TRAIL: how long TX stays keyed after you release, so the buffered tail isn't chopped (tick = recommended 110 ms).</p>
+        <p class="pane-hint">TX BUFFER: mic backlog cap — lower = less TX latency, higher = more tolerant of network jitter (tick = recommended 100 ms). TX TRAIL: how long TX stays keyed after you release, so the buffered tail isn't chopped (tick = recommended 110 ms). RX BUFFER: jitter buffer between the sound card and the WebRTC track, in 20 ms blocks. The card and the event loop run on different clocks; without a buffer a block is now and then sent twice or skipped, and every such seam is a click. Raise it if the received audio crackles, lower it for the shortest delay (tick = recommended 60 ms).</p>
       </div>
       <div class="modal-actions">
         <button id="set-cancel-audio" class="btn-ghost">CLOSE</button>

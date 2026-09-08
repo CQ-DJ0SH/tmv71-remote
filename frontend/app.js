@@ -1280,6 +1280,7 @@ async function loadTones() {
     if (s.roger_beep_level != null) { const sl = $("#roger-level"); if (sl) { const v = Math.round(s.roger_beep_level * 1000); sl.value = v; setRogerUi(v); } }
     if (s.tx_buffer_ms != null) { const sl = $("#tx-buffer"); if (sl) sl.value = s.tx_buffer_ms; setMsUi("tx-buffer", s.tx_buffer_ms); }
     if (s.ptt_tail_ms != null) { const sl = $("#ptt-tail"); if (sl) sl.value = s.ptt_tail_ms; setMsUi("ptt-tail", s.ptt_tail_ms); }
+    if (s.rx_buffer_ms != null) { const sl = $("#rx-buffer"); if (sl) sl.value = s.rx_buffer_ms; setMsUi("rx-buffer", s.rx_buffer_ms); }
   } catch { /* leave as-is */ }
 }
 
@@ -1385,13 +1386,14 @@ function bindAudio() {
       catch (e) { toast("Auto gain: " + e.message, "err"); txAuto.checked = !txAuto.checked; setTxAutoUi(txAuto.checked); }
     });
   }
-  [["tx-buffer", "tx_buffer_ms"], ["ptt-tail", "ptt_tail_ms"]].forEach(([id, key]) => {
+  [["tx-buffer", "tx_buffer_ms"], ["ptt-tail", "ptt_tail_ms"],
+   ["rx-buffer", "rx_buffer_ms"]].forEach(([id, key]) => {
     const sl = document.getElementById(id); if (!sl) return;
     sl.addEventListener("input", () => setMsUi(id, sl.value));
     sl.addEventListener("change", async () => {
       const body = {}; body[key] = Number(sl.value);
       try { await api("POST", "/api/audio/buffer", body); }
-      catch (e) { toast("TX timing: " + e.message, "err"); }
+      catch (e) { toast("Audio timing: " + e.message, "err"); }
     });
   });
   const du = $("#deemph-us");

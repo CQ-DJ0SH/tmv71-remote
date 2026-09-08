@@ -1931,10 +1931,12 @@ body.theme-light #audio-toggle.connected:hover{
 }
 #rx-gain{--g-accent:#8b7ad6}   /* RX in the audio-panel colour (violet) */
 #tx-gain{--g-accent:#cf6159}   /* MIC gain slider: muted red */
-/* TX timing sliders: muted cyan — without --g-accent the gradient is invalid
-   and the browser falls back to a glaring default track */
-#tx-buffer, #ptt-tail, #deemph-us, #roger-level{--g-accent:#3fa6b3}
-#tx-buffer-val, #ptt-tail-val, #deemph-us-val, #roger-level-val{color:#5cc3cf}
+/* Audio timing sliders: muted cyan — without --g-accent the whole background
+   shorthand is invalid and the track disappears (a new slider left off this
+   list has no visible groove at all, only a thumb) */
+#tx-buffer, #ptt-tail, #rx-buffer, #deemph-us, #roger-level{--g-accent:#3fa6b3}
+#tx-buffer-val, #ptt-tail-val, #rx-buffer-val,
+#deemph-us-val, #roger-level-val{color:#5cc3cf}
 .audio-ctl .gv{font-family:var(--font-mono); font-size:11px; color:var(--cyan); width:40px; text-align:right}
 /* RX value: audio-panel violet; shrink to content + left-align so the short
    whole-number value sits snug to the slider instead of a wide right-aligned box */

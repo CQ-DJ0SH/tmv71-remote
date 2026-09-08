@@ -90,6 +90,7 @@ radio_audio = RadioAudio(device=settings.audio_device,
                          tx_auto_gain=settings.tx_auto_gain,
                          rx_deemph=settings.rx_deemph_enabled,
                          rx_squelch=settings.rx_squelch_enabled,
+                         rx_buffer_ms=settings.rx_buffer_ms,
                          rx_deemph_us=settings.rx_deemph_us)
 pcs: set = set()      # active WebRTC peer connections
 
@@ -1757,10 +1758,13 @@ async def download_audio_record() -> Response:
 async def set_audio_buffer(req: AudioBufferRequest) -> dict:
     radio_audio.set_tx_timing(tx_buffer_ms=req.tx_buffer_ms,
                               ptt_tail_ms=req.ptt_tail_ms)
+    radio_audio.set_rx_buffer(req.rx_buffer_ms)
     settings.tx_buffer_ms = radio_audio.tx_buffer_ms
     settings.ptt_tail_ms = radio_audio.ptt_tail_ms
+    settings.rx_buffer_ms = radio_audio.rx_buffer_ms
     save_runtime(tx_buffer_ms=radio_audio.tx_buffer_ms,
-                 ptt_tail_ms=radio_audio.ptt_tail_ms)
+                 ptt_tail_ms=radio_audio.ptt_tail_ms,
+                 rx_buffer_ms=radio_audio.rx_buffer_ms)
     return radio_audio.status()
 
 

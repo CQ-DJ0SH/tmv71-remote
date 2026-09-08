@@ -79,6 +79,11 @@ class Settings(BaseSettings):
     rx_deemph_enabled: bool = True
     rx_deemph_us: float = 75.0
 
+    # RX jitter buffer between the sound-card callback and the WebRTC track, in
+    # ms (20 ms = one block). Absorbs the drift between the audio clock and the
+    # event loop, which otherwise repeats or skips a block — an audible click.
+    rx_buffer_ms: int = 60
+
     # Software squelch gated by the radio's BUSY status (for the always-open
     # discriminator/9600 output that bypasses the hardware squelch).
     rx_squelch_enabled: bool = False
@@ -149,6 +154,7 @@ _RUNTIME_KEYS = ("serial_port", "serial_baud", "gpio_power_pin",
                  "callsign", "roger_beep_enabled", "roger_beep_level", "theme",
                  "tx_lowpass_enabled", "rx_lowpass_enabled", "rx_deemph_enabled",
                  "rx_deemph_us", "rx_squelch_enabled", "asr_callsign_enabled",
+                 "rx_buffer_ms",
                  "wavelog_url", "wavelog_key", "wavelog_station_id",
                  "qrz_api_key", "qrz_username", "qrz_password",
                  "selcall_own", "selcall_code",
