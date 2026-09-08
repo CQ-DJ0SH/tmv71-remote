@@ -3169,6 +3169,36 @@ function overForget() {
 // applies to the over it was made in and normal operation resumes afterwards.
 // A callsign actually HEARD still moves the mark: that is evidence, not a guess.
 let overPin = false;
+// The manual pick corrects ONE over, so it needs a way back: clicking the held
+// card again releases it, a callsign actually heard releases it (evidence ends
+// a correction), and the start of the next over releases it. The card keeps its
+// mark either way — released only means the voice may move it again.
+function overUnpin() {
+  if (!overPin) return;
+  overPin = false;
+  document.querySelectorAll("#asr-log .asr-card.pinned")
+    .forEach(c => c.classList.remove("pinned"));
+}
+function overSetPin(card) {
+  overUnpin();
+  overPin = true;
+  card?.classList.add("pinned");
+}
+// Letting go of a hand-picked card deliberately: the hold, the red "current"
+// ring and the talk timer all belong to that pick, so all three go — a card
+// that still counted time while looking like no card at all would be exactly
+// the invisible state this button exists to avoid. The time counted so far is
+// banked on the card first; releasing must not lose it.
+function overRelease(card) {
+  overUnpin();
+  card.classList.remove("marked", "byvoice");
+  if (overCard === card) {
+    overStop();                  // fold the running stretch into the card
+    overCard = null;
+    overAcc = 0;
+    asrModSync();                // no focused card -> MOD has nothing to act on
+  }
+}
 function overFocus(card, byVoice = false) {
   if (byVoice && overPin) return;
   if (overCard === card) return;
@@ -3376,7 +3406,7 @@ $("#asr-voice")?.addEventListener("click", async () => {
 // heard (enrolment, free) or matches it against the profiles. Stage 1 only
 // reports what it would have decided; stage 2 moves the mark and the timer.
 function asrVoice(m) {
-  if (m.event === "start") { overPin = false; return; }   // new over
+  if (m.event === "start") { overUnpin(); return; }      // new over
   if (m.event === "enrol") {
     spkCountPaint(m.profiles);
     const card = asrCards.get(m.call);
@@ -3529,7 +3559,7 @@ function asrCardBuild(e) {
   dur.title = "Redezeit dieser Station starten / stoppen";
   dur.addEventListener("click", ev => {
     ev.stopPropagation();
-    overPin = true;                  // starting a timer by hand is a manual pick
+    overSetPin(card);                // starting a timer by hand is a manual pick
     overFocus(card);
     if (overRunning()) overStop();
     else overStart = Date.now();     // resumes this card's own total
@@ -3561,11 +3591,13 @@ function asrCardBuild(e) {
   // timer — onto this contact, for when the wrong one is marked or the ASR
   // attributed the over to the previous station
   card.addEventListener("click", () => {
+    // a second click on the held card lets go of it again
+    if (overPin && card.classList.contains("pinned")) { overRelease(card); return; }
     const box = $("#asr-log");
     box?.querySelectorAll(".asr-card.marked").forEach(c => c.classList.remove("marked"));
     box?.querySelectorAll(".asr-card.byvoice").forEach(c => c.classList.remove("byvoice"));
     card.classList.add("marked");
-    overPin = true;             // hand-picked: the voice must not move it again
+    overSetPin(card);           // hand-picked: the voice must not move it again
     overFocus(card);            // deliberately no repaint — see overPaint()
   });
   const del = mk("button", "ac-del", "✕");
@@ -3783,6 +3815,7 @@ function asrLog(e, fresh = true) {
   // moving it would reshuffle the tray under the reader's eyes on every over.
   if (isNew) box.insertBefore(card, box.firstChild);
   if (fresh) {
+    overUnpin();               // a heard callsign supersedes a hand-picked card
     box.querySelectorAll(".asr-card.marked").forEach(c => c.classList.remove("marked"));
     card.classList.add("marked");                      // exactly one current card
     card.classList.remove("flash");
@@ -3829,10 +3862,28 @@ async function asrManualAdd() {
 asrManual?.addEventListener("keydown", ev => { if (ev.key === "Enter") asrManualAdd(); });
 $("#asr-manual-add")?.addEventListener("click", asrManualAdd);
 
-$("#asr-log-clear")?.addEventListener("click", () => {
+// CLEAR ALL empties the log on the Pi as well. Clearing only the view left the
+// history in the ring buffer, so the next reload brought every card back — and
+// the talk times, which live in the browser, were gone for good. Asking first,
+// because this now takes the cards away from every open client at once.
+$("#asr-log-clear")?.addEventListener("click", async () => {
+  const n = asrCards.size;
+  if (!n) return;
+  const ok = await confirmDialog(
+    `Alle ${n} Kontaktkarten entfernen — auch auf dem Pi und in anderen Browsern?`
+    + " Die Redezeiten gehen dabei verloren; die gelernten Stimmen bleiben.",
+    { title: "CLEAR ALL", okText: "LÖSCHEN", cancelText: "ABBRECHEN", danger: true });
+  if (!ok) return;
+  asrClearView();
+  try { await api("DELETE", "/api/asr/log"); }
+  catch (err) { toast("Löschen: " + err.message, "err"); }
+});
+// the local half of a clear — also runs when another client clears the log
+function asrClearView() {
   const box = $("#asr-log"); if (box) box.textContent = "";
   asrCards.clear(); asrTipHide(); overForget(); asrFillSlots();
-});
+  voiceLast = ""; voicePaint();
+}
 
 function connectCallsignWS() {
   let ws;
@@ -3847,6 +3898,7 @@ function connectCallsignWS() {
       return;
     }
     if (m.t === "asrvoice") { asrVoice(m); return; }
+    if (m.t === "asrclear") { asrClearView(); return; }
     if (m.t === "asrrename" && m.old) {
       asrRenameCard(m);
       if (m.profiles != null) spkCountPaint(m.profiles);

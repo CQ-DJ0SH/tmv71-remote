@@ -580,6 +580,7 @@ API_DIGI = (
     "POST /api/asr/log           add a callsign by hand\n"
     "PATCH /api/asr/log/{call}   correct a callsign (profile follows)\n"
     "GET/POST /api/asr/speaker   voice ID: on/off, stage, limits\n"
+    "DELETE /api/asr/log         empty the contact log (CLEAR ALL)\n"
     "DELETE /api/asr/log/{call}  drop a misrecognised contact\n"
     "WS   /ws/callsign           recognised-callsign events\n"
     "GET  /api/selcall           5-tone status\n"
@@ -964,9 +965,11 @@ EN = [
         "the ranking, without a bar and without a rank. COPY puts the list on the "
         "clipboard as plain text. The dialog keeps counting while a station is "
         "being heard, so it can stay open through an over.",
-        "CLEAR ALL empties the tray — in dark red, because it takes every card "
-        "at once. It clears the view only; the cross on a single card also "
-        "deletes that contact on the Pi.",
+        "CLEAR ALL empties the log — in dark red, because it takes every card "
+        "at once, on the Pi and in every open client, and asks before it does. "
+        "The talk times go with them (they live in the browser); the learned "
+        "voices do not — clearing a list is not the same statement as “this "
+        "was wrong”, which is what the cross on a single card means.",
         "VOICE, at the right-hand end, switches the speaker recognition on and "
         "off (see below). Its lamp pulses green while it is listening; an "
         "outlined button means it only observes, a filled one that it acts.",
@@ -1447,9 +1450,12 @@ DE = [
         "Klartext in die Zwischenablage. Der Dialog zählt weiter, solange eine "
         "Station zu hören ist, kann also über einen Durchgang hinweg offen "
         "bleiben.",
-        "CLEAR ALL leert den Kartenkasten — in Dunkelrot, weil es alle Karten "
-        "auf einmal betrifft. Es räumt nur die Ansicht; das ✕ auf einer "
-        "einzelnen Karte löscht den Kontakt zusätzlich auf dem Pi.",
+        "CLEAR ALL leert das Protokoll — in Dunkelrot, weil es alle Karten auf "
+        "einmal betrifft, auf dem Pi und in jedem offenen Client, und deshalb "
+        "vorher nachfragt. Die Redezeiten gehen mit (sie liegen im Browser), "
+        "die gelernten Stimmen nicht: Eine Liste zu leeren ist nicht dieselbe "
+        "Aussage wie „das war falsch“, die das ✕ auf einer einzelnen Karte "
+        "trifft.",
         "VOICE am rechten Ende schaltet die Stimmerkennung ein und aus (siehe "
         "unten). Die Lampe pulst grün, solange sie zuhört; ein umrandeter Knopf "
         "bedeutet, dass sie nur beobachtet, ein gefüllter, dass sie eingreift.",

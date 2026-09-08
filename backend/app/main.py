@@ -614,6 +614,25 @@ class CallsignService:
                          "profiles": self._spk.stats()["profiles"]})
         return before - len(self._log)
 
+    def clear_log(self) -> int:
+        """Empty the contact log — on the Pi, not just in one browser.
+
+        CLEAR ALL used to clear the view only, so the next reload pulled the
+        whole history back from the ring buffer. The de-dupe window is cleared
+        with it, so a station heard again gets a fresh card instead of being
+        muted for 90 s against a list that no longer exists.
+
+        The voice profiles deliberately survive: they took real overs to learn,
+        and clearing a list is not the same statement as “this was wrong”,
+        which is what deleting a single card (drop_call) means."""
+        n = len(self._log)
+        self._log = []
+        self._seen.clear()
+        self._recent.clear()
+        self._marks.clear()
+        self._broadcast({"t": "asrclear"})
+        return n
+
     def rename_call(self, old: str, new: str) -> dict:
         """Correct the callsign on a card.
 
@@ -1915,6 +1934,12 @@ async def asr_config_set(req: AsrConfigRequest) -> dict:
 async def asr_log_add(req: AsrManualRequest) -> dict:
     """Add a contact card by hand (recognition missed or mangled the call)."""
     return callsign_svc.add_manual(req.call)
+
+
+@app.delete("/api/asr/log")
+async def asr_log_clear() -> dict:
+    """Empty the contact log for every client (CLEAR ALL)."""
+    return {"removed": callsign_svc.clear_log()}
 
 
 @app.patch("/api/asr/log/{call}")
