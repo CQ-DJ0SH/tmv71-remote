@@ -165,7 +165,7 @@ class AudioDeviceRequest(BaseModel):
 
 class AudioBufferRequest(BaseModel):
     """Audio path timing: mic backlog cap, transmit tail, RX jitter buffer."""
-    tx_buffer_ms: Optional[int] = Field(default=None, ge=20, le=1000)
+    tx_buffer_ms: Optional[int] = Field(default=None, ge=80, le=1000)
     ptt_tail_ms: Optional[int] = Field(default=None, ge=0, le=1000)
     rx_buffer_ms: Optional[int] = Field(default=None, ge=20, le=300)
 
@@ -177,6 +177,8 @@ class TonesRequest(BaseModel):
     roger_beep_level: Optional[float] = Field(default=None, ge=0, le=1)
     test_tone: Optional[bool] = None
     tx_lowpass: Optional[bool] = None
+    tx_preemph: Optional[bool] = None
+    tx_comp: Optional[bool] = None
     rx_lowpass: Optional[bool] = None
     rx_deemph: Optional[bool] = None
     rx_deemph_us: Optional[float] = Field(default=None, ge=10, le=500)

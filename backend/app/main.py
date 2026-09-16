@@ -91,6 +91,8 @@ radio_audio = RadioAudio(device=settings.audio_device,
                          rx_deemph=settings.rx_deemph_enabled,
                          rx_squelch=settings.rx_squelch_enabled,
                          rx_buffer_ms=settings.rx_buffer_ms,
+                         tx_preemph=settings.tx_preemph_enabled,
+                         tx_comp=settings.tx_comp_enabled,
                          rx_deemph_us=settings.rx_deemph_us)
 pcs: set = set()      # active WebRTC peer connections
 
@@ -412,6 +414,12 @@ class CallsignService:
         self._seg_speech = 0.0        # seconds of speech in it
         self._seg_quiet = 0.0         # seconds since speech last stopped
         self._marks: list = []        # (ts, call) the ASR heard, for labelling
+        # Why so few voices get learned is the first question the panel raises,
+        # so the segmenter counts what it did with each over instead of leaving
+        # it to guesswork.
+        self._seg_stat = {"overs": 0, "short": 0, "nocall": 0, "multi": 0,
+                          "enrol": 0, "match": 0, "accept": 0, "manual": 0}
+        self._spk_last = None         # (ts, vector) of the last unlabelled over
 
     def _model_dir(self) -> str:
         if settings.asr_model_dir:
@@ -435,11 +443,53 @@ class CallsignService:
 
     def spk_status(self) -> dict:
         return {"available": self._spk.available,
+                "seg": dict(self._seg_stat),
                 "enabled": bool(settings.spk_enabled),
                 "act": bool(settings.spk_act),
                 "threshold": settings.spk_threshold,
                 "margin": settings.spk_margin,
                 **self._spk.stats()}
+
+    def mark_manual(self, call: str) -> dict:
+        """A hand-picked card is a label — use it to learn the voice.
+
+        Only recognised callsigns used to teach anything, and in a round most
+        overs carry none, so the profiles grew at a crawl. Picking a card by
+        hand says exactly what the recogniser could not: whose voice this is.
+
+        Two cases, never both. While an over is running the pick labels THAT
+        over, and the segmenter files it when the over closes. Between overs it
+        labels the one that just ended — the correction usually arrives a moment
+        too late, and holding the last unlabelled voiceprint for a few seconds
+        is what makes that click count."""
+        call = "".join(c for c in (call or "").upper() if c.isalnum())
+        if len(call) < 3 or not settings.spk_enabled or not self._spk.available:
+            return {"call": call, "learned": ""}
+        now = time.monotonic()
+        if self._seg:                       # an over is in progress
+            self._marks.append((now, call))
+            return {"call": call, "learned": "current"}
+        last = self._spk_last
+        if last and now - last[0] <= self.MANUAL_BACK_S:
+            self._spk_last = None
+            n = self._spk.enrol(call, last[1])
+            self._seg_stat["manual"] += 1
+            self._broadcast({"t": "asrvoice", "event": "enrol", "call": call,
+                             "n": n, "dur": 0, "manual": True,
+                             "profiles": self._spk.stats()["profiles"]})
+            return {"call": call, "learned": "previous", "n": n}
+        return {"call": call, "learned": ""}
+
+    # how long after an over a hand-picked card still counts as its label
+    MANUAL_BACK_S = 12.0
+
+    def spk_forget(self, call: str) -> dict:
+        """Drop one voice profile — for a station whose profile went bad (an
+        over with two voices in it, a mis-heard call enrolled under it)."""
+        ok = self._spk.forget(call)
+        st = self.status()
+        self._broadcast({"t": "status", **st})
+        return {"removed": bool(ok), **self.spk_status()}
 
     def spk_config(self, enabled=None, act=None, threshold=None,
                    margin=None) -> dict:
@@ -591,6 +641,7 @@ class CallsignService:
             raise HTTPException(400, "callsign too short")
         info = self._calls.get(call) or {}
         self._seen[call] = time.monotonic()      # don't re-announce it right away
+        self.mark_manual(call)     # typing a call also says whose voice is on
         self._add_log("manuell eingetragen", call=call, valid=True,
                       klass=info.get("class", ""), name=info.get("name", ""),
                       city=info.get("city", ""), event="shown", manual=True)
@@ -800,7 +851,9 @@ class CallsignService:
         # Below ~3 s of speech the x-vector is not worth trusting (measured:
         # d' 2.2 on 1.5–3 s pieces against 3.8 on whole overs), so a short
         # over is dropped rather than guessed at.
+        self._seg_stat["overs"] += 1
         if speech < speaker_id.MIN_SPEECH_S or not buf:
+            self._seg_stat["short"] += 1
             return
         pcm = np.concatenate([b for b in buf if len(b)])
         asyncio.create_task(self._speaker_job(pcm, t0, time.monotonic(), speech))
@@ -821,6 +874,7 @@ class CallsignService:
             return
         if len(calls) == 1:
             call = calls.pop()
+            self._seg_stat["enrol"] += 1
             n = await asyncio.to_thread(self._spk.enrol, call, vec)
             # the panel shows the number of learned voices, so every change to
             # the profile set carries the new count with it
@@ -829,10 +883,19 @@ class CallsignService:
                              "profiles": self._spk.stats()["profiles"]})
             return
         if calls:
+            self._seg_stat["multi"] += 1
             return          # two stations in one segment: labelling it would
                             # poison both profiles, so this over is skipped
+        self._seg_stat["nocall"] += 1
+        # Hold on to it: the operator often corrects the attribution just AFTER
+        # an over ends ("that was DL2YP"), and that is a label for exactly this
+        # voiceprint — see mark_manual().
+        self._spk_last = (time.monotonic(), vec)
         m = await asyncio.to_thread(self._spk.match, vec,
                                     settings.spk_threshold, settings.spk_margin)
+        self._seg_stat["match"] += 1
+        if m.get("accept"):
+            self._seg_stat["accept"] += 1
         self._broadcast({"t": "asrvoice", "event": "match", "act": settings.spk_act,
                          "dur": round(speech, 1), **m})
 
@@ -1804,6 +1867,14 @@ async def set_audio_tones(req: TonesRequest) -> dict:
         radio_audio.tx_lowpass = req.tx_lowpass
         settings.tx_lowpass_enabled = req.tx_lowpass
         save_runtime(tx_lowpass_enabled=req.tx_lowpass)
+    if req.tx_preemph is not None:
+        radio_audio.tx_preemph = req.tx_preemph
+        settings.tx_preemph_enabled = req.tx_preemph
+        save_runtime(tx_preemph_enabled=req.tx_preemph)
+    if req.tx_comp is not None:
+        radio_audio.tx_comp = req.tx_comp
+        settings.tx_comp_enabled = req.tx_comp
+        save_runtime(tx_comp_enabled=req.tx_comp)
     if req.rx_lowpass is not None:
         radio_audio.rx_lowpass = req.rx_lowpass
         settings.rx_lowpass_enabled = req.rx_lowpass
@@ -1950,6 +2021,18 @@ async def asr_log_clear() -> dict:
 async def asr_log_rename(call: str, req: AsrRenameRequest) -> dict:
     """Correct the callsign on a contact card — the voice profile follows."""
     return callsign_svc.rename_call(call, req.call)
+
+
+@app.post("/api/asr/mark")
+async def asr_mark(req: AsrManualRequest) -> dict:
+    """A hand-picked card labels the current (or the just-ended) over."""
+    return callsign_svc.mark_manual(req.call)
+
+
+@app.delete("/api/asr/speaker/{call}")
+async def asr_speaker_forget(call: str) -> dict:
+    """Forget one learned voice."""
+    return callsign_svc.spk_forget(call)
 
 
 @app.get("/api/asr/speaker")

@@ -598,6 +598,7 @@
       <button class="scan-clear" id="asr-mod" type="button" aria-pressed="false" disabled
               title="Karte anklicken, dann als Moderator kennzeichnen">MOD</button>
       <button class="scan-clear" id="asr-stats" type="button" title="Redezeiten auswerten — Rangliste aller Stationen">STATS</button>
+      <button class="scan-clear" id="asr-profiles" type="button" title="Gelernte Stimmprofile ansehen und einzeln verwerfen">PROFILES</button>
       <span class="asr-total" id="asr-total" title="Summe der Redezeiten in diesem Panel — ohne als Moderator (M) gekennzeichnete Stationen">Σ 00:00:00</span>
       <button class="scan-clear" id="asr-log-clear" type="button" title="Alle Kontaktkarten aus der Ansicht entfernen">CLEAR ALL</button>
       <button class="scan-clear" id="asr-voice" type="button" aria-pressed="false"
@@ -665,6 +666,18 @@
     <div class="modal-actions">
       <button type="button" class="btn-ghost" id="confirm-cancel">CANCEL</button>
       <button type="button" class="btn-primary" id="confirm-ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- learned voices: one profile per callsign, with the segmenter's own tally -->
+<div class="modal" id="asr-spk-dlg" role="dialog" aria-modal="true" aria-labelledby="asr-spk-title">
+  <div class="modal-card spk-card">
+    <h3 id="asr-spk-title">STIMMPROFILE</h3>
+    <div class="spk-list" id="spk-list"></div>
+    <p class="spk-seg" id="spk-seg"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn-primary" id="asr-spk-close">CLOSE</button>
     </div>
   </div>
 </div>
@@ -820,7 +833,8 @@
             <option value="act">Zuordnen (Marke + Timer)</option>
           </select>
         </label>
-        <p class="pane-hint">Ordnet einen Durchgang <em>ohne</em> genanntes Rufzeichen einer Station zu, deren Stimme schon einmal mit Rufzeichen zu hören war. Das Einlernen läuft nebenbei: Jeder erkannte Ruf beschriftet seine eigene Aufnahme. Ein Durchgang endet an der <em>Sprechpause</em>, nicht am Träger — über ein Relais bleibt BUSY sonst die ganze Runde stehen. Gemessen an zwei Mitschnitten derselben Runde: gleiche Station 0,62–0,79 Kosinus, fremde 0,33 im Mittel; bei Schwelle 0,55 und 0,10 Abstand 3 von 4 richtig, keine Fehlzuordnung, keine der 7 fremden Stationen verwechselt. Unter ~3 s Sprache wird nichts geraten. „Beobachten" entscheidet und meldet nur; erst „Zuordnen" verschiebt Marke und Redezeit — eine <em>von Hand</em> gewählte Kachel hat immer Vorrang. Die Stimmprofile bleiben auf dem Pi (<span id="spk-profiles">0</span> gespeichert) und werden mit der Karte gelöscht.</p>
+        <p class="pane-hint">Ordnet einen Durchgang <em>ohne</em> genanntes Rufzeichen einer Station zu, deren Stimme schon einmal mit Rufzeichen zu hören war. Das Einlernen läuft nebenbei: Jeder erkannte Ruf beschriftet seine eigene Aufnahme. Ein Durchgang endet an der <em>Sprechpause</em>, nicht am Träger — über ein Relais bleibt BUSY sonst die ganze Runde stehen. Gemessen an zwei Mitschnitten derselben Runde: gleiche Station 0,62–0,79 Kosinus, fremde 0,33 im Mittel; bei Schwelle 0,55 und 0,10 Abstand 3 von 4 richtig, keine Fehlzuordnung, keine der 7 fremden Stationen verwechselt. Unter ~3 s Sprache wird nichts geraten. „Beobachten" entscheidet und meldet nur; erst „Zuordnen" verschiebt Marke und Redezeit — eine <em>von Hand</em> gewählte Kachel hat immer Vorrang. Die Stimmprofile bleiben auf dem Pi (<span id="spk-profiles">0</span> gespeichert) und werden mit der Karte gelöscht; ansehen und einzeln verwerfen lassen sie sich über PROFILES im ASR-Panel.</p>
+
       </div>
       <div class="mixer-field">
         <span class="logo-label">TX voice filter</span>
@@ -829,6 +843,20 @@
           <span>Low-pass (voice only, ≤ 3.5 kHz)</span>
         </label>
         <p class="pane-hint">Band-limits the transmitted mic audio to the voice range, cutting hiss and high-frequency content above ~3.5 kHz for a cleaner, more intelligible signal.</p>
+      </div>
+      <div class="mixer-field">
+        <span class="logo-label">TX modulation</span>
+        <div class="acg-row">
+          <label class="switch-label">
+            <input type="checkbox" id="set-tx-comp" class="switch">
+            <span>Compressor</span>
+          </label>
+          <label class="switch-label">
+            <input type="checkbox" id="set-tx-preemph" class="switch">
+            <span>Pre-emphasis</span>
+          </label>
+        </div>
+        <p class="pane-hint">COMPRESSOR (default off): lifts quiet syllables and trailing words by up to 9 dB and holds loud bursts back, so the average deviation rises without overdeviating — peaks are limited at −3 dBFS. It acts within a syllable, unlike AGC, which rides the overall level slowly; both can be on. Pauses between words are not lifted (gate), so room noise stays in the background. PRE-EMPHASIS (default on): +6 dB/octave treble lift, the exact inverse of the RX de-emphasis and using its time constant. Only switch it on if the TX audio goes into a FLAT input (the 9600-baud data port) — the radio's mic input and its 1200-baud input pre-emphasise by themselves, and doing it twice sounds shrill. The voice low-pass runs automatically while it is on, so the lift above the voice band does not go out as hiss. Try either with MIC TEST: the replay passes through the same chain.</p>
       </div>
       <div class="mixer-field">
         <span class="logo-label">TX tones</span>
@@ -842,7 +870,7 @@
         <span class="logo-label">Audio timing</span>
         <div class="audio-ctl">
           <label class="acg">TX BUFFER
-            <input type="range" id="tx-buffer" min="40" max="500" step="5" value="250" style="--def-pct:13.04%">
+            <input type="range" id="tx-buffer" min="80" max="500" step="10" value="250" style="--def-pct:16.7%">
             <span class="gv" id="tx-buffer-val">250 ms</span>
           </label>
           <label class="acg">TX TRAIL
@@ -854,7 +882,7 @@
             <span class="gv" id="rx-buffer-val">60 ms</span>
           </label>
         </div>
-        <p class="pane-hint">TX BUFFER: mic backlog cap — lower = less TX latency, higher = more tolerant of network jitter (tick = recommended 100 ms). TX TRAIL: how long TX stays keyed after you release, so the buffered tail isn't chopped (tick = recommended 110 ms). RX BUFFER: jitter buffer between the sound card and the WebRTC track, in 20 ms blocks. The card and the event loop run on different clocks; without a buffer a block is now and then sent twice or skipped, and every such seam is a click. Raise it if the received audio crackles, lower it for the shortest delay (tick = recommended 60 ms).</p>
+        <p class="pane-hint">TX BUFFER: mic backlog cap — lower = less TX latency, higher = more tolerant of network jitter (tick = recommended 150 ms; below ~80 ms the backlog is smaller than the bursts the browser delivers, which starves and overflows at the same time — audible as dropouts). TX TRAIL: how long TX stays keyed after you release, so the buffered tail isn't chopped (tick = recommended 110 ms). RX BUFFER: jitter buffer between the sound card and the WebRTC track, in 20 ms blocks. The card and the event loop run on different clocks; without a buffer a block is now and then sent twice or skipped, and every such seam is a click. Raise it if the received audio crackles, lower it for the shortest delay (tick = recommended 60 ms).</p>
       </div>
       <div class="modal-actions">
         <button id="set-cancel-audio" class="btn-ghost">CLOSE</button>

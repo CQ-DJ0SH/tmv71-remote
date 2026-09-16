@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     # TX path timing (ms). tx_buffer = mic backlog cap (latency vs jitter
     # tolerance); ptt_tail = how long TX stays keyed after release so the
     # buffered/in-flight tail plays out instead of being chopped.
-    tx_buffer_ms: int = 250
+    tx_buffer_ms: int = 150   # smaller caps starve and overflow — see webrtc_audio
     ptt_tail_ms: int = 250
 
     # TLS (required for browser microphone access / getUserMedia). When both are
@@ -69,6 +69,12 @@ class Settings(BaseSettings):
     # Band-limit the transmitted (mic) audio with a low-pass filter so only the
     # voice range goes out — tames hiss/high-frequency content on TX.
     tx_lowpass_enabled: bool = False
+
+    # TX modulation: pre-emphasis (only into a FLAT input such as the 9600-baud
+    # data port — the mic input emphasises by itself) and a dynamics compressor
+    # that raises the average modulation without overdeviating.
+    tx_preemph_enabled: bool = True
+    tx_comp_enabled: bool = False
 
     # Same voice low-pass on the received audio — cuts high-frequency hiss/noise
     # from the radio for more comfortable listening.
@@ -153,6 +159,7 @@ _RUNTIME_KEYS = ("serial_port", "serial_baud", "gpio_power_pin",
                  "auto_power_off_enabled", "auto_power_off_seconds",
                  "callsign", "roger_beep_enabled", "roger_beep_level", "theme",
                  "tx_lowpass_enabled", "rx_lowpass_enabled", "rx_deemph_enabled",
+                 "tx_preemph_enabled", "tx_comp_enabled",
                  "rx_deemph_us", "rx_squelch_enabled", "asr_callsign_enabled",
                  "rx_buffer_ms",
                  "wavelog_url", "wavelog_key", "wavelog_station_id",

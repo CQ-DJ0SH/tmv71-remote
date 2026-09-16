@@ -391,6 +391,7 @@ async function refreshAudio() {
     // feed the in-display S-meter with the live RX / mic audio levels
     lastRxDb = a.rx_db; lastTxDb = a.tx_db; lastRxS = a.rx_s;
     sqQuietCheck(a.rx_db);            // DROP: also release after 3 s of silence
+    overQuietCheck(a.rx_db);          // and let go of the card on a long pause
     updateSmeters();
     // mini VU bars flanking the PTT button (PWA): RX left, TX right, with 1 s
     // peak-hold. The mask covers the empty (top) part → fills upward from bottom.
@@ -1273,6 +1274,8 @@ async function loadTones() {
     const rbs = $("#set-roger"); if (rbs) rbs.checked = !!s.roger_beep;
     const tt = $("#set-testtone"); if (tt) tt.checked = !!s.test_tone;
     const lp = $("#set-tx-lowpass"); if (lp) lp.checked = !!s.tx_lowpass;
+    const tc = $("#set-tx-comp"); if (tc) tc.checked = !!s.tx_comp;
+    const pe = $("#set-tx-preemph"); if (pe) pe.checked = !!s.tx_preemph;
     const rlp = $("#set-rx-lowpass"); if (rlp) rlp.checked = !!s.rx_lowpass;
     const rde = $("#set-rx-deemph"); if (rde) rde.checked = !!s.rx_deemph;
     const rsq = $("#set-rx-squelch"); if (rsq) rsq.checked = !!s.rx_squelch;
@@ -1335,6 +1338,17 @@ function bindAudio() {
       await api("POST", "/api/audio/tones", { tx_lowpass: e.target.checked });
       toast(e.target.checked ? "TX low-pass on" : "TX low-pass off", e.target.checked ? "ok" : "");
     } catch (err) { toast("TX low-pass: " + err.message, "err"); e.target.checked = !e.target.checked; }
+  });
+  // TX modulation stages — same pattern as the low-pass switch above
+  [["#set-tx-comp", "tx_comp", "TX compressor"],
+   ["#set-tx-preemph", "tx_preemph", "TX pre-emphasis"]].forEach(([sel, key, label]) => {
+    $(sel)?.addEventListener("change", async e => {
+      const on = e.target.checked;
+      try {
+        await api("POST", "/api/audio/tones", { [key]: on });
+        toast(label + (on ? " on" : " off"), on ? "ok" : "");
+      } catch (err) { toast(label + ": " + err.message, "err"); e.target.checked = !on; }
+    });
   });
   $("#set-rx-lowpass")?.addEventListener("change", async e => {
     try {
@@ -3144,7 +3158,44 @@ function overSave() {                // persist the total on the card itself
   overCard.dataset.durMs = String(Math.round(overAcc));
   durSet(overCard, overAcc);
   overCard.querySelector(".ac-dur")?.classList.remove("live");
+  overTimerStore(overCard.dataset.call, overAcc);
   overTotalPaint();
+}
+
+// ---- talk times across a reload -------------------------------------------
+// The cards themselves come back from the Pi's history after a reload, but the
+// times lived only in the DOM and came back as zero. They are kept per callsign
+// in the browser, like the moderator flag — the count belongs to whoever is
+// listening, and the backend does not run the clock.
+//
+// Entries carry the time they were written and are dropped after TIMER_MAX_AGE:
+// talk time is a property of a ROUND, not of a station for ever, so yesterday's
+// figures must not quietly add themselves to tonight's.
+const TIMER_KEY = "tmv71.asrTimers";
+const TIMER_MAX_AGE = 12 * 3600 * 1000;
+let overTimers = {};
+try {
+  const raw = JSON.parse(localStorage.getItem(TIMER_KEY) || "{}");
+  const now = Date.now();
+  for (const [call, e] of Object.entries(raw)) {
+    if (e && now - (e.ts || 0) < TIMER_MAX_AGE) overTimers[call] = e;
+  }
+} catch {}
+function overTimerSave() {
+  try { localStorage.setItem(TIMER_KEY, JSON.stringify(overTimers)); } catch {}
+}
+function overTimerStore(call, ms) {
+  if (!call) return;
+  overTimers[call] = { ms: Math.round(ms), ts: Date.now() };
+  overTimerSave();
+}
+const overTimerGet = call => Math.round(overTimers[call]?.ms || 0);
+function overTimerDrop(call) {
+  if (call && delete overTimers[call]) overTimerSave();
+}
+function overTimerClear() {
+  overTimers = {};
+  overTimerSave();
 }
 // Sum of every card's talk time. The focused card's stored value is stale while
 // its clock runs, so that one is taken live instead of from the dataset.
@@ -3181,6 +3232,14 @@ function overUnpin() {
   document.querySelectorAll("#asr-log .asr-card.pinned")
     .forEach(c => c.classList.remove("pinned"));
 }
+// A hand-picked card is a label for the voice on air. Sent to the backend,
+// which files it against the over that is running (or the one that just ended).
+// Only worth a request while the recognition is actually listening.
+function overTeach(card) {
+  const call = card?.dataset.call;
+  if (!call || !spkOn) return;
+  api("POST", "/api/asr/mark", { call }).catch(() => {});
+}
 function overSetPin(card) {
   overUnpin();
   overPin = true;
@@ -3204,11 +3263,49 @@ function overRelease(card) {
 function overFocus(card, byVoice = false) {
   if (byVoice && overPin) return;
   if (overCard === card) return;
-  overStop();
+  const ran = overRunning();
+  overStop();                        // bank what the old card had
   overCard = card;
   overAcc = Number(card?.dataset.durMs) || 0;
+  // The clock has to follow the mark while the over is still on air. Without
+  // this it stopped at the very moment the callsign was recognised and stayed
+  // stopped: overStop() clears overStart, and the only thing that sets it again
+  // is the RISING edge of BUSY — which is long past by then.
+  if (card && (ran || overBusy)) overStart = Date.now();
   asrModSync();                      // MOD in the head reflects the focused card
 }
+// Through a repeater BUSY stays up for the whole round, so the falling edge that
+// would end an over never comes: the clock keeps counting the dead carrier onto
+// whichever card was marked, and the next station's over is credited to the
+// previous one. Three seconds without speech — the same silence that releases
+// DROP — end it instead.
+const OVER_QUIET_MS = 3000;
+let overQuietSince = 0;
+function overQuietCheck(db) {
+  if (db == null || db > SQ_SPEECH_DB) { overQuietSince = 0; return; }
+  const now = Date.now();
+  if (!overQuietSince) { overQuietSince = now; return; }
+  if (now - overQuietSince < OVER_QUIET_MS) return;
+  const began = overQuietSince;
+  overQuietSince = 0;
+  overIdle(began);
+}
+function overIdle(quietStart) {
+  // Only the repeater case: with a carrier that drops, overEdge() has already
+  // stopped the clock and the mark may stand as "last heard".
+  if (!overBusy || !overRunning() || !overCard) return;
+  // The clock stops as of the START of the pause, not now — three seconds of
+  // silence are nobody's talk time.
+  overAcc += Math.max(0, quietStart - overStart);
+  overStart = 0;
+  overSave();
+  overUnpin();
+  overCard.classList.remove("marked", "byvoice");
+  overCard = null;
+  overAcc = 0;
+  asrModSync();
+}
+
 function overEdge(busy) {
   if (busy && !overBusy) overStart = Date.now();     // carrier up -> clock runs
   else if (!busy && overBusy) overStop();
@@ -3228,10 +3325,25 @@ function overPaint() {
   if (!overRunning() || !overCard) return;
   const el = overCard.querySelector(".ac-dur");
   if (!el) return;
-  durSet(overCard, overElapsed());
+  const ms = overElapsed();
+  durSet(overCard, ms);
   el.classList.add("live");
+  // The RUNNING value has to be persisted too. It used to be painted only as
+  // text while data-dur-ms and the store kept the last BANKED figure — so a
+  // card whose clock was still going showed minutes and came back from a reload
+  // at zero, because nothing had ever banked it. The dataset is updated every
+  // tick (free), the browser store at most every few seconds, which bounds what
+  // a reload can cost to TIMER_SAVE_MS.
+  overCard.dataset.durMs = String(Math.round(ms));
+  const now = Date.now();
+  if (now - overSaveTs >= TIMER_SAVE_MS) {
+    overSaveTs = now;
+    overTimerStore(overCard.dataset.call, ms);
+  }
   overTotalPaint();
 }
+const TIMER_SAVE_MS = 5000;
+let overSaveTs = 0;
 // The status push only arrives on a change, so the running value needs its own
 // tick; it costs nothing once the clock is stopped.
 setInterval(() => { if (overRunning()) overPaint(); }, 500);
@@ -3372,6 +3484,49 @@ function spkCountPaint(n) {
   if (st) st.textContent = n ?? 0;
 }
 
+// The learned voices, listed in their own dialog with the number of overs each
+// profile rests on — and the segmenter's own tally underneath, because "why has it
+// learned only one voice?" is the first question the bare count raises. Most
+// overs carry no callsign at all, and only an over that does can be filed.
+function spkListPaint(k) {
+  const box = $("#spk-list");
+  if (box) {
+    box.textContent = "";
+    for (const [call, n] of (k.calls || [])) {
+      const row = document.createElement("div");
+      row.className = "spk-row";
+      const c = document.createElement("b"); c.textContent = callDisp(call);
+      const o = document.createElement("span");
+      o.textContent = n === 1 ? "1 Durchgang" : n + " Durchgänge";
+      const x = document.createElement("button");
+      x.type = "button"; x.className = "spk-x"; x.textContent = "✕";
+      x.title = "Stimmprofil von " + call + " verwerfen";
+      x.addEventListener("click", async () => {
+        x.disabled = true;
+        try { reflectSpk(await api("DELETE", "/api/asr/speaker/"
+                                   + encodeURIComponent(call))); }
+        catch (err) { x.disabled = false; toast("Stimmprofil: " + err.message, "err"); }
+      });
+      row.append(c, o, x);
+      box.appendChild(row);
+    }
+    if (!(k.calls || []).length) {
+      const e = document.createElement("div");
+      e.className = "spk-row spk-empty";
+      e.textContent = "noch keine Stimme gelernt";
+      box.appendChild(e);
+    }
+  }
+  const seg = $("#spk-seg"), g = k.seg;
+  if (seg && g) {
+    seg.textContent = g.overs
+      ? `Durchgänge: ${g.overs} · zu kurz ${g.short} · mit Rufzeichen ${g.enrol}`
+        + ` · zwei Rufzeichen ${g.multi} · ohne Rufzeichen ${g.nocall}`
+        + ` · davon zugeordnet ${g.accept}`
+      : "noch keine Durchgänge ausgewertet";
+  }
+}
+
 function reflectSpk(k) {
   const sel = $("#set-spk-mode");
   if (sel) {
@@ -3379,6 +3534,7 @@ function reflectSpk(k) {
     sel.disabled = !k.available;
   }
   spkCountPaint(k.profiles);        // panel button + the figure in Settings
+  spkListPaint(k);
   // the panel button switches the recognition on and off; WHICH stage it runs
   // in stays with the selector in Settings, so one click here never silently
   // promotes "observe" to "assign"
@@ -3396,6 +3552,31 @@ function reflectSpk(k) {
   spkOn = !!k.enabled;
 }
 let spkOn = false;
+// PROFILES sits next to STATS: same panel, same kind of dialog. It is opened
+// rarely, so it fetches the current state each time rather than relying on
+// whatever the last status push happened to carry.
+const spkKey = ev => {
+  if (ev.key === "Escape") { ev.preventDefault(); spkDlgClose(); }
+};
+async function spkDlgOpen() {
+  const m = $("#asr-spk-dlg");
+  if (!m) return;
+  try { reflectSpk(await api("GET", "/api/asr/speaker")); }
+  catch (err) { toast("Stimmprofile: " + err.message, "err"); return; }
+  m.classList.add("open");
+  document.addEventListener("keydown", spkKey);
+  $("#asr-spk-close")?.focus();
+}
+function spkDlgClose() {
+  $("#asr-spk-dlg")?.classList.remove("open");
+  document.removeEventListener("keydown", spkKey);
+}
+$("#asr-profiles")?.addEventListener("click", spkDlgOpen);
+$("#asr-spk-close")?.addEventListener("click", spkDlgClose);
+$("#asr-spk-dlg")?.addEventListener("mousedown", ev => {
+  if (ev.target.id === "asr-spk-dlg") spkDlgClose();
+});
+
 $("#asr-voice")?.addEventListener("click", async () => {
   try {
     reflectAsr(await api("POST", "/api/asr/speaker", { enabled: !spkOn }));
@@ -3411,6 +3592,9 @@ function asrVoice(m) {
   if (m.event === "start") { overUnpin(); return; }      // new over
   if (m.event === "enrol") {
     spkCountPaint(m.profiles);
+    // the list in Settings shows per-call counts, which the message does not
+    // carry — refresh it from the source instead of guessing
+    api("GET", "/api/asr/speaker").then(reflectSpk).catch(() => {});
     const card = asrCards.get(m.call);
     if (card) {
       card.dataset.vprof = m.n;                            // overs behind the profile
@@ -3562,6 +3746,7 @@ function asrCardBuild(e) {
   dur.addEventListener("click", ev => {
     ev.stopPropagation();
     overSetPin(card);                // starting a timer by hand is a manual pick
+    overTeach(card);
     overFocus(card);
     if (overRunning()) overStop();
     else overStart = Date.now();     // resumes this card's own total
@@ -3587,6 +3772,8 @@ function asrCardBuild(e) {
   // so it and the button that follows it are pushed to the right edge
   foot.append(mk("span", "ac-count"), log);
   asrSetMod(card, asrMods.has(e.call));              // restore a remembered flag
+  const kept = overTimerGet(e.call);                 // ...and the talk time
+  if (kept) { card.dataset.durMs = String(kept); durSet(card, kept); }
   // remove a misrecognised contact — server-side, so it cannot come back from
   // the history when the panel is reopened
   // clicking the card itself moves the "current" mark — and with it the over
@@ -3600,6 +3787,7 @@ function asrCardBuild(e) {
     box?.querySelectorAll(".asr-card.byvoice").forEach(c => c.classList.remove("byvoice"));
     card.classList.add("marked");
     overSetPin(card);           // hand-picked: the voice must not move it again
+    overTeach(card);            // ...and it teaches the voice recognition
     overFocus(card);            // deliberately no repaint — see overPaint()
   });
   const del = mk("button", "ac-del", "✕");
@@ -3679,6 +3867,8 @@ function asrRenameCard(m) {
       ? "×" + twin.dataset.count : "";
     if (overCard === card) { overCard = null; overFocus(twin); }
     durSet(twin, Number(twin.dataset.durMs) || 0);
+    overTimerDrop(m.old);                    // the merged time lives under the
+    overTimerStore(m.new, Number(twin.dataset.durMs) || 0);   // corrected call
     card.remove();
     asrTipHide(); asrFillSlots(); overTotalPaint();
     return;
@@ -3693,6 +3883,8 @@ function asrRenameCard(m) {
   asrSetKlass(card, m.klass);
   asrCards.set(m.new, card);
   if (asrMods.delete(m.old)) { asrMods.add(m.new); asrModSave(); }   // flag follows
+  const t = overTimerGet(m.old);                                    // time too
+  if (t) { overTimerDrop(m.old); overTimerStore(m.new, t); }
   asrModSync();
 }
 
@@ -3776,6 +3968,7 @@ function asrCardDrop(call) {
   asrCards.delete(call);
   card.remove();
   if (asrMods.delete(call)) asrModSave();      // the flag goes with the card
+  overTimerDrop(call);                         // and so does its talk time
   if (overCard === card) overForget();         // do not keep timing a dead card
   asrTipHide();
   asrFillSlots();
@@ -3884,6 +4077,7 @@ $("#asr-log-clear")?.addEventListener("click", async () => {
 function asrClearView() {
   const box = $("#asr-log"); if (box) box.textContent = "";
   asrCards.clear(); asrTipHide(); overForget(); asrFillSlots();
+  overTimerClear();
   voiceLast = ""; voicePaint();
 }
 

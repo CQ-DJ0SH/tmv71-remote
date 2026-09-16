@@ -504,6 +504,32 @@ body.theme-light #asr-voice.act::before{
 }
 #asr-voice .vn:empty{display:none}
 #asr-voice:disabled{opacity:.4; cursor:default}
+/* learned voices — the list lives in its own dialog, opened from PROFILES */
+.spk-card{width:min(440px,94vw)}
+.spk-list{display:flex; flex-direction:column; gap:3px; margin:2px 0 8px;
+  max-height:52vh; overflow-y:auto}
+.spk-row{
+  display:flex; align-items:center; gap:10px;
+  font-family:var(--font-mono); font-size:11px; color:var(--text-dim);
+  padding:3px 6px; border-radius:5px; background:var(--field-bg);
+  border:1px solid var(--edge);
+}
+.spk-row b{color:var(--text); letter-spacing:.06em; min-width:74px}
+.spk-row span{flex:1 1 auto}
+.spk-row.spk-empty{justify-content:center; opacity:.6; background:transparent;
+  border-style:dashed}
+.spk-x{
+  flex:0 0 auto; width:16px; height:16px; padding:0; line-height:1; font-size:9px;
+  color:var(--text-dim); background:transparent; border:1px solid transparent;
+  border-radius:4px; cursor:pointer; transition:.12s;
+}
+@media (hover:hover){
+  .spk-x:hover{color:#ff3b30; border-color:#ff3b30}
+}
+.spk-x:disabled{opacity:.3; cursor:default}
+/* the segmenter's tally — small, it is diagnostic rather than decoration */
+.spk-seg{font-family:var(--font-mono); font-size:9.5px; color:var(--text-dim);
+  opacity:.75; margin:0 0 4px; line-height:1.5}
 /* the collapse arrow keeps its place at the very end, but VOICE is the element
    that claims the free space now — two auto margins would share it and leave
    the button floating in the middle */
@@ -940,7 +966,8 @@ body.theme-light .asr-tip{background:#ffffffF2; border-color:#c5cfd8; box-shadow
      hidden here, which is also what keeps the head on one line. VOICE loses its
      margin-left:auto: in a wrapping head that pushes it onto a line of its own
      at the far right, where it reads as missing. */
-  .debug-zone .asr-total, .debug-zone #asr-stats{display:none}
+  .debug-zone .asr-total, .debug-zone #asr-stats,
+  .debug-zone #asr-profiles{display:none}
   .debug-zone .panel-head{gap:8px; flex-wrap:wrap}
   .debug-zone #asr-voice{margin-left:0}
   .debug-zone .asr-manual{width:96px; margin-left:0}

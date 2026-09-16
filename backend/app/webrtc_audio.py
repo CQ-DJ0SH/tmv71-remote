@@ -30,7 +30,11 @@ log = logging.getLogger("tmv71.audio")
 
 SAMPLE_RATE = 48000
 BLOCK = 960          # 20 ms @ 48 kHz
-DEF_TX_BUFFER_MS = 250    # default mic backlog cap — bounds TX latency vs jitter
+# Default mic backlog cap. Bounds TX latency against jitter — but it has to be
+# larger than the clusters WebRTC delivers the mic in: measured on this link, a
+# 40 ms cap starved and overflowed at the same time (2.3 s of silence inserted
+# while 2.5 s were discarded), and 150 ms ran clean.
+DEF_TX_BUFFER_MS = 150
 # RX jitter buffer: three 20 ms blocks. Enough to absorb the drift between the
 # sound-card clock and the event loop (which is what made the playback crackle),
 # little enough that the added delay is not noticeable in a QSO.
@@ -167,6 +171,165 @@ class _HighPass:
         self._tail[:] = 0.0
 
 
+class _PreEmphasis:
+    """1st-order FM pre-emphasis for the TX path — the exact inverse of
+    _DeEmphasis, same time constant, so what one lifts the other lowers.
+
+    Only meaningful into a FLAT input (the 9600-baud data port). The radio's own
+    mic input and its 1200-baud input apply pre-emphasis themselves; doing it
+    here as well would lift the treble twice and sound shrill.
+
+    y[n] = (x[n] − a·x[n−1]) / (1 − a): unity gain at DC, +6 dB/octave above the
+    corner (1/2πτ). A one-zero FIR keeps it loop-free. The lift keeps rising to
+    Nyquist (+17 dB at 75 µs), so it is always followed by the voice low-pass —
+    otherwise hiss above the voice band would go out lifted as well."""
+
+    def __init__(self, tau_us: float, fs: float):
+        self.a = float(np.exp(-1.0 / (tau_us * 1e-6 * fs)))
+        self._x1 = 0.0
+
+    def process(self, pcm: np.ndarray) -> np.ndarray:
+        x = pcm.astype(np.float64)
+        prev = np.concatenate(([self._x1], x[:-1]))
+        self._x1 = float(x[-1]) if x.size else self._x1
+        y = (x - self.a * prev) / (1.0 - self.a)
+        return np.clip(y, -32768, 32767).astype(np.int16)
+
+    def reset(self) -> None:
+        self._x1 = 0.0
+
+
+class _Limiter:
+    """Peak ceiling for the end of the TX chain — ramped gain, never a hard cut.
+
+    Pre-emphasis lifts the treble, and both the AGC and a loud syllable can push
+    the lifted peaks past full scale. Clipping them in int16 is not a quiet
+    failure: it turns every sibilant into a burst of broadband crackle, and the
+    emphasis stage sits right before the band-limiting low-pass, so that crackle
+    lands inside the voice band where it cannot be filtered out again. Gain is
+    reduced over 2.5 ms slices and ramped between them, so nothing steps."""
+
+    SLICE = 120
+
+    def __init__(self, fs: float, ceiling_db: float = -1.0,
+                 release_ms: float = 120.0):
+        self.ceiling = 32768.0 * 10 ** (ceiling_db / 20.0)
+        self.rel = 1.0 - np.exp(-(self.SLICE / fs) / (release_ms / 1000.0))
+        self.reset()
+
+    def reset(self) -> None:
+        self._gain = 1.0
+        self.hits = 0                     # slices that needed limiting
+
+    def process(self, pcm: np.ndarray) -> np.ndarray:
+        x = pcm.astype(np.float64)
+        n = x.size
+        if not n:
+            return pcm
+        k = self.SLICE
+        m = max(1, n // k)
+        out = np.empty(n, dtype=np.float64)
+        pos = 0
+        for i in range(m):
+            end = n if i == m - 1 else pos + k
+            seg = x[pos:end]
+            peak = float(np.max(np.abs(seg))) if seg.size else 0.0
+            need = self.ceiling / peak if peak > self.ceiling else 1.0
+            if need < self._gain:
+                g = need                  # attack: immediate, or it clips
+                self.hits += 1
+            else:                         # release: slow, or it pumps
+                g = self._gain + (min(1.0, need) - self._gain) * self.rel
+            ramp = np.linspace(self._gain, g, seg.size, endpoint=False)
+            ramp = np.minimum(ramp, need) if need < 1.0 else ramp
+            out[pos:end] = seg * ramp
+            self._gain = g
+            pos = end
+        return np.clip(out, -32768, 32767).astype(np.int16)
+
+
+class _Compressor:
+    """Feed-forward dynamics compressor with makeup gain and a peak ceiling.
+
+    Raises the AVERAGE modulation: quiet syllables and trailing words come up,
+    loud bursts do not overdeviate. That is different from the AGC, which rides
+    the overall level slowly (tens of seconds); this acts within a syllable.
+
+    Levels are measured in 2.5 ms slices rather than per 20 ms block — at block
+    resolution the attack would let the first 20 ms of a loud word through
+    uncompressed, and the gain would step audibly between blocks. The gain is
+    ramped linearly across each slice for the same reason. Below the gate
+    threshold the makeup gain is withheld, so the pauses between words (room
+    noise, fan, breath) are not pumped up to speech level."""
+
+    SLICE = 120                          # 2.5 ms @ 48 kHz
+
+    def __init__(self, fs: float, threshold_db: float = -26.0, ratio: float = 3.0,
+                 knee_db: float = 6.0, attack_ms: float = 5.0,
+                 release_ms: float = 180.0, makeup_db: float = 9.0,
+                 gate_db: float = -52.0, ceiling_db: float = -3.0):
+        self.thr, self.ratio, self.knee = threshold_db, ratio, knee_db
+        self.makeup, self.gate = makeup_db, gate_db
+        self.ceiling = 32768.0 * 10 ** (ceiling_db / 20.0)
+        dt = self.SLICE / fs
+        self.att = 1.0 - np.exp(-dt / (attack_ms / 1000.0))
+        self.rel = 1.0 - np.exp(-dt / (release_ms / 1000.0))
+        self.reset()
+
+    def reset(self) -> None:
+        self._env_db = -90.0
+        self._gain = 1.0                 # last applied linear gain (ramp start)
+        self.gain_db = 0.0               # exposed for the status readout
+
+    def _curve(self, lvl_db: float) -> float:
+        """Static gain (dB) for an input level: soft-knee downward compression."""
+        over = lvl_db - self.thr
+        if 2 * over <= -self.knee:
+            g = 0.0
+        elif 2 * abs(over) <= self.knee:
+            g = (1.0 / self.ratio - 1.0) * (over + self.knee / 2) ** 2 / (2 * self.knee)
+        else:
+            g = (1.0 / self.ratio - 1.0) * over
+        return g
+
+    def process(self, pcm: np.ndarray) -> np.ndarray:
+        x = pcm.astype(np.float64)
+        n = x.size
+        if not n:
+            return pcm
+        k = self.SLICE
+        m = max(1, n // k)
+        out = np.empty(n, dtype=np.float64)
+        pos = 0
+        for i in range(m):                        # 8 slices per block: cheap
+            end = n if i == m - 1 else pos + k
+            seg = x[pos:end]
+            rms = float(np.sqrt(np.mean(seg * seg)))
+            lvl = 20.0 * np.log10(rms / 32768.0) if rms >= 1.0 else -90.0
+            c = self.att if lvl > self._env_db else self.rel
+            self._env_db += (lvl - self._env_db) * c
+            gdb = self._curve(self._env_db)
+            if self._env_db > self.gate:          # makeup only on speech
+                gdb += self.makeup
+            g = 10 ** (gdb / 20.0)
+            peak = float(np.max(np.abs(seg))) if seg.size else 0.0
+            start = self._gain
+            if peak > 0:
+                lim = self.ceiling / peak
+                g = min(g, lim)                   # never past the ceiling...
+                # ...not even at the START of the ramp. The ramp begins at the
+                # previous slice's gain, and after a pause that is the full
+                # makeup gain: the first samples of a loud onset went out at
+                # -1 dBFS against a -3 dBFS ceiling. Peaks are limited at once.
+                start = min(start, lim)
+            ramp = np.linspace(start, g, seg.size, endpoint=False)
+            out[pos:end] = seg * ramp
+            self._gain = g
+            pos = end
+        self.gain_db = round(20.0 * np.log10(max(self._gain, 1e-6)), 1)
+        return np.clip(out, -32768, 32767).astype(np.int16)
+
+
 def _level(samples, prev):
     """RMS of an int16 block as dBFS, with fast-attack / slow-release."""
     if samples.size == 0:
@@ -189,7 +352,8 @@ class RadioAudio:
                  rx_lowpass: bool = False, tx_auto_gain: bool = False,
                  rx_deemph: bool = False, rx_squelch: bool = False,
                  rx_deemph_us: float = DEEMPH_TAU_US,
-                 rx_buffer_ms: int = DEF_RX_BUFFER_MS):
+                 rx_buffer_ms: int = DEF_RX_BUFFER_MS,
+                 tx_preemph: bool = True, tx_comp: bool = False):
         self.device = device
         self.rx_gain = rx_gain
         self.tx_gain = tx_gain
@@ -219,6 +383,12 @@ class RadioAudio:
         self.tx_lowpass = tx_lowpass
         self.rx_lowpass = rx_lowpass
         self._tx_lp = _FIRLowpass(TX_LP_CUTOFF, SAMPLE_RATE)
+        # TX modulation stages, both off by default (see _PreEmphasis/_Compressor)
+        self.tx_preemph = tx_preemph
+        self.tx_comp = tx_comp
+        self._tx_pre = _PreEmphasis(rx_deemph_us, SAMPLE_RATE)
+        self._tx_comp = _Compressor(SAMPLE_RATE)
+        self._tx_lim = _Limiter(SAMPLE_RATE)
         self._rx_lp = _FIRLowpass(RX_LP_CUTOFF, SAMPLE_RATE)
         # TX timing (see set_tx_timing); stored in ms, applied as samples/seconds.
         self.tx_buffer_ms = int(tx_buffer_ms)
@@ -234,7 +404,24 @@ class RadioAudio:
         self._rx_subs: list = []
         self._rx_lock = threading.Lock()
         self.rx_buffer_ms: int = int(rx_buffer_ms)
+        # Mic FIFO for the radio: a deque of int16 BLOCKS, not of single
+        # samples. It used to hold one Python int per sample, which meant the
+        # audio callback popped 960 of them one by one — a per-sample Python
+        # loop in the most timing-critical place in the program, holding the
+        # lock the producer needs. That is what the TX jitter was.
         self._playback: deque = deque()
+        self._pb_off = 0          # read offset into the head block
+        self._pb_len = 0          # samples queued in total
+        self._pb_fill = True      # collect a cushion before playing out
+        # Jitter accounting for the TX path, so a report of "it stutters" can be
+        # answered with numbers instead of a theory: underruns (the card asked
+        # for samples that had not arrived) against overruns (the backlog hit
+        # the cap and audio was thrown away). They point at opposite causes.
+        self.tx_under = 0         # blocks that ran dry AFTER play-out started
+        self.tx_under_ms = 0.0    # silence inserted because of that
+        self.tx_fill_ms = 0.0     # silence while the cushion filled (by design)
+        self.tx_over_ms = 0.0     # audio discarded at the cap
+        self.tx_late = 0          # mic chunks that arrived while dry
         self._pb_lock = threading.Lock()
         self._ptt_open = False
         self.connected = False
@@ -520,10 +707,7 @@ class RadioAudio:
                 if self._beep_pos >= len(b):
                     self._beep_buf = None
             else:
-                with self._pb_lock:
-                    n = min(frames, len(self._playback))
-                    for i in range(n):
-                        mono[i] = self._playback.popleft()
+                mono = self._pb_pull(frames)
         outdata[:, 0] = mono
         if outdata.shape[1] > 1:
             outdata[:, 1] = mono
@@ -542,8 +726,7 @@ class RadioAudio:
 
     def trigger_roger_beep(self) -> None:
         """Queue a short beep on the mic path — call while still keyed."""
-        with self._pb_lock:
-            self._playback.clear()         # drop trailing mic; beep only
+        self._pb_clear()                   # drop trailing mic; beep only
         self._beep_buf = self._render_roger_beep(self.roger_beep_level)
         self._beep_pos = 0
 
@@ -685,8 +868,18 @@ class RadioAudio:
         elif self.tx_gain != 1.0:
             pcm = np.clip(pcm.astype(np.float32) * self.tx_gain,
                           -32768, 32767).astype(np.int16)
-        if self.tx_lowpass:
+        # Order matters: compress first (level), then emphasise (tilt), then
+        # band-limit. Emphasis before the compressor would make the treble drive
+        # the gain down; the low-pass last removes the emphasis lift above the
+        # voice band — which is why it runs whenever emphasis is on.
+        if self.tx_comp:
+            pcm = self._tx_comp.process(pcm)
+        if self.tx_preemph:
+            pcm = self._tx_pre.process(pcm)
+        if self.tx_lowpass or self.tx_preemph:
             pcm = self._tx_lp.process(pcm)
+        if self.tx_preemph or self.tx_comp:
+            pcm = self._tx_lim.process(pcm)     # last in line: nothing clips
         self.tx_db = _level(pcm, self.tx_db)
         if not self._ptt_open:
             # mic test only: level measured, nothing to the radio. Record the
@@ -705,12 +898,82 @@ class RadioAudio:
                             self._asr_rx_chunks.pop(0)
             return
         with self._pb_lock:
-            self._playback.extend(pcm.tolist())
+            if self._pb_len == 0 and not self._pb_fill:
+                self.tx_late += 1          # arrived after the queue had emptied
+            self._playback.append(pcm.copy())
+            self._pb_len += pcm.size
             # keep the backlog tight so TX stays low-latency (bound jitter, not 1 s)
             cap = max(BLOCK, self.tx_buffer_ms * SAMPLE_RATE // 1000)
-            excess = len(self._playback) - cap
-            for _ in range(max(0, excess)):
-                self._playback.popleft()
+            while self._pb_len > cap and self._playback:
+                head = self._playback[0]
+                avail = head.size - self._pb_off
+                drop = min(avail, self._pb_len - cap)
+                self._pb_len -= drop
+                self.tx_over_ms += drop * 1000.0 / SAMPLE_RATE
+                if drop >= avail:
+                    self._playback.popleft()
+                    self._pb_off = 0
+                else:
+                    self._pb_off += drop
+
+    def _pb_pull(self, frames: int) -> np.ndarray:
+        """`frames` samples of queued mic audio, zero-padded if it runs out.
+
+        Slice copies only: a handful of numpy moves per block instead of one
+        Python iteration per sample, and the lock is held for microseconds."""
+        out = np.zeros(frames, dtype=np.int16)
+        got = 0
+        with self._pb_lock:
+            # Wait for a cushion before starting to play out, and rebuild it
+            # after a dry spell. The mic arrives over WebRTC in bursts, while the
+            # sound card asks for exactly 960 samples every 20 ms: without a
+            # cushion the queue is empty on one call and has 40 ms on the next,
+            # so the callback pads with silence and the backlog later hits the
+            # cap and is dropped — a gap in, a gap out. This is the same cushion
+            # the RX track keeps, on the other side of the link.
+            if self._pb_fill:
+                if self._pb_len < self._pb_target():
+                    # Filling the cushion is not a dropout — it is the lead-in
+                    # at the start of an over, and counting it as a fault made
+                    # a healthy transmission look broken.
+                    if self._ptt_open:
+                        self.tx_fill_ms += frames * 1000.0 / SAMPLE_RATE
+                    return out
+                self._pb_fill = False
+            while got < frames and self._playback:
+                head = self._playback[0]
+                k = min(frames - got, head.size - self._pb_off)
+                out[got:got + k] = head[self._pb_off:self._pb_off + k]
+                got += k
+                self._pb_off += k
+                if self._pb_off >= head.size:
+                    self._playback.popleft()
+                    self._pb_off = 0
+            self._pb_len -= got
+            if got < frames and self._ptt_open:
+                self.tx_under += 1
+                self.tx_under_ms += (frames - got) * 1000.0 / SAMPLE_RATE
+            if self._pb_len <= 0:          # ran dry -> rebuild the cushion
+                self._pb_fill = True
+        return out
+
+    def _pb_target(self) -> int:
+        """Cushion in samples: half the configured backlog, 40–80 ms.
+
+        It has to be a real cushion. Measured on this link the mic arrives in
+        clusters, not in even 20 ms steps: with a 40 ms cap, 2.3 s of silence
+        were inserted for want of samples while 2.5 s were thrown away at the
+        cap — starving and overflowing at the same time, which is the signature
+        of a backlog smaller than the burst that feeds it."""
+        ms = min(80, max(40, self.tx_buffer_ms // 2))
+        return ms * SAMPLE_RATE // 1000
+
+    def _pb_clear(self) -> None:
+        with self._pb_lock:
+            self._playback.clear()
+            self._pb_off = 0
+            self._pb_len = 0
+            self._pb_fill = True
 
     async def drain_tx(self, settle: Optional[float] = None,
                        max_wait: float = 0.5) -> None:
@@ -740,11 +1003,17 @@ class RadioAudio:
 
     def set_ptt_open(self, is_open: bool) -> None:
         if not is_open:
-            with self._pb_lock:
-                self._playback.clear()
+            self._pb_clear()
             self.tx_db = None
         else:
             self._tx_lp.reset()      # clear filter state at the start of each over
+            self._tx_pre.reset()
+            self._tx_comp.reset()    # no gain carried over from the last over
+            self._tx_lim.reset()
+            # counters are per over: totals over hours hide which transmission
+            # went wrong, and one over is exactly the unit being judged
+            self.tx_under = self.tx_late = 0
+            self.tx_under_ms = self.tx_over_ms = self.tx_fill_ms = 0.0
         self._ptt_open = is_open
 
     # -- mic-test echo -----------------------------------------------------
@@ -784,6 +1053,8 @@ class RadioAudio:
         us = max(10.0, min(500.0, float(us)))
         self.rx_deemph_us = us
         self._rx_deemph = _DeEmphasis(us, SAMPLE_RATE)
+        # TX pre-emphasis mirrors it: one time constant for both directions
+        self._tx_pre = _PreEmphasis(us, SAMPLE_RATE)
 
     # -- raw RX recorder ---------------------------------------------------
     def set_record(self, on: bool) -> None:
@@ -835,6 +1106,14 @@ class RadioAudio:
                 "roger_beep": self.roger_beep,
                 "roger_beep_level": round(self.roger_beep_level, 2),
                 "tx_lowpass": self.tx_lowpass,
+                "tx_preemph": self.tx_preemph, "tx_comp": self.tx_comp,
+                "tx_under": self.tx_under, "tx_late": self.tx_late,
+                "tx_lim_hits": self._tx_lim.hits,
+                "tx_under_ms": round(self.tx_under_ms, 1),
+                "tx_fill_ms": round(self.tx_fill_ms, 1),
+                "tx_over_ms": round(self.tx_over_ms, 1),
+                "tx_queue_ms": round(self._pb_len * 1000.0 / SAMPLE_RATE, 1),
+                "comp_db": self._tx_comp.gain_db,     # live compressor gain
                 "rx_lowpass": self.rx_lowpass, "rx_deemph": self.rx_deemph,
                 "rx_deemph_us": self.rx_deemph_us,
                 "rx_squelch": self.rx_squelch, "mic_test": self.mic_test,

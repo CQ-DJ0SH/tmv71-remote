@@ -817,6 +817,14 @@ EN = [
           "Audio timing (TX buffer / TX trail / RX buffer) and the USB card mixer "
           "are in Settings > Audio. The link auto-reconnects after a network "
           "glitch and is restored on the next launch."),
+    ("p", "The TX buffer bounds how much microphone audio may queue up for the "
+          "radio. It has to be larger than the clusters the browser delivers in: "
+          "measured here with a 40 ms cap, 2.3 s of silence were inserted for "
+          "want of samples while 2.5 s were discarded at the cap — starving and "
+          "overflowing at the same time, heard as dropouts. 150 ms is the "
+          "default and the slider stops at 80 ms, because below that no setting "
+          "can work. Half of it (40–80 ms) is collected as a cushion before "
+          "play-out starts."),
     ("p", "The RX buffer (Settings > Audio, 60 ms by default) is a jitter buffer "
           "between the sound card and the WebRTC track, and it is worth knowing "
           "why it exists. The card produces a 20 ms block on its own clock; the "
@@ -844,6 +852,37 @@ EN = [
           "that always-open output; and TX/RX voice low-pass filters (≤ 3.5 kHz) "
           "tame hiss. The decoders always receive the un-squelched, un-filtered "
           "signal."),
+    ("p", "TX modulation (Settings > Audio). Two stages can be switched into "
+          "the transmit path, followed by a peak limiter that is always active "
+          "behind them."),
+    ("ul", [
+        "COMPRESSOR (off by default) raises the AVERAGE modulation: quiet "
+        "syllables and trailing words come up by as much as 9 dB while loud "
+        "bursts are held back. Measured on a 1 kHz tone, an input range of "
+        "−45…−1 dBFS leaves as −36…−9 dBFS, so 44 dB of speech dynamics become "
+        "27 dB. It acts within a syllable — unlike the AGC, which rides the "
+        "overall level over seconds; both may be on. Below −52 dBFS nothing is "
+        "lifted, so the pauses between words keep their room noise in the "
+        "background instead of being pumped up to speech level.",
+        "PRE-EMPHASIS (on by default) lifts the treble by 6 dB/octave — the "
+        "exact inverse of the RX de-emphasis, using the same time constant, and "
+        "within 0.2 dB of the analogue curve (+4.6 dB at 3 kHz). Switch it on "
+        "ONLY if the transmit audio goes into a FLAT input, i.e. the 9600-baud "
+        "data port: the radio's mic input and its 1200-baud input pre-emphasise "
+        "by themselves, and doing it twice sounds shrill. The voice low-pass "
+        "runs automatically while it is on — without it the lift would send "
+        "hiss above the voice band as well (+11 dB at 8 kHz, −44 dB with it).",
+        "The LIMITER holds peaks at −1 dBFS whenever either stage is on. It is "
+        "not decoration: the emphasis lifts treble before the band-limiting "
+        "low-pass, so a hot microphone clipped in 16-bit — 1.9 % of samples at "
+        "a −1 dBFS peak — and hard clipping there lands as broadband crackle "
+        "INSIDE the voice band, where no filter can take it out again. The "
+        "limiter reduces gain over 2.5 ms slices and ramps between them; "
+        "measured across the chain, a 0 dBFS input leaves at −1.0 dBFS with not "
+        "a single clipped sample.",
+    ]),
+    ("p", "Try either with MIC TEST: the replay runs through the same chain, so "
+          "it is heard without transmitting."),
     ("p", "Bluetooth headsets: transmit audio is captured from the phone's "
           "built-in microphone (not the headset's), so the headset stays on the "
           "A2DP profile and receive audio keeps coming through in good quality. "
@@ -1304,6 +1343,15 @@ DE = [
           "liegen unter Einstellungen > Audio. Die Verbindung verbindet sich nach "
           "einer Netzstörung automatisch neu und wird beim nächsten Start "
           "wiederhergestellt."),
+    ("p", "Der TX-Buffer begrenzt, wie viel Mikrofonaudio sich für das "
+          "Funkgerät stauen darf. Er muss größer sein als die Schübe, in denen "
+          "der Browser liefert: Hier gemessen wurden mit 40 ms Deckel 2,3 s "
+          "Stille eingefügt, weil nichts da war, während gleichzeitig 2,5 s am "
+          "Deckel verworfen wurden — verhungern und überlaufen zugleich, hörbar "
+          "als Aussetzer. 150 ms sind die Voreinstellung, der Regler endet bei "
+          "80 ms, weil darunter kein Wert funktionieren kann. Die Hälfte davon "
+          "(40–80 ms) wird als Polster gesammelt, bevor die Wiedergabe "
+          "beginnt."),
     ("p", "Der RX-Buffer (Einstellungen > Audio, standardmäßig 60 ms) ist ein "
           "Jitterpuffer zwischen Soundkarte und WebRTC-Track — und es lohnt zu "
           "wissen, warum es ihn gibt. Die Karte liefert alle 20 ms einen Block "
@@ -1332,6 +1380,39 @@ DE = [
           "daueroffenen Ausgang die Stummschaltung aus dem Busy-Status des Geräts; "
           "TX/RX-Sprachtiefpässe (≤ 3,5 kHz) zähmen Rauschen. Die Decoder erhalten "
           "stets das un-gesquelchte, ungefilterte Signal."),
+    ("p", "TX-Modulation (Einstellungen > Audio). Zwei Stufen lassen sich in "
+          "den Sendeweg schalten, dahinter arbeitet immer ein Spitzenbegrenzer."),
+    ("ul", [
+        "KOMPRESSOR (standardmäßig aus) hebt den MITTLEREN Hub: Leise Silben "
+        "und auslaufende Wörter kommen um bis zu 9 dB herauf, laute Stellen "
+        "werden zurückgehalten. Am 1-kHz-Ton gemessen wird aus einem "
+        "Eingangsbereich von −45…−1 dBFS ein Ausgang von −36…−9 dBFS, aus 44 dB "
+        "Sprachdynamik also 27 dB. Er wirkt innerhalb einer Silbe — anders als "
+        "die AGC, die den Gesamtpegel über Sekunden nachführt; beides darf "
+        "gleichzeitig an sein. Unter −52 dBFS wird nichts angehoben, damit das "
+        "Raumrauschen in den Sprechpausen im Hintergrund bleibt statt auf "
+        "Sprachpegel hochgezogen zu werden.",
+        "PRE-EMPHASIS (standardmäßig an) hebt die Höhen um 6 dB pro Oktave an — "
+        "die genaue Umkehrung der RX-De-Emphasis, mit derselben Zeitkonstante "
+        "und auf 0,2 dB an der analogen Kurve (+4,6 dB bei 3 kHz). NUR "
+        "einschalten, wenn das Sendeaudio in einen LINEAREN Eingang geht, also "
+        "die 9600-Baud-Datenbuchse: Der Mikrofoneingang des Geräts und sein "
+        "1200-Baud-Eingang machen die Anhebung selbst, doppelt klingt es "
+        "schrill. Der Sprach-Tiefpass läuft dabei zwingend mit — ohne ihn ginge "
+        "auch das Rauschen oberhalb des Sprachbands angehoben hinaus (+11 dB "
+        "bei 8 kHz, mit Tiefpass −44 dB).",
+        "Der BEGRENZER hält die Spitzen bei −1 dBFS, sobald eine der beiden "
+        "Stufen an ist. Er ist kein Zierrat: Die Emphasis hebt die Höhen vor "
+        "dem bandbegrenzenden Tiefpass an, ein heißes Mikrofon lief damit in "
+        "die 16-Bit-Grenze — bei −1 dBFS Spitze 1,9 % aller Samples — und "
+        "hartes Clipping landet dort als breitbandiges Knistern MITTEN im "
+        "Sprachband, wo es kein Filter mehr herausholt. Der Begrenzer regelt in "
+        "2,5-ms-Scheiben und verschleift dazwischen; über die ganze Kette "
+        "gemessen verlässt ein Signal mit 0 dBFS die Kette mit −1,0 dBFS, ohne "
+        "ein einziges geklipptes Sample.",
+    ]),
+    ("p", "Ausprobieren lässt sich beides mit MIC TEST: Die Wiedergabe läuft "
+          "durch dieselbe Kette, man hört es also, ohne zu senden."),
     ("p", "Bluetooth-Headsets: Das Sende-Audio wird vom eingebauten Telefon-"
           "Mikrofon aufgenommen (nicht vom Headset-Mikro), damit das Headset im "
           "A2DP-Profil bleibt und der Empfang in guter Qualität durchkommt. Das "
