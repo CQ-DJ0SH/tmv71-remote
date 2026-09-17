@@ -1173,6 +1173,20 @@ body.theme-light .screw::before{
 .digi-auto{display:flex; align-items:center; gap:7px; margin-left:-13px; margin-right:18px;
   font-family:var(--font-ui); font-size:10px; letter-spacing:.14em; color:var(--text-dim)}
 .digi-auto.dp-alpha{margin-left:10px}   /* nudge the POCSAG ALPHA toggle to the right */
+/* Read-only figures in a parameter row (the APRS frame counters). Same size and
+   family as the other values in the row — without a rule of its own the span
+   inherited the panel font and came out smaller than everything beside it. */
+.digi-ro{font-family:var(--font-mono); font-size:12px; color:var(--text-dim);
+  letter-spacing:.02em; white-space:nowrap}
+/* The APRS row holds only a switch and a readout, so it is shorter than the
+   rows with sliders and fields — which pulled the decode window up. Hold the
+   height the others have, and drop the negative indent .digi-auto carries for
+   the CW AUTO toggle, which here is the first element in the row. */
+#digi-params-aprs{min-height:32px}
+/* DEBUG is the twin of the DECODE switch beside it and carries the same classes,
+   so the two read as one pair; only the left margin, which positions DECODE
+   after the mode tabs, is not wanted at the start of a parameter row. */
+#digi-params-aprs .digi-rx-toggle{margin-left:0; margin-right:18px}
 .digi-params select{font-family:var(--font-mono); font-size:12px; color:var(--text);
   background:var(--field-bg); border:1px solid var(--edge); border-radius:7px; padding:6px 8px}
 .digi-params .acd{display:flex; align-items:center; gap:8px;

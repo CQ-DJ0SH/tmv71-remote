@@ -134,8 +134,9 @@ class AutoPowerOffRequest(BaseModel):
 
 
 class CallsignRequest(BaseModel):
-    """Operator callsign, persisted server-side."""
+    """Operator callsign and locator, persisted server-side."""
     callsign: str = Field(default="", max_length=12)
+    locator: Optional[str] = Field(default=None, max_length=8)
 
 
 class ThemeRequest(BaseModel):
@@ -216,7 +217,7 @@ class AudioRecordRequest(BaseModel):
 
 class DigiConfig(BaseModel):
     """CW/RTTY/POCSAG digimode parameters (all optional — only sent fields change)."""
-    mode: Optional[str] = None          # "cw" | "rtty" | "pocsag"
+    mode: Optional[str] = None          # "cw" | "rtty" | "pocsag" | "aprs"
     rx: Optional[bool] = None           # start/stop the decoder
     cw_wpm: Optional[float] = Field(default=None, ge=5, le=60)
     cw_pitch: Optional[float] = Field(default=None, ge=300, le=1200)
@@ -225,6 +226,7 @@ class DigiConfig(BaseModel):
     rtty_shift: Optional[float] = Field(default=None, ge=50, le=1000)
     rtty_mark: Optional[float] = Field(default=None, ge=500, le=3000)
     pocsag_baud: Optional[int] = Field(default=None)          # 512 | 1200 | 2400
+    aprs_debug: Optional[bool] = None   # per-frame decoder detail line
     pocsag_addr: Optional[int] = Field(default=None, ge=0, le=2097151)   # RIC
     pocsag_func: Optional[int] = Field(default=None, ge=0, le=3)         # function bits
     pocsag_alpha: Optional[bool] = None  # alphanumeric (else numeric)

@@ -43,6 +43,7 @@ from .models import (AsrManualRequest, AudioDeviceRequest, AudioGainRequest,
                      HackRFConfig,
                      LogConfigRequest, LogLookupRequest, LogQsoRequest,
                      LogDeleteRequest, AsrRenameRequest, AsrSpeakerRequest)
+from . import aprs
 from . import mixer
 from . import speaker_id
 from . import system_info
@@ -120,18 +121,26 @@ class DigiService:
         self.pocsag_listen_all = True
         self.rx = False
         self._dec = None
+        self.aprs_debug = True         # per-frame decoder detail line
         self._subs: set = set()
         self._task = None
         self._tx_lock = asyncio.Lock()
 
     def status(self) -> dict:
-        return {"mode": self.mode, "rx": self.rx, "tx": self.audio.digi_tx_busy(),
-                "cw_wpm": self.cw_wpm, "cw_pitch": self.cw_pitch, "cw_auto": self.cw_auto,
+        st = {"mode": self.mode, "rx": self.rx, "tx": self.audio.digi_tx_busy(),
+              "aprs_debug": self.aprs_debug,
+              "cw_wpm": self.cw_wpm, "cw_pitch": self.cw_pitch, "cw_auto": self.cw_auto,
                 "rtty_baud": self.rtty_baud, "rtty_shift": self.rtty_shift,
                 "rtty_mark": self.rtty_mark,
                 "pocsag_baud": self.pocsag_baud, "pocsag_addr": self.pocsag_addr,
                 "pocsag_func": self.pocsag_func, "pocsag_alpha": self.pocsag_alpha,
                 "pocsag_listen_all": self.pocsag_listen_all}
+        if self.mode == "aprs" and self._dec is not None:
+            try:
+                st["aprs"] = self._dec.status()
+            except Exception:  # noqa: BLE001
+                pass
+        return st
 
     def cw_wpm_live(self):
         """Current auto-detected CW speed (WPM), or None when not applicable."""
@@ -151,19 +160,59 @@ class DigiService:
                 return None
         return None
 
+    async def _beacon(self, comment: str, set_ptt) -> dict:
+        """Transmit one position beacon for this station.
+
+        Nothing is digipeated or gated — this announces this station and stops.
+        The position is the centre of the configured Maidenhead square, which is
+        why the locator should have six characters or more; four would put the
+        beacon anywhere within about 100 km."""
+        call = (settings.callsign or "").strip().upper()
+        if not call:
+            raise HTTPException(400, "Kein eigenes Rufzeichen — Einstellungen > Allgemein")
+        if not settings.locator:
+            raise HTTPException(400, "Kein Locator — Einstellungen > Allgemein")
+        try:
+            lat, lon = aprs.locator_to_latlon(settings.locator)
+            pcm, line = aprs.beacon(call, lat, lon, comment=comment,
+                                    path=["WIDE1-1"], fs=SAMPLE_RATE)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        async with self._tx_lock:
+            await set_ptt(True)
+            self.audio.play_digi(pcm)
+            deadline = time.monotonic() + len(pcm) / SAMPLE_RATE + 3.0
+            while self.audio.digi_tx_busy() and time.monotonic() < deadline:
+                await asyncio.sleep(0.05)
+            await set_ptt(False)
+        self._broadcast(f"{time.strftime('%H:%M:%S')} ◀ Bake gesendet: {line}\n")
+        return {"sent": line}
+
+    def _announce(self) -> None:
+        """Say what the decoder is, in the window where its output lands."""
+        banner = getattr(self._dec, "BANNER", "")
+        if banner:
+            self._broadcast(banner)
+
     def _new_decoder(self):
         if self.mode == "rtty":
             return digimodes.RTTYDecoder(SAMPLE_RATE, self.rtty_baud,
                                          self.rtty_shift, self.rtty_mark)
         if self.mode == "pocsag":
-            return digimodes.POCSAGDecoder(SAMPLE_RATE, self.pocsag_baud, self.pocsag_alpha,
-                                           self.pocsag_addr, self.pocsag_listen_all)
+            return digimodes.POCSAGDecoder(SAMPLE_RATE, self.pocsag_baud,
+                                           self.pocsag_alpha, self.pocsag_addr,
+                                           self.pocsag_listen_all)
+        if self.mode == "aprs":
+            return aprs.APRSDecoder(SAMPLE_RATE, self.aprs_debug)
         return digimodes.CWDecoder(SAMPLE_RATE, self.cw_pitch, self.cw_wpm, self.cw_auto)
 
     def configure(self, cfg: DigiConfig) -> dict:
         changed = False
         if cfg.cw_auto is not None and cfg.cw_auto != self.cw_auto:
             self.cw_auto = cfg.cw_auto
+            changed = True
+        if cfg.aprs_debug is not None and cfg.aprs_debug != self.aprs_debug:
+            self.aprs_debug = cfg.aprs_debug
             changed = True
         for f in ("mode", "cw_wpm", "cw_pitch", "rtty_baud", "rtty_shift", "rtty_mark",
                   "pocsag_baud", "pocsag_addr", "pocsag_func", "pocsag_alpha",
@@ -175,13 +224,16 @@ class DigiService:
         if cfg.rx is not None:
             self.set_rx(cfg.rx)
         elif changed and self.rx:
-            self._dec = self._new_decoder()       # restart decoder with new params
+            self._dec = self._new_decoder()
+            self._announce()       # restart decoder with new params
         return self.status()
 
     def set_rx(self, on: bool) -> None:
         self.rx = on
         self.audio.set_digi_rx(on)
         self._dec = self._new_decoder() if on else None
+        if on:
+            self._announce()
 
     def subscribe(self) -> "asyncio.Queue":
         q: asyncio.Queue = asyncio.Queue()
@@ -240,6 +292,10 @@ class DigiService:
 
     async def transmit(self, text: str, set_ptt) -> dict:
         text = (text or "").strip()
+        # APRS first: a beacon needs no text — the comment is optional, and the
+        # position comes from the station's locator, not from what was typed.
+        if self.mode == "aprs":
+            return await self._beacon(text, set_ptt)
         if not text:
             return {"sent": ""}
         if self.mode == "rtty":
@@ -1489,7 +1545,7 @@ async def set_auto_power_off(req: AutoPowerOffRequest) -> dict:
 
 @app.get("/api/callsign")
 async def get_callsign() -> dict:
-    return {"callsign": settings.callsign}
+    return {"callsign": settings.callsign, "locator": settings.locator}
 
 
 @app.post("/api/callsign")
@@ -1498,7 +1554,16 @@ async def set_callsign(req: CallsignRequest) -> dict:
     settings.callsign = cs
     save_runtime(callsign=cs)
     callsign_svc.set_own(cs)          # keep ASR from flagging our own callsign
-    return {"callsign": cs}
+    if req.locator is not None:
+        loc = req.locator.strip().upper()
+        if loc:                       # reject it here, not when the beacon keys
+            try:
+                aprs.locator_to_latlon(loc)
+            except ValueError as e:
+                raise HTTPException(400, str(e))
+        settings.locator = loc
+        save_runtime(locator=loc)
+    return {"callsign": cs, "locator": settings.locator}
 
 
 # ---- logbook (Wavelog logging + QRZ.com lookup) --------------------------

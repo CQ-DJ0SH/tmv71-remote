@@ -571,7 +571,7 @@ API_AUDIO = (
     "GET/POST /api/audio/mixer   USB card mixer\n"
 )
 API_DIGI = (
-    "GET  /api/digi              CW/RTTY/POCSAG status\n"
+    "GET  /api/digi              CW/RTTY/POCSAG/APRS status\n"
     "POST /api/digi/config       mode + parameters\n"
     "POST /api/digi/tx           encode + transmit\n"
     "POST /api/digi/decode-recording  decode the RX buffer\n"
@@ -898,7 +898,7 @@ EN = [
           "5-digit CALL code and press CALL (keys PTT). Enter your own ID and press "
           "MUTE to silence RX until your ID is received — then it un-mutes "
           "automatically. Over FM this is AFSK; use a dummy load when setting up."),
-    ("h2", "Digimodes (CW / RTTY / POCSAG)"),
+    ("h2", "Digimodes (CW / RTTY / POCSAG / APRS)"),
     ("p", "Switch between CW (Morse), RTTY (Baudot/AFSK) and POCSAG paging. DECODE "
           "shows received text; type into the field and SEND to transmit (keys "
           "PTT); the CW text input is forced upper case. Parameters: CW WPM/pitch "
@@ -910,6 +910,42 @@ EN = [
           "RIC/FUNC/timestamp output. The REC button decodes the raw RX recorder "
           "buffer off-line in the current mode. Over the FM radio this is MCW / "
           "AFSK / FSK — not native HF modes."),
+    ("h2", "APRS"),
+    ("p", "The fourth digimode, in software: the TM-V71 has no built-in TNC — "
+          "that is the TM-D710 — so the whole stack runs on the Pi. Feed it the "
+          "flat 9600-baud data output rather than the speaker path: no "
+          "de-emphasis, and no squelch chopping a frame in half."),
+    ("ul", [
+        "RECEIVE decodes Bell 202 AFSK (1200 baud, mark 1200 Hz, space "
+        "2200 Hz) into AX.25 and then APRS: uncompressed and compressed "
+        "positions, MIC-E — which most mobile stations send — status, messages, "
+        "objects, telemetry and weather. Each frame becomes one line with "
+        "source, path, position, course, speed and comment; DEBUG adds a second "
+        "line with the frame type, symbol, length and the raw payload. The panel "
+        "head counts frames, CRC failures and distinct stations.",
+        "The CRC check is not optional. Noise regularly produces bit patterns "
+        "that look like a frame, and every one of them would be a ghost station "
+        "in the list. Measured here: ten seconds of pure noise produced four "
+        "such candidates and not one of them survived the check.",
+        "TRANSMIT sends a position beacon — BAKE keys PTT, the text field is its "
+        "optional comment. The position is the centre of the Maidenhead locator "
+        "from Settings > General, so use six characters or more: four is a 1°×2° "
+        "field, roughly 111×70 km. It is sent as an uncompressed position "
+        "without timestamp, path WIDE1-1, destination APZV71 — the APZ prefix "
+        "marks experimental software, and claiming a registered one would "
+        "misreport which program is on the air. 300 ms of flags precede the "
+        "frame: too short and the receiving TNC loses the first bytes, which "
+        "looks like a decoder fault at the far end.",
+        "There is no digipeater, no APRS-IS gateway and no automatic repeat. "
+        "A beacon that transmits by itself every few minutes is an operating "
+        "decision, not a default.",
+    ]),
+    ("p", "Verified by loop-back — every beacon was decoded again by this "
+          "program's own receiver, position, symbol, path and comment intact, "
+          "and still error-free at 6 dB signal-to-noise. MIC-E was checked "
+          "against known coordinates in both hemispheres, including a "
+          "three-digit longitude with its offset. Decoding costs 0.2 ms per "
+          "20 ms of audio."),
     ("h2", "Callsign recognition (Vosk)"),
     ("p", "An optional, offline speech-recognition pass on the RX audio that "
           "detects spoken German callsigns; enable it in Settings > Audio. A "
@@ -1430,7 +1466,7 @@ DE = [
           "eigenen Code (MY ID) eingeben und MUTE drücken, um RX stumm zu schalten, "
           "bis der eigene Ruf empfangen wird — dann wird automatisch entstummt. "
           "Über FM ist das AFSK; zum Einstellen einen Dummy-Load verwenden."),
-    ("h2", "Digimodes (CW / RTTY / POCSAG)"),
+    ("h2", "Digimodes (CW / RTTY / POCSAG / APRS)"),
     ("p", "Umschalten zwischen CW (Morse), RTTY (Baudot/AFSK) und POCSAG-Paging. "
           "DECODE zeigt den empfangenen Text; in das Feld tippen und mit SEND "
           "senden (tastet PTT); die CW-Eingabe wird in Großbuchstaben erzwungen. "
@@ -1442,6 +1478,45 @@ DE = [
           "439,9875 MHz mit RIC/FUNC/Zeitstempel pro Meldung. Die REC-Taste "
           "dekodiert den Roh-RX-Puffer offline im aktuellen Modus. Über das "
           "FM-Gerät ist das MCW / AFSK / FSK — keine echten HF-Modes."),
+    ("h2", "APRS"),
+    ("p", "Die vierte Betriebsart, vollständig in Software: Der TM-V71 hat "
+          "keinen eingebauten TNC — das ist der TM-D710 —, der ganze Stapel "
+          "läuft also auf dem Pi. Zuführen sollte man den flachen "
+          "9600-Baud-Datenausgang statt des Lautsprecherwegs: keine "
+          "De-Emphasis, und keine Rauschsperre, die einen Rahmen zerhackt."),
+    ("ul", [
+        "EMPFANG dekodiert Bell-202-AFSK (1200 Baud, Mark 1200 Hz, Space "
+        "2200 Hz) über AX.25 zu APRS: Positionen unkomprimiert und komprimiert, "
+        "MIC-E — was die meisten Mobilstationen senden —, Status, Nachrichten, "
+        "Objekte, Telemetrie und Wetter. Jeder Rahmen wird eine Zeile mit "
+        "Quelle, Pfad, Position, Kurs, Tempo und Kommentar; DEBUG ergänzt eine "
+        "zweite Zeile mit Rahmentyp, Symbol, Länge und roher Nutzlast. Die "
+        "Titelzeile zählt Rahmen, CRC-Fehler und verschiedene Stationen.",
+        "Die CRC-Prüfung ist nicht verhandelbar. Rauschen erzeugt regelmäßig "
+        "Bitmuster, die wie ein Rahmen aussehen, und jedes davon wäre eine "
+        "Geisterstation in der Liste. Hier gemessen: Zehn Sekunden reines "
+        "Rauschen brachten vier solche Kandidaten hervor — keiner überstand die "
+        "Prüfsumme.",
+        "SENDEN heißt Positionsbake: BAKE tastet PTT, das Textfeld ist der "
+        "optionale Kommentar. Die Position ist die Mitte des "
+        "Maidenhead-Locators aus Einstellungen > Allgemein, weshalb sechs "
+        "Zeichen oder mehr nötig sind: Vier Zeichen sind ein 1°×2°-Feld, also "
+        "rund 111×70 km. Gesendet wird eine unkomprimierte Position ohne "
+        "Zeitstempel, Pfad WIDE1-1, Ziel APZV71 — das Kürzel APZ kennzeichnet "
+        "experimentelle Software; eine registrierte Kennung zu verwenden würde "
+        "falsch melden, welches Programm auf dem Band ist. Dem Rahmen gehen "
+        "300 ms Flaggen voraus: zu wenig, und die Gegenstelle verliert die "
+        "ersten Bytes, was dort wie ein Decoderfehler aussieht.",
+        "Digipeater, APRS-IS-Gateway und automatische Wiederholung gibt es "
+        "nicht. Eine Bake, die von selbst alle paar Minuten sendet, ist eine "
+        "Betriebsentscheidung und keine Voreinstellung.",
+    ]),
+    ("p", "Nachgewiesen über die Rückschleife — jede Bake wurde vom eigenen "
+          "Empfänger dieses Programms wieder gelesen, mit Position, Symbol, "
+          "Pfad und Kommentar, und bis 6 dB Störabstand fehlerfrei. MIC-E wurde "
+          "gegen bekannte Koordinaten auf beiden Halbkugeln geprüft, "
+          "einschließlich dreistelliger Länge mit Offset. Das Dekodieren kostet "
+          "0,2 ms je 20 ms Audio."),
     ("h2", "Rufzeichenerkennung (Vosk)"),
     ("p", "Eine optionale, Offline-Spracherkennung auf dem RX-Audio, die "
           "gesprochene deutsche Rufzeichen erkennt; einzuschalten unter "

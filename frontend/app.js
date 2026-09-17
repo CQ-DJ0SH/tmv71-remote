@@ -1761,9 +1761,10 @@ function bindSettings() {
     $("#set-apiurl").value = apiBase();
     $("#set-callsign").value = localStorage.getItem("tmv71.callsign") || "";
     try {
-      const cs = (await api("GET", "/api/callsign")).callsign;
-      if (cs !== undefined) $("#set-callsign").value = cs;
-    } catch { /* fall back to cached value */ }
+      const c = await api("GET", "/api/callsign");   // callsign and locator
+      if (c.callsign !== undefined) $("#set-callsign").value = c.callsign;
+      if (c.locator != null) $("#set-locator").value = c.locator;
+    } catch { /* fall back to the cached callsign */ }
     $("#set-gpio").value = powerState?.pin ?? "";
     $("#set-apo-on").checked = !!powerState?.auto_off_enabled;
     $("#set-apo-sec").value = powerState?.auto_off_seconds ?? 60;
@@ -1821,9 +1822,10 @@ function bindSettings() {
       return;
     }
     const cs = $("#set-callsign").value.trim().toUpperCase();
+    const loc = ($("#set-locator")?.value || "").trim().toUpperCase();
     localStorage.setItem("tmv71.callsign", cs);
-    try { await api("POST", "/api/callsign", { callsign: cs }); }
-    catch (e) { toast("Callsign save: " + e.message, "err"); }
+    try { await api("POST", "/api/callsign", { callsign: cs, locator: loc }); }
+    catch (e) { toast("Callsign/Locator: " + e.message, "err"); }
     renderCallsign();
     // GPIO power pin (server-side, persisted)
     const gpioRaw = $("#set-gpio").value.trim();
@@ -2657,7 +2659,24 @@ function bindDigi() {
     $("#digi-params-cw").hidden = mode !== "cw";
     $("#digi-params-rtty").hidden = mode !== "rtty";
     $("#digi-params-pocsag").hidden = mode !== "pocsag";
+    $("#digi-params-aprs").hidden = mode !== "aprs";
     const dh = $(".digi-hint-pocsag"); if (dh) dh.hidden = mode !== "pocsag";
+    const da = $(".digi-hint-aprs"); if (da) da.hidden = mode !== "aprs";
+    // APRS sends a position beacon; the text field carries its comment
+    const ti = $("#digi-text");
+    if (ti) {
+      ti.disabled = false;
+      ti.placeholder = mode === "aprs" ? "Kommentar für die Bake (optional)…"
+                                       : "text to transmit…";
+    }
+    const sb = $("#digi-send");
+    if (sb) {
+      sb.disabled = false;
+      sb.textContent = mode === "aprs" ? "BAKE" : "SEND";
+      sb.title = mode === "aprs"
+        ? "Positionsbake aus dem Locator senden (tastet PTT)"
+        : "Encode & transmit (keys PTT)";
+    }
     if (mode === "cw") { const el = $("#digi-text"); if (el) el.value = el.value.toUpperCase(); }
     post({ mode });
   }));
@@ -2693,6 +2712,7 @@ function bindDigi() {
   $("#digi-baud")?.addEventListener("change", e => post({ rtty_baud: Number(e.target.value) }));
   $("#digi-shift")?.addEventListener("change", e => post({ rtty_shift: Number(e.target.value) }));
   // POCSAG params
+  $("#aprs-debug")?.addEventListener("change", e => post({ aprs_debug: e.target.checked }));
   $("#pocsag-baud")?.addEventListener("change", e => post({ pocsag_baud: Number(e.target.value) }));
   $("#pocsag-func")?.addEventListener("change", e => post({ pocsag_func: Number(e.target.value) }));
   $("#pocsag-alpha")?.addEventListener("change", e => post({ pocsag_alpha: e.target.checked }));
@@ -2723,13 +2743,20 @@ function bindDigi() {
   });
   // transmit
   const sendBtn = $("#digi-send"), txt = $("#digi-text");
+  // The APRS beacon carries its own position; the text is only a comment, so an
+  // empty field must not block it — in the other modes the text IS the message.
+  const digiMode = () => $(".digi-mode.active")?.dataset.mode || "cw";
+  const sendLabel = () => (digiMode() === "aprs" ? "BAKE" : "SEND");
   const send = async () => {
     const t = txt.value.trim();
-    if (!t) return;
+    if (!t && digiMode() !== "aprs") return;
     sendBtn.disabled = true; sendBtn.classList.add("tx"); sendBtn.textContent = "SENDING…";
     try { const r = await api("POST", "/api/digi/tx", { text: t }); if (r && r.sent) txt.value = ""; }
     catch (e) { toast("Send: " + e.message, "err"); }
-    finally { sendBtn.disabled = false; sendBtn.classList.remove("tx"); sendBtn.textContent = "SEND"; }
+    finally {
+      sendBtn.disabled = false; sendBtn.classList.remove("tx");
+      sendBtn.textContent = sendLabel();   // not always "SEND": APRS says BAKE
+    }
   };
   sendBtn?.addEventListener("click", send);
   txt?.addEventListener("keydown", e => { if (e.key === "Enter") send(); });
@@ -2747,6 +2774,23 @@ function bindDigi() {
     $("#digi-params-cw").hidden = s.mode !== "cw";
     $("#digi-params-rtty").hidden = s.mode !== "rtty";
     $("#digi-params-pocsag").hidden = s.mode !== "pocsag";
+    $("#digi-params-aprs").hidden = s.mode !== "aprs";
+    if (sendBtn) {
+      sendBtn.textContent = s.mode === "aprs" ? "BAKE" : "SEND";
+      sendBtn.title = s.mode === "aprs"
+        ? "Positionsbake aus dem Locator senden (tastet PTT)"
+        : "Encode & transmit (keys PTT)";
+    }
+    if (txt) txt.placeholder = s.mode === "aprs" ? "Kommentar für die Bake (optional)…"
+                                                 : "text to transmit…";
+    const ad = $("#aprs-debug"); if (ad && s.aprs_debug != null) ad.checked = !!s.aprs_debug;
+    // the running totals belong here, not under every frame in the log
+    if (s.aprs) {
+      const el = $("#aprs-stat");
+      if (el) el.textContent = `${s.aprs.frames} Rahmen · ${s.aprs.bad_crc} CRC-Fehler · `
+        + (s.aprs.stations === 1 ? "1 Station" : `${s.aprs.stations} Stationen`);
+    }
+    const das = $(".digi-hint-aprs"); if (das) das.hidden = s.mode !== "aprs";
     { const dh = $(".digi-hint-pocsag"); if (dh) dh.hidden = s.mode !== "pocsag"; }
     const set = (id, val, vid, suffix) => {
       const el = $(id); if (!el) return;

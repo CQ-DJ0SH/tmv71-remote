@@ -464,6 +464,7 @@
         <button class="digi-mode active" data-mode="cw" role="tab">CW</button>
         <button class="digi-mode" data-mode="rtty" role="tab">RTTY</button>
         <button class="digi-mode" data-mode="pocsag" role="tab">POCSAG</button>
+        <button class="digi-mode" data-mode="aprs" role="tab">APRS</button>
       </div>
       <label class="switch-label digi-rx-toggle" title="Decode the received audio">
         <span>DECODE</span><input type="checkbox" id="digi-rx" class="switch">
@@ -481,6 +482,10 @@
           <select id="digi-shift"><option value="170">170</option><option value="425">425</option><option value="850">850</option></select>
         </label>
         <label class="acg">MARK<input type="range" id="digi-mark" min="800" max="2600" step="25" value="2125"><span class="gv" id="digi-mark-v">2125 Hz</span></label>
+      </div>
+      <div class="digi-params" id="digi-params-aprs" hidden>
+        <label class="switch-label digi-rx-toggle" title="Zweite Zeile je Rahmen: Typ, Symbol, Länge und die rohe Nutzlast"><span>DEBUG</span><input type="checkbox" id="aprs-debug" class="switch" checked></label>
+        <span class="digi-ro" id="aprs-stat">0 Rahmen · 0 CRC-Fehler · 0 Stationen</span>
       </div>
       <div class="digi-params" id="digi-params-pocsag" hidden>
         <label class="acd">BAUD
@@ -503,7 +508,7 @@
         <input type="text" id="digi-text" placeholder="text to transmit…" autocomplete="off" autocapitalize="characters">
         <button class="digi-send" id="digi-send" title="Encode &amp; transmit (keys PTT)">SEND</button>
       </div>
-      <p class="digi-hint">FM MCW (CW) · AFSK (RTTY) · FSK (POCSAG) — keys PTT while sending.<span class="digi-hint-pocsag" hidden> · DAPNET 439.9875 MHz</span></p>
+      <p class="digi-hint">FM MCW (CW) · AFSK (RTTY) · FSK (POCSAG) — keys PTT while sending.<span class="digi-hint-pocsag" hidden> · DAPNET 439.9875 MHz</span><span class="digi-hint-aprs" hidden> · APRS: Empfang am flachen 9600-Ausgang.</span></p>
     </div>
   </section>
 
@@ -727,6 +732,7 @@
       <div class="form-grid">
         <label class="span-2">API backend URL<input type="text" id="set-apiurl" placeholder="empty = this server (e.g. https://192.168.1.50:8443)" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
         <label>Own callsign<input type="text" id="set-callsign" maxlength="12" placeholder="e.g. DJ0SH" autocapitalize="characters"></label>
+        <label title="Maidenhead locator — position of the APRS beacon. Six characters or more: four is a 1°×2° field, roughly 111×70 km.">Locator<input type="text" id="set-locator" maxlength="8" placeholder="e.g. JO62QM" autocapitalize="characters" autocomplete="off" spellcheck="false"></label>
         <label>Serial port<input type="text" id="set-port" list="port-list" placeholder="/dev/ttyUSB0"></label>
         <datalist id="port-list"></datalist>
         <label>Baud rate<select id="set-baud"></select></label>

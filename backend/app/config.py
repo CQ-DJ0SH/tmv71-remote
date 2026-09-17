@@ -116,6 +116,11 @@ class Settings(BaseSettings):
     spk_threshold: float = 0.55
     spk_margin: float = 0.10
 
+    # Maidenhead locator of this station (Settings > General). Used as the
+    # position of the APRS beacon; 6 characters or more, or the square is
+    # larger than the town.
+    locator: str = ""
+
     # UI colour theme ("light" | "dark"). Persisted server-side so the choice
     # survives across browsers/devices and storage clears.
     theme: str = "light"
@@ -157,7 +162,7 @@ _RUNTIME_KEYS = ("serial_port", "serial_baud", "gpio_power_pin",
                  "squelch_a", "squelch_b",
                  "tx_buffer_ms", "ptt_tail_ms",
                  "auto_power_off_enabled", "auto_power_off_seconds",
-                 "callsign", "roger_beep_enabled", "roger_beep_level", "theme",
+                 "callsign", "locator", "roger_beep_enabled", "roger_beep_level", "theme",
                  "tx_lowpass_enabled", "rx_lowpass_enabled", "rx_deemph_enabled",
                  "tx_preemph_enabled", "tx_comp_enabled",
                  "rx_deemph_us", "rx_squelch_enabled", "asr_callsign_enabled",
