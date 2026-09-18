@@ -64,6 +64,7 @@
     </div>
     <div class="audio-status"><span class="led" id="audio-led"></span><span id="audio-text">USB Audio</span></div>
     <div class="clock" id="clock">--:--:--</div>
+    <button class="gear rail-x" type="button" title="Kachelspalten einklappen" aria-label="ASR contact columns">▶</button>
     <button class="gear theme-toggle" id="theme-toggle" title="Toggle light/dark" aria-label="Toggle theme">☾</button>
     <button class="gear hdr-hide" id="hdr-hide" title="Hide title bar" aria-label="Hide title bar">▴</button>
     <button class="gear" id="open-settings" title="Settings" aria-label="Settings">⚙</button>
@@ -88,6 +89,21 @@
     <button class="rh-x" id="radio-hint-x" title="Dismiss" aria-label="Dismiss">✕</button>
   </div>
 </div>
+
+<!-- Mirrors of the ASR contact cards in the empty margins beside the console:
+     the newest on the left, the next ones on the right. Read-only copies, so
+     the recognised stations stay in view without scrolling down to the panel.
+     Hidden whenever the window is too narrow to hold them clear of the deck. -->
+<aside class="asr-rail" id="asr-rail-l">
+  <div class="rail-head"><span class="rail-title">ASR CONTACTS<span class="rail-n"></span></span></div>
+  <div class="rail-body" aria-hidden="true"></div>
+  <div class="rail-foot"><span class="rail-total" title="Summe der Redezeiten — ohne als Moderator gekennzeichnete Stationen">Σ 00:00:00</span></div>
+</aside>
+<aside class="asr-rail" id="asr-rail-r">
+  <div class="rail-head"><span class="rail-title">ASR CONTACTS</span></div>
+  <div class="rail-body" aria-hidden="true"></div>
+  <div class="rail-foot"><span class="rail-voice">VOICE MATCH<span class="rail-vn"></span></span></div>
+</aside>
 
 <main class="console">
   <!-- BAND PANELS -->
@@ -485,7 +501,7 @@
       </div>
       <div class="digi-params" id="digi-params-aprs" hidden>
         <label class="switch-label digi-rx-toggle" title="Zweite Zeile je Rahmen: Typ, Symbol, Länge und die rohe Nutzlast"><span>DEBUG</span><input type="checkbox" id="aprs-debug" class="switch" checked></label>
-        <span class="digi-ro" id="aprs-stat">0 Rahmen · 0 CRC-Fehler · 0 Stationen</span>
+        <span class="digi-ro" id="aprs-stat" title="Rahmen: gültig empfangen · beschädigt: echte Aussendung mit falscher Prüfsumme (Kollision, schwaches Signal) · Rauschen: zufälliges Bitmuster zwischen zwei Flaggen, korrekt verworfen">0 Rahmen · 0 beschädigt · 0 Stationen · 0× Rauschen</span>
       </div>
       <div class="digi-params" id="digi-params-pocsag" hidden>
         <label class="acd">BAUD
@@ -593,7 +609,7 @@
 
   <section class="debug-zone collapsed" id="debug-zone">
     <div class="panel-head">
-      <h2>ASR · KONTAKTE</h2>
+      <h2>ASR · CONTACTS</h2>
       <input class="asr-manual" id="asr-manual" type="text" maxlength="12"
              placeholder="RUFZEICHEN" autocomplete="off" spellcheck="false"
              autocapitalize="characters" inputmode="text"
@@ -607,7 +623,7 @@
       <span class="asr-total" id="asr-total" title="Summe der Redezeiten in diesem Panel — ohne als Moderator (M) gekennzeichnete Stationen">Σ 00:00:00</span>
       <button class="scan-clear" id="asr-log-clear" type="button" title="Alle Kontaktkarten aus der Ansicht entfernen">CLEAR ALL</button>
       <button class="scan-clear" id="asr-voice" type="button" aria-pressed="false"
-              title="Stimmerkennung">VOICE<span class="vn" id="asr-spk-n"></span></button>
+              title="Stimmerkennung">VOICE MATCH<span class="vn" id="asr-spk-n"></span></button>
       <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="debug-body" title="Show / hide the recognised contacts">▲</button>
     </div>
     <div class="panel-body" id="debug-body">

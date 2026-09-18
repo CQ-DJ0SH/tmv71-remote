@@ -43,6 +43,28 @@ def crc_x25(data: bytes) -> int:
     return crc ^ 0xFFFF
 
 
+def _plausible_header(data: bytes) -> bool:
+    """Does a frame that failed its CRC still carry a real AX.25 address field?
+
+    Destination and source are twelve callsign characters, each an upper-case
+    letter, digit or space shifted left by one — so every byte is even and comes
+    from a set of 37 values out of 256. A random byte passes with probability
+    37/256 ≈ 0.14, twelve in a row with about 8·10⁻¹¹: noise cannot produce this.
+    A frame that does is a real transmission that was damaged somewhere later —
+    typically a collision or a fade in the payload, which is the common case.
+    """
+    if not MIN_FRAME <= len(data) <= 332:
+        return False
+    for k in (*range(0, 6), *range(7, 13)):
+        b = data[k]
+        if b & 1:
+            return False
+        ch = chr(b >> 1)
+        if not (ch.isupper() or ch.isdigit() or ch == " "):
+            return False
+    return chr(data[7] >> 1) != " "          # a source callsign starts with a letter/digit
+
+
 def _addr(raw: bytes) -> tuple[str, int, bool]:
     """One AX.25 address field: 6 shifted ASCII chars + SSID byte."""
     call = "".join(chr(b >> 1) for b in raw[:6]).strip()
@@ -310,7 +332,12 @@ class APRSDecoder:
         self._frame = bytearray()
         # statistics for the panel
         self.frames = 0
-        self.bad_crc = 0
+        # A failed CRC is two very different things, and one counter mixed them:
+        # a real transmission damaged on the way (worth knowing — collisions,
+        # weak stations) and a pattern the noise happened to produce between two
+        # flags (worth nothing). Counted apart, see _plausible_header().
+        self.damaged = 0
+        self.noise = 0
         self.last: Optional[_Frame] = None
         self.stations: dict[str, dict] = {}
 
@@ -388,8 +415,18 @@ class APRSDecoder:
             return ""
         fcs = data[-2] | (data[-1] << 8)
         if crc_x25(data[:-2]) != fcs:
-            self.bad_crc += 1
-            return ""
+            if not _plausible_header(data):
+                self.noise += 1
+                return ""
+            self.damaged += 1
+            if not self.verbose:
+                return ""
+            # the header survived, so it is worth saying WHO was lost
+            dst, dssid, _ = _addr(data[0:7])
+            src, sssid, _ = _addr(data[7:14])
+            return (time.strftime("%H:%M:%S ")
+                    + f"✗ {_call(src, sssid)}>{_call(dst, dssid)} "
+                    + f"beschädigt, CRC falsch ({len(data)} B)\n")
         return self._decode(data[:-2])
 
     # --- layer 3: AX.25 + APRS -------------------------------------------
@@ -427,8 +464,8 @@ class APRSDecoder:
         return line + (f.debug() + "\n" if self.verbose else "")
 
     def status(self) -> dict:
-        return {"frames": self.frames, "bad_crc": self.bad_crc,
-                "stations": len(self.stations)}
+        return {"frames": self.frames, "damaged": self.damaged,
+                "noise": self.noise, "stations": len(self.stations)}
 
 
 def locator_to_latlon(loc: str) -> tuple[float, float]:

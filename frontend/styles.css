@@ -592,6 +592,114 @@ body.theme-light .asr-cards{background-color:#eef2f5; border-color:#d3dce2}
   box-shadow:inset 0 1px 2px #00000055;
 }
 body.theme-light .asr-slot{background:#e6ebef; border-color:#ccd6dd; box-shadow:inset 0 1px 2px #0000000d}
+/* ---- card mirrors in the margins beside the console ----
+   The console is 1220 px wide and centred, so on a wide screen a few hundred
+   pixels sit unused on either side. They hold a read-only copy of the contact
+   cards — same card, same tray background, same empty slots — so the stations
+   heard stay visible while the panel itself is scrolled away. Positioned from
+   the centre outwards, which keeps them glued to the console edge at any width. */
+.asr-rail{
+  /* Head and foot cost height that the cards need — every 92 px is one more
+     card. Kept as tight as the top bar and the screws allow. */
+  position:fixed; top:106px; bottom:8px; width:180px; z-index:3;
+  display:flex; flex-direction:column; gap:var(--ac-gap, 8px);
+  padding:7px 9px; border-radius:6px; overflow:hidden;
+  background-color:#05080a; border:1px solid #0c151b;
+  /* The copies carry the same buttons as the originals and route to them, so
+     the rails take clicks like the panel does. */
+  transition:width .2s ease, height .2s ease, background-color .2s, border-color .2s;
+}
+body.theme-light .asr-rail{background-color:#eef2f5; border-color:#d3dce2}
+#asr-rail-l{right:calc(50% + 610px + 14px)}
+#asr-rail-r{left:calc(50% + 610px + 14px)}
+.rail-body{display:flex; flex-direction:column; gap:var(--ac-gap, 8px);
+  flex:1 1 auto; min-height:0; overflow:hidden; transition:opacity .15s ease}
+.asr-rail .asr-card, .asr-rail .asr-slot{flex:0 0 var(--ac-h, 84px); width:100%}
+/* Empty places carry their number, large and very faint — it says how far the
+   list reaches without competing with the cards beside it. Set from the slot's
+   data-n, which counts on across both rails. */
+.rail-body .asr-slot{position:relative}
+.rail-body .asr-slot::before{
+  content:attr(data-n);
+  position:absolute; inset:0; display:flex; align-items:center;
+  justify-content:center;
+  font-family:var(--font-disp); font-weight:700; font-size:34px;
+  letter-spacing:.06em; color:var(--text-dim); opacity:.11;
+}
+body.theme-light .rail-body .asr-slot::before{opacity:.16}
+/* head: just the panel's name — the fold control sits in the title bar */
+/* The title is centred over the whole rail, so both columns read as one pair;
+   the handle is taken out of the flow and pinned to the outer edge, otherwise
+   its 18 px would push the title off centre. */
+.rail-head{position:relative; display:flex; align-items:center;
+  justify-content:center; flex:0 0 auto; margin-bottom:5px; min-height:16px}
+.rail-title{
+  transition:opacity .15s ease;
+  min-width:0; overflow:hidden; white-space:nowrap; text-align:center;
+  font-family:var(--font-disp); font-weight:700; letter-spacing:.16em;
+  font-size:12.5px; color:var(--text-dim);
+}
+/* the fold control wears the same suit as the gears beside it in the title bar,
+   and is only meaningful while there are margins for the rails to live in */
+.rail-x{font-size:10px}
+@media (max-width:1620px){ .rail-x{display:none} }
+/* how many contact cards exist in total — the rails show only the first few, so
+   the number says whether anything is out of sight */
+.rail-n{
+  margin-left:8px; font-family:var(--font-mono); font-weight:400;
+  font-size:11px; letter-spacing:.02em; color:var(--text-dim); opacity:.75;
+}
+.rail-n:empty{display:none}
+/* foot of the rails: the talk-time total on the left, the voice lamp on the
+   right — the two figures from the panel head that are worth having in view
+   while the panel itself is scrolled away */
+.rail-foot{flex:0 0 auto; display:flex; align-items:center; justify-content:center;
+  margin-top:3px; min-height:11px; line-height:1; transition:opacity .15s ease}
+.rail-total{font-family:var(--font-mono); font-size:10.5px; letter-spacing:.03em;
+  line-height:1; color:var(--text); font-variant-numeric:tabular-nums;
+  white-space:nowrap}
+.rail-voice{
+  display:inline-flex; align-items:center; gap:5px; line-height:1;
+  font-family:var(--font-ui); font-size:9px; letter-spacing:.14em;
+  color:var(--text-dim);
+}
+/* same lamp as the VOICE button in the panel head: dark when off, pulsing green
+   while it listens — the pulse is what says "right now" */
+.rail-voice::before{
+  content:""; width:6px; height:6px; border-radius:50%; flex:0 0 auto;
+  background:var(--text-dim); opacity:.4;
+}
+/* learned voices, same badge as on the panel button */
+.rail-vn{margin-left:5px; font-family:var(--font-mono); font-size:9.5px;
+  letter-spacing:0; opacity:.75}
+.rail-vn:empty{display:none}
+.rail-voice.on{color:#dbe7ef}
+.rail-voice.on::before{
+  background:var(--ok); opacity:1;
+  box-shadow:0 0 8px var(--ok), inset 0 0 2px #fff8;
+  animation:asrPulse 1.6s ease-in-out infinite;
+}
+body.theme-light .rail-voice.on{color:#1b2731}
+.asr-rail.folded .rail-foot{opacity:0}
+/* Collapsed: nothing but the handle. The dark tray is the reserved space for
+   cards — with no cards shown it would only be a bar with no meaning, so the
+   background, border and height go and the rail shrinks to its own handle. */
+.asr-rail.folded{
+  /* Nothing needs to stay behind: the control that brings the rails back now
+     lives in the title bar, so they can fold away to nothing. */
+  width:0; height:0; bottom:auto; padding:0; border-width:0;
+  background:transparent;
+}
+/* Not display:none — the contents stay in the layout and are simply clipped by
+   the shrinking box, which is what makes the fold look like a movement instead
+   of a disappearance. Their opacity fades slightly faster than the box moves,
+   so nothing is seen sliding out sideways. */
+.asr-rail.folded .rail-body, .asr-rail.folded .rail-title{opacity:0}
+.asr-rail.folded .rail-head{margin:0; min-height:18px}
+.asr-rail .asr-card{animation:none}    /* the flash belongs to the panel copy */
+/* Below this width the margins are gone: 1220 console + 2x194 for the rails. */
+@media (max-width:1620px){ .asr-rail{display:none} }
+
 /* "nothing yet" hint — overlaid, not a grid item, so it does not consume a slot */
 .asr-cards.no-cards::before{
   content:attr(data-empty); position:absolute; left:0; right:0; top:10px;
@@ -1002,6 +1110,11 @@ body.theme-light .asr-tip{background:#ffffffF2; border-color:#c5cfd8; box-shadow
 
   /* radio-off prompt: the centred nameplate plate is used here too; only sit
      clear of the left tab rail so it stays centred over the deck */
+  /* no margins in the deck to put them in — and the control goes with them:
+     since it moved to the title bar it is no longer hidden along with the rails,
+     so a wide but short window would otherwise keep a button that toggles
+     something invisible */
+  .asr-rail, .rail-x{display:none}
   .radio-hint{left:44px}
   .rh-plate{padding:20px 44px; gap:10px}
 
@@ -2539,8 +2652,11 @@ body.theme-light .log-recent-list{
   font-family:var(--font-ui); font-size:12px}
 /* one compact line per QSO: time+band left, lookup extras (grid/qth/country/
    email) flexible in the middle, name right-aligned just before the callsign */
+/* tighter rows: the callsign is 14 px on a 1.2 line box, so 3 px above and
+   below still clears the descenders and fits two more QSOs into the same list */
 .log-item{display:flex; align-items:baseline; gap:8px; white-space:nowrap;
-  padding:6px 11px; border-bottom:1px solid color-mix(in srgb, var(--edge) 60%, transparent)}
+  padding:3px 11px; line-height:1.25;
+  border-bottom:1px solid color-mix(in srgb, var(--edge) 60%, transparent)}
 .log-item:last-child{border-bottom:0}
 .log-item .li-when{flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis;
   font-family:var(--font-mono); font-size:10px; color:var(--text-dim)}

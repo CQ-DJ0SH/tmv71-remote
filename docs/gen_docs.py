@@ -922,11 +922,21 @@ EN = [
         "objects, telemetry and weather. Each frame becomes one line with "
         "source, path, position, course, speed and comment; DEBUG adds a second "
         "line with the frame type, symbol, length and the raw payload. The panel "
-        "head counts frames, CRC failures and distinct stations.",
+        "head counts frames, damaged frames, distinct stations and noise.",
         "The CRC check is not optional. Noise regularly produces bit patterns "
         "that look like a frame, and every one of them would be a ghost station "
         "in the list. Measured here: ten seconds of pure noise produced four "
         "such candidates and not one of them survived the check.",
+        "A failed check is two very different things, so they are counted "
+        "apart. A candidate whose address field still holds twelve plausible "
+        "callsign characters was a real transmission, damaged on the way — a "
+        "collision, a fade — and is counted as DAMAGED; with DEBUG on, the line "
+        "names who was lost. Anything else is noise between two flags and is "
+        "counted as such. Random bytes pass the address test with a probability "
+        "around 8·10⁻¹¹, and sixty seconds of pure noise produced not one. "
+        "Measured on the air: in 152 s, 17 frames received, 5 damaged, 108 "
+        "noise candidates — so the raw CRC count said far more about the noise "
+        "floor than about lost stations.",
         "TRANSMIT sends a position beacon — BAKE keys PTT, the text field is its "
         "optional comment. The position is the centre of the Maidenhead locator "
         "from Settings > General, so use six characters or more: four is a 1°×2° "
@@ -946,6 +956,32 @@ EN = [
           "against known coordinates in both hemispheres, including a "
           "three-digit longitude with its offset. Decoding costs 0.2 ms per "
           "20 ms of audio."),
+    ("h2", "Contact columns beside the console"),
+    ("p", "On a wide screen the console leaves a few hundred pixels unused on "
+          "either side. They hold a copy of the contact cards — the newest in "
+          "the left column, the next ones in the right — so the stations heard "
+          "stay in view while the panel itself is scrolled away. The tray "
+          "background and the empty places are the panel's own, and the free "
+          "places are numbered straight through both columns, large and faint, "
+          "so an empty one says how far the list reaches."),
+    ("ul", [
+        "The heads carry the panel's name and, on the left, the total number of "
+        "cards — not what fits, so the figure says whether anything is out of "
+        "sight. The feet carry the two readings worth having in view: the sum "
+        "of all talk timers on the left, the VOICE MATCH lamp with the number "
+        "of learned voices on the right.",
+        "The copies are fully operable: delete, log to Wavelog, start and stop "
+        "the talk timer, mark a card, correct a callsign, and the hover detail. "
+        "Every click is routed to the original card and performed by ITS button "
+        "— cloning does not copy event handlers, and giving the copies their "
+        "own would mean every behaviour existed twice, with the certainty of "
+        "drifting apart one day.",
+        "One control in the title bar folds both columns away together; they "
+        "are one display split over two columns, and leaving one open would "
+        "look like a fault rather than a choice. The columns appear from "
+        "1620 px of window width (1220 for the console plus room for both) and "
+        "never in the mobile deck, which has no margins to put them in.",
+    ]),
     ("h2", "Callsign recognition (Vosk)"),
     ("p", "An optional, offline speech-recognition pass on the RX audio that "
           "detects spoken German callsigns; enable it in Settings > Audio. A "
@@ -1491,12 +1527,25 @@ DE = [
         "Objekte, Telemetrie und Wetter. Jeder Rahmen wird eine Zeile mit "
         "Quelle, Pfad, Position, Kurs, Tempo und Kommentar; DEBUG ergänzt eine "
         "zweite Zeile mit Rahmentyp, Symbol, Länge und roher Nutzlast. Die "
-        "Titelzeile zählt Rahmen, CRC-Fehler und verschiedene Stationen.",
+        "Titelzeile zählt Rahmen, beschädigte Rahmen, verschiedene Stationen "
+        "und Rauschkandidaten.",
         "Die CRC-Prüfung ist nicht verhandelbar. Rauschen erzeugt regelmäßig "
         "Bitmuster, die wie ein Rahmen aussehen, und jedes davon wäre eine "
         "Geisterstation in der Liste. Hier gemessen: Zehn Sekunden reines "
         "Rauschen brachten vier solche Kandidaten hervor — keiner überstand die "
         "Prüfsumme.",
+        "Eine fehlgeschlagene Prüfung sind zwei sehr verschiedene Dinge, "
+        "deshalb werden sie getrennt gezählt. Ein Kandidat, dessen Adressfeld "
+        "noch zwölf plausible Rufzeichen-Zeichen enthält, war eine echte "
+        "Aussendung, die unterwegs beschädigt wurde — Kollision, Schwund — und "
+        "zählt als BESCHÄDIGT; bei eingeschaltetem DEBUG nennt die Zeile, wer "
+        "verloren ging. Alles andere ist Rauschen zwischen zwei Flaggen und "
+        "wird als solches gezählt. Zufällige Bytes bestehen die Adressprüfung "
+        "mit einer Wahrscheinlichkeit um 8·10⁻¹¹, und sechzig Sekunden reines "
+        "Rauschen brachten keinen einzigen hervor. Auf dem Band gemessen: in "
+        "152 s 17 empfangene Rahmen, 5 beschädigte, 108 Rauschkandidaten — die "
+        "reine CRC-Zahl sagte also weit mehr über den Störpegel als über "
+        "verlorene Stationen.",
         "SENDEN heißt Positionsbake: BAKE tastet PTT, das Textfeld ist der "
         "optionale Kommentar. Die Position ist die Mitte des "
         "Maidenhead-Locators aus Einstellungen > Allgemein, weshalb sechs "
@@ -1517,6 +1566,34 @@ DE = [
           "gegen bekannte Koordinaten auf beiden Halbkugeln geprüft, "
           "einschließlich dreistelliger Länge mit Offset. Das Dekodieren kostet "
           "0,2 ms je 20 ms Audio."),
+    ("h2", "Kontaktspalten neben der Konsole"),
+    ("p", "Auf einem breiten Bildschirm bleiben links und rechts der Konsole "
+          "einige hundert Pixel ungenutzt. Dort steht eine Kopie der "
+          "Kontaktkarten — die neuesten in der linken Spalte, die nächsten in "
+          "der rechten —, sodass die gehörten Stationen im Blick bleiben, "
+          "während das Panel selbst weggescrollt ist. Hintergrund und leere "
+          "Fächer sind die des Panels, und die freien Plätze sind groß und "
+          "blass durchnummeriert, über beide Spalten hinweg: Ein leeres Fach "
+          "sagt damit auch, wie weit die Liste reicht."),
+    ("ul", [
+        "Die Köpfe tragen den Namen des Panels und links die Gesamtzahl der "
+        "Karten — nicht die der sichtbaren, damit die Zahl verrät, ob etwas "
+        "außer Sicht liegt. Die Füße tragen die beiden Werte, die man im Auge "
+        "behalten will: links die Summe aller Redezeiten, rechts die "
+        "VOICE-MATCH-Lampe mit der Zahl der gelernten Stimmen.",
+        "Die Kopien sind voll bedienbar: löschen, ins Wavelog eintragen, "
+        "Redezeit starten und stoppen, Karte markieren, Rufzeichen korrigieren "
+        "und die Detailanzeige beim Überfahren. Jeder Klick wird an die "
+        "Originalkarte weitergereicht und von DEREN Knopf ausgeführt — Klonen "
+        "kopiert keine Ereignisbehandler, und eigene zu vergeben hieße, jedes "
+        "Verhalten zweimal im Quelltext zu haben, mit der sicheren Aussicht, "
+        "dass beide Fassungen eines Tages auseinanderlaufen.",
+        "Ein Schalter in der Titelzeile klappt beide Spalten gemeinsam weg; sie "
+        "sind eine Anzeige auf zwei Spalten verteilt, und eine offen und eine "
+        "zu sähe nach Fehler aus statt nach Entscheidung. Die Spalten "
+        "erscheinen ab 1620 px Fensterbreite (1220 für die Konsole plus Platz "
+        "für beide) und nie im mobilen Deck, das keine Ränder dafür hat.",
+    ]),
     ("h2", "Rufzeichenerkennung (Vosk)"),
     ("p", "Eine optionale, Offline-Spracherkennung auf dem RX-Audio, die "
           "gesprochene deutsche Rufzeichen erkennt; einzuschalten unter "

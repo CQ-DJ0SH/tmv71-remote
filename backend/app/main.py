@@ -122,6 +122,7 @@ class DigiService:
         self.rx = False
         self._dec = None
         self.aprs_debug = True         # per-frame decoder detail line
+        self._aprs_last = None         # last APRS counters pushed to the panel
         self._subs: set = set()
         self._task = None
         self._tx_lock = asyncio.Lock()
@@ -190,6 +191,7 @@ class DigiService:
 
     def _announce(self) -> None:
         """Say what the decoder is, in the window where its output lands."""
+        self._aprs_last = None         # a fresh decoder starts its counts at zero
         banner = getattr(self._dec, "BANNER", "")
         if banner:
             self._broadcast(banner)
@@ -271,6 +273,20 @@ class DigiService:
                 continue
             if text:
                 self._broadcast(text)
+            if self.mode == "aprs":
+                # The panel reads its counters from "status", which is only sent
+                # on connect and on a config change — so they stood still while
+                # traffic ran. Push them whenever they move; a CRC failure
+                # changes them without producing a single line of text.
+                try:
+                    st = self._dec.status()
+                except Exception:  # noqa: BLE001
+                    st = None
+                if st is not None:
+                    key = (st["frames"], st["damaged"], st["noise"], st["stations"])
+                    if key != self._aprs_last:
+                        self._aprs_last = key
+                        self._broadcast({"t": "aprsstat", **st})
 
     async def decode_recording(self) -> dict:
         """Run the current-mode decoder over the raw RX recorder buffer and push
@@ -2006,7 +2022,10 @@ async def ws_digi(ws: WebSocket) -> None:
                 else:
                     await ws.send_json({"t": "idle"})   # keep-alive / detect drop
                 continue
-            await ws.send_json({"t": "rx", "text": text})
+            if isinstance(text, dict):        # structured push (e.g. aprsstat)
+                await ws.send_json(text)
+            else:
+                await ws.send_json({"t": "rx", "text": text})
     except WebSocketDisconnect:
         pass
     except Exception:  # noqa: BLE001

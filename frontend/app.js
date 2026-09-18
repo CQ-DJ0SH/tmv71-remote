@@ -2785,11 +2785,7 @@ function bindDigi() {
                                                  : "text to transmit…";
     const ad = $("#aprs-debug"); if (ad && s.aprs_debug != null) ad.checked = !!s.aprs_debug;
     // the running totals belong here, not under every frame in the log
-    if (s.aprs) {
-      const el = $("#aprs-stat");
-      if (el) el.textContent = `${s.aprs.frames} Rahmen · ${s.aprs.bad_crc} CRC-Fehler · `
-        + (s.aprs.stations === 1 ? "1 Station" : `${s.aprs.stations} Stationen`);
-    }
+    if (s.aprs) aprsStatPaint(s.aprs);
     const das = $(".digi-hint-aprs"); if (das) das.hidden = s.mode !== "aprs";
     { const dh = $(".digi-hint-pocsag"); if (dh) dh.hidden = s.mode !== "pocsag"; }
     const set = (id, val, vid, suffix) => {
@@ -2836,11 +2832,24 @@ function reflectDigiPitch(p) {
   if (v) v.textContent = val + " Hz";
 }
 
+// APRS counters in the panel head — from the initial status and from every
+// "aprsstat" push while traffic runs
+function aprsStatPaint(a) {
+  const el = $("#aprs-stat");
+  if (!el || !a) return;
+  // damaged real frames and noise candidates are different statements: the
+  // first says stations were lost, the second only that the channel is noisy
+  el.textContent = `${a.frames} Rahmen · ${a.damaged} beschädigt · `
+    + (a.stations === 1 ? "1 Station" : `${a.stations} Stationen`)
+    + ` · ${a.noise}× Rauschen`;
+}
+
 function connectDigiWS(decode) {
   let ws;
   try { ws = new WebSocket(wsUrl("/ws/digi")); } catch { return; }
   ws.onmessage = ev => {
     let m; try { m = JSON.parse(ev.data); } catch { return; }
+    if (m.t === "aprsstat") { aprsStatPaint(m); return; }   // live APRS counters
     if (m.t === "wpm" && m.wpm != null) {          // live auto-detected CW speed + pitch
       if ($("#digi-auto")?.checked) {
         reflectDigiWpm(m.wpm);
@@ -3252,6 +3261,8 @@ function overTotalPaint() {
     sum += (c === overCard) ? overElapsed() : (Number(c.dataset.durMs) || 0);
   });
   el.textContent = "Σ " + overFmt(sum);
+  const rt = $(".rail-total");         // the same total, in the left rail's foot
+  if (rt) rt.textContent = el.textContent;
 }
 // Point the clock at another card: bank what the old one had, then pick up that
 // card's own total so a start continues it instead of restarting at zero.
@@ -3372,6 +3383,7 @@ function overPaint() {
   const ms = overElapsed();
   durSet(overCard, ms);
   el.classList.add("live");
+  asrRailSync();
   // The RUNNING value has to be persisted too. It used to be painted only as
   // text while data-dur-ms and the store kept the last BANKED figure — so a
   // card whose clock was still going showed minutes and came back from a reload
@@ -3524,6 +3536,8 @@ $("#sq-mute")?.addEventListener("click", () => {
 function spkCountPaint(n) {
   const vn = $("#asr-spk-n");
   if (vn) vn.textContent = n ? String(n) : "";
+  const rn = $(".rail-vn");            // the same figure in the right rail's foot
+  if (rn) rn.textContent = n ? String(n) : "";
   const st = $("#spk-profiles");
   if (st) st.textContent = n ?? 0;
 }
@@ -3578,6 +3592,14 @@ function reflectSpk(k) {
     sel.disabled = !k.available;
   }
   spkCountPaint(k.profiles);        // panel button + the figure in Settings
+  const rv = $(".rail-voice");         // the lamp in the right rail's foot
+  if (rv) {
+    rv.classList.toggle("on", !!k.enabled);
+    rv.title = !k.available ? "Stimmerkennung: Sprechermodell fehlt"
+      : !k.enabled ? "Stimmerkennung aus"
+      : k.act ? `Stimmerkennung ordnet zu (${k.profiles} Stimmprofile)`
+              : `Stimmerkennung beobachtet nur (${k.profiles} Stimmprofile)`;
+  }
   spkListPaint(k);
   // the panel button switches the recognition on and off; WHICH stage it runs
   // in stays with the selector in Settings, so one click here never silently
@@ -3996,7 +4018,131 @@ function asrFillSlots() {
   for (let i = have - 1; i >= want - cards; i--) slots[i].remove();
   box.classList.toggle("no-cards", cards === 0);
   overTotalPaint();                  // cards added, dropped or cleared
+  asrRailBuild();                    // ...and so do the copies in the margins
 }
+// ---- card mirrors in the margins ------------------------------------------
+// A copy of the contact cards beside the console, so the stations heard stay in
+// view while the panel itself is scrolled away: the newest on the left rail, the
+// next ones on the right. The cards are cloned rather than rebuilt — one source
+// of truth for how a card looks — and every click is routed to the original
+// card, which is the one source of truth for what a card DOES. Cloning does not
+// copy event listeners, so without that routing the copies would be dead.
+const RAIL_MAX = 10;                    // cards per rail, if the height allows
+function railFits(rail) {
+  const body = rail?.querySelector(".rail-body");
+  if (!body) return 0;
+  const h = body.clientHeight;
+  const card = 84, gap = 8;
+  return Math.max(0, Math.min(RAIL_MAX, Math.floor((h + gap) / (card + gap))));
+}
+function asrRailBuild() {
+  const l = $("#asr-rail-l"), r = $("#asr-rail-r");
+  // NOT offsetParent: that is null for every position:fixed element, so the
+  // check would have refused to build the rails at any width.
+  if (!l || !r || getComputedStyle(l).display === "none") return;
+  const cards = [...document.querySelectorAll("#asr-log .asr-card")];
+  let at = 0;
+  for (const rail of [l, r]) {
+    const body = rail.querySelector(".rail-body");
+    const n = railFits(rail);
+    body.textContent = "";
+    for (let i = 0; i < n; i++) {
+      const src = cards[at + i];
+      if (src) {
+        const c = src.cloneNode(true);
+        c.classList.remove("flash");
+        body.appendChild(c);
+      } else {
+        const slot = document.createElement("div");
+        slot.className = "asr-slot";                // reserve the space, darkened
+        // numbered across both rails, so an empty place says which one it is
+        slot.dataset.n = String(at + i + 1);
+        body.appendChild(slot);
+      }
+    }
+    at += n;
+  }
+  // the total, not what fits: the point is to show when cards are out of sight
+  $$(".rail-n").forEach(e => e.textContent = cards.length ? String(cards.length) : "");
+  asrRailSync();
+}
+// the parts that change without the card set changing: talk time and state
+function asrRailSync() {
+  const cards = [...document.querySelectorAll("#asr-log .asr-card")];
+  const copies = [...document.querySelectorAll(".rail-body .asr-card")];
+  copies.forEach((c, i) => {
+    const src = cards[i];
+    if (!src || c.querySelector(".ac-edit")) return;   // leave an open editor be
+    if (c.className !== src.className) c.className = src.className.replace(" flash", "");
+    const a = c.querySelector(".ac-dv"), b = src.querySelector(".ac-dv");
+    if (a && b && a.textContent !== b.textContent) a.textContent = b.textContent;
+    const ca = c.querySelector(".ac-count"), cb = src.querySelector(".ac-count");
+    if (ca && cb && ca.textContent !== cb.textContent) ca.textContent = cb.textContent;
+  });
+}
+// Fold both rails together: they are one display split over two columns, and
+// leaving one open while the other is shut looks like a fault, not a choice.
+const RAIL_KEY = "tmv71.railFolded";
+function railFoldPaint() {
+  const folded = $("#asr-rail-l")?.classList.contains("folded");
+  const b = $(".rail-x");              // one handle, on the left rail
+  if (!b) return;
+  // the arrow points the way the rails will move: out to the margins, or back
+  b.textContent = folded ? "◀" : "▶";
+  b.title = folded ? "Kachelspalten ausklappen" : "Kachelspalten einklappen";
+}
+function railFold(on) {
+  $$(".asr-rail").forEach(r => r.classList.toggle("folded", on));
+  try { localStorage.setItem(RAIL_KEY, on ? "1" : "0"); } catch {}
+  railFoldPaint();
+  // While folded the rail is 38 px tall, so nothing could be measured; rebuild
+  // once the box has grown back, not before.
+  if (!on) setTimeout(asrRailBuild, 210);
+}
+try { if (localStorage.getItem(RAIL_KEY) === "1") railFold(true); } catch {}
+railFoldPaint();
+// the state lives on the rail, not on the button — which since the move sits in
+// the title bar and has no rail to ask
+$$(".rail-x").forEach(b => b.addEventListener("click",
+  () => railFold(!$("#asr-rail-l")?.classList.contains("folded"))));
+// Every action on a copy is performed BY the original: clicking the original's
+// own button runs the handler that is already there, so delete, log, timer and
+// focus behave identically in both places and exist only once in the code.
+function asrRailAction(ev) {
+  const copy = ev.target.closest(".rail-body .asr-card");
+  if (!copy) return;
+  const card = asrCards.get(copy.dataset.call);
+  if (!card) return;
+  for (const sel of [".ac-del", ".ac-log", ".ac-dur", ".ac-mod"]) {
+    if (ev.target.closest(sel)) {
+      ev.stopPropagation();
+      card.querySelector(sel)?.click();
+      asrRailSync();
+      return;
+    }
+  }
+  if (ev.target.closest(".ac-call")) {   // correct the callsign right here
+    ev.stopPropagation();
+    asrEditCall(copy);
+    return;
+  }
+  card.click();                          // mark / hold, exactly as in the panel
+  asrRailSync();
+}
+$$(".rail-body").forEach(b => {
+  b.addEventListener("click", asrRailAction);
+  // the hover detail is bound per card in the panel; for the copies one
+  // delegated pair does it
+  b.addEventListener("mouseover", ev => {
+    const c = ev.target.closest(".asr-card");
+    if (c) asrTipShow(c);
+  });
+  b.addEventListener("mouseout", ev => {
+    if (!ev.relatedTarget?.closest?.(".asr-card")) asrTipHide();
+  });
+});
+addEventListener("resize", asrRailBuild);
+
 addEventListener("resize", asrFillSlots);
 // the debug panel starts collapsed (clientHeight 0), so a plain resize listener
 // would never see it open: observe the tray itself
@@ -4063,6 +4209,7 @@ function asrLog(e, fresh = true) {
     overFocus(card);                                   // this over's duration
     overPaint();
     if (box.scrollTop < 24) box.scrollTop = 0;
+    asrRailSync();
   }
   while (box.childElementCount > 120) {                // drop the oldest card
     const last = box.lastElementChild;
