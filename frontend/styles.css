@@ -2134,7 +2134,7 @@ body.theme-light .graph-bytes .gb-tx{color:#b64a42}
 .graph-legend .lg.mic::before{background:#cf6159; box-shadow:0 0 6px #cf615988}
 
 /* ---------------- band scan ---------------- */
-.scan-zone{padding:26px 30px 26px}
+.scan-zone{padding:22px 30px 26px}   /* top as every other panel: see .collapsed */
 .scan-head{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:12px}
 .scan-head h2{font-family:var(--font-disp); font-weight:700; letter-spacing:.16em; font-size:16px; color:var(--text)}
 .scan-bands{display:inline-flex; gap:6px}
@@ -2510,8 +2510,13 @@ body.disconnected .console{opacity:.5; filter:grayscale(.4); transition:.4s}
 @media (hover:hover){
 .panel-toggle:hover{color:var(--accent); border-color:var(--accent)}}
 .collapsed .panel-body{display:none}
-.hackrf-zone{padding:26px 30px 26px}
-.hackrf-zone.collapsed{padding-bottom:22px}
+.hackrf-zone{padding:22px 30px 26px}
+/* Collapsed, a panel is little more than its padding and its head row, so a
+   few pixels of difference show at once. The TOP padding is therefore 22 px in
+   both states, like every other panel — changing it on toggle moved the head
+   row up and down — and only the bottom folds from 26 to 22. The sides stay
+   put for the same reason: the head must not move when the body opens. */
+.hackrf-zone.collapsed, .scan-zone.collapsed{padding-bottom:22px}
 /* switched off → dim the panel body (header with the ON button stays bright) */
 .hackrf-zone .panel-body{transition:opacity .25s, filter .25s}
 .hackrf-zone.hrf-off .panel-body{opacity:.4; filter:grayscale(.6) brightness(.82)}
@@ -2563,7 +2568,8 @@ body.theme-light .hrf-graph{border-color:var(--edge)}
   border-top:5px solid rgba(255,255,255,0.85)}
 
 /* ---- logbook panel (Wavelog) ------------------------------------------- */
-.log-zone{padding:20px 28px}
+.log-zone{padding:22px 28px}   /* 22 top and bottom like the other panels —
+   folded, 20 left it 4 px short of the row */
 .log-form{display:flex; flex-direction:column; gap:10px; margin-top:6px}
 .log-row{display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap}
 .log-f{display:flex; flex-direction:column; gap:3px; min-width:0;
