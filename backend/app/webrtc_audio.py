@@ -39,6 +39,8 @@ DEF_TX_BUFFER_MS = 150
 # sound-card clock and the event loop (which is what made the playback crackle),
 # little enough that the added delay is not noticeable in a QSO.
 DEF_RX_BUFFER_MS = 60
+TAIL_GATE = 330            # -40 dBFS: quieter than this at the end of an over is silence
+TAIL_MARGIN_MS = 40        # kept after the last sound (soft final consonants)
 DEF_PTT_TAIL_MS = 250     # default post-release transmit tail (drain settle)
 TX_LP_CUTOFF = 3500.0     # voice low-pass cutoff (Hz) for the TX mic path
 RX_LP_CUTOFF = 3500.0     # voice low-pass cutoff (Hz) for the RX path (de-hiss)
@@ -413,6 +415,8 @@ class RadioAudio:
         self._pb_off = 0          # read offset into the head block
         self._pb_len = 0          # samples queued in total
         self._pb_fill = True      # collect a cushion before playing out
+        self._digi_keyed = False  # a digital transmission holds the mic line
+        self._tx_closing = False  # key released: play out what is queued, take no more
         # Jitter accounting for the TX path, so a report of "it stutters" can be
         # answered with numbers instead of a theory: underruns (the card asked
         # for samples that had not arrived) against overruns (the backlog hit
@@ -799,9 +803,22 @@ class RadioAudio:
                 self._asr_rx_chunks = []
 
     def play_digi(self, pcm: np.ndarray) -> None:
-        """Queue encoded CW/RTTY audio for the radio mic (played while keyed)."""
+        """Queue encoded CW/RTTY audio for the radio mic (played while keyed).
+
+        A digital transmission owns the mic line for as long as the radio stays
+        keyed — not just while its own samples last. The browser mic streams
+        over WebRTC all the time; it used to queue behind the CW, and when the
+        CW ended the callback fell through to that queue and put about half a
+        second of room audio and speech on the air before the key dropped."""
+        self._digi_keyed = True
+        self._pb_clear()                     # nothing of the mic may follow
         self._digi_pos = 0
         self._digi_tx = pcm.astype(np.int16)
+
+    @property
+    def digi_keyed(self) -> bool:
+        """True from play_digi() until the radio is unkeyed."""
+        return self._digi_keyed
 
     def digi_tx_busy(self) -> bool:
         return self._digi_tx is not None
@@ -851,6 +868,10 @@ class RadioAudio:
         # Mic test: meter the mic level continuously (gain + low-pass applied so
         # it matches what TX would send) without routing anything to the radio.
         if not self._ptt_open and not self.mic_test:
+            return
+        if self._digi_keyed:                 # CW/RTTY/POCSAG/APRS on the air
+            return
+        if self._tx_closing:                 # released: the over is complete
             return
         if self.tx_auto_gain:
             # Simple AGC: aim for a target RMS. Lower the gain fast (avoid clipping
@@ -931,7 +952,9 @@ class RadioAudio:
             # so the callback pads with silence and the backlog later hits the
             # cap and is dropped — a gap in, a gap out. This is the same cushion
             # the RX track keeps, on the other side of the link.
-            if self._pb_fill:
+            # (after release nothing more is coming: play out what is left
+            # instead of waiting for a cushion that will never fill)
+            if self._pb_fill and not self._tx_closing:
                 if self._pb_len < self._pb_target():
                     # Filling the cushion is not a dropout — it is the lead-in
                     # at the start of an over, and counting it as a fault made
@@ -968,6 +991,27 @@ class RadioAudio:
         ms = min(80, max(40, self.tx_buffer_ms // 2))
         return ms * SAMPLE_RATE // 1000
 
+    def _trim_tail(self) -> None:
+        """Drop the silence at the end of the queued mic audio.
+
+        Most overs end with a breath of silence before the button is let go;
+        with the queue closed that silence is all that holds the key open.
+        Everything up to the last sound above the gate stays, plus a short
+        margin so a soft final consonant is not clipped."""
+        with self._pb_lock:
+            if not self._playback:
+                return
+            buf = np.concatenate([self._playback[0][self._pb_off:],
+                                  *list(self._playback)[1:]])
+            loud = np.flatnonzero(np.abs(buf.astype(np.int32)) > TAIL_GATE)
+            keep = 0 if loud.size == 0 else \
+                min(buf.size, int(loud[-1]) + 1 + TAIL_MARGIN_MS * SAMPLE_RATE // 1000)
+            self._playback.clear()
+            self._pb_off = 0
+            self._pb_len = keep
+            if keep:
+                self._playback.append(buf[:keep])
+
     def _pb_clear(self) -> None:
         with self._pb_lock:
             self._playback.clear()
@@ -988,6 +1032,12 @@ class RadioAudio:
         start = time.monotonic()
         if settle > 0:
             await asyncio.sleep(settle)
+        # From here the over is complete. The browser mic streams continuously
+        # and is not gated by the PTT button, so if we kept accepting it the
+        # queue would never run empty and every over would be held open for
+        # the full max_wait -- half a second of room noise on the air.
+        self._tx_closing = True
+        self._trim_tail()
         while time.monotonic() - start < settle + max_wait:
             with self._pb_lock:
                 if not self._playback:
@@ -1002,8 +1052,10 @@ class RadioAudio:
             self.ptt_tail_ms = int(ptt_tail_ms)
 
     def set_ptt_open(self, is_open: bool) -> None:
+        self._tx_closing = False
         if not is_open:
             self._pb_clear()
+            self._digi_keyed = False
             self.tx_db = None
         else:
             self._tx_lp.reset()      # clear filter state at the start of each over

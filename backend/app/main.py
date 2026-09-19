@@ -1271,6 +1271,13 @@ async def lifespan(app: FastAPI):
             radio_audio.set_ptt_open(transmit)
 
         async def _roger_beep() -> None:
+            # A digital transmission ends when its last symbol has gone out:
+            # the voice tail below would hold the key open waiting for mic audio
+            # that keeps arriving (so it only ever ends at its time limit, with
+            # speech on the air), and a roger beep after CW or a data frame is a
+            # voice-mode habit that only corrupts the tail of the transmission.
+            if radio_audio.digi_keyed:
+                return
             # radio is still keyed + audio gate open here: first let the buffered
             # mic tail play out (so PTT release doesn't chop the last words),
             # then sound the roger beep.
