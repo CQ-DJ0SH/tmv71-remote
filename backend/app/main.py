@@ -170,9 +170,9 @@ class DigiService:
         beacon anywhere within about 100 km."""
         call = (settings.callsign or "").strip().upper()
         if not call:
-            raise HTTPException(400, "Kein eigenes Rufzeichen — Einstellungen > Allgemein")
+            raise HTTPException(400, "No own callsign — Settings > General")
         if not settings.locator:
-            raise HTTPException(400, "Kein Locator — Einstellungen > Allgemein")
+            raise HTTPException(400, "No locator — Settings > General")
         try:
             lat, lon = aprs.locator_to_latlon(settings.locator)
             pcm, line = aprs.beacon(call, lat, lon, comment=comment,
@@ -186,7 +186,7 @@ class DigiService:
             while self.audio.digi_tx_busy() and time.monotonic() < deadline:
                 await asyncio.sleep(0.05)
             await set_ptt(False)
-        self._broadcast(f"{time.strftime('%H:%M:%S')} ◀ Bake gesendet: {line}\n")
+        self._broadcast(f"{time.strftime('%H:%M:%S')} ◀ beacon sent: {line}\n")
         return {"sent": line}
 
     def _announce(self) -> None:
@@ -714,7 +714,7 @@ class CallsignService:
         info = self._calls.get(call) or {}
         self._seen[call] = time.monotonic()      # don't re-announce it right away
         self.mark_manual(call)     # typing a call also says whose voice is on
-        self._add_log("manuell eingetragen", call=call, valid=True,
+        self._add_log("entered by hand", call=call, valid=True,
                       klass=info.get("class", ""), name=info.get("name", ""),
                       city=info.get("city", ""), event="shown", manual=True)
         return {"call": call, "known": bool(info)}

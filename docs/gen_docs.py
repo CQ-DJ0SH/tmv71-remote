@@ -937,7 +937,7 @@ EN = [
         "Measured on the air: in 152 s, 17 frames received, 5 damaged, 108 "
         "noise candidates — so the raw CRC count said far more about the noise "
         "floor than about lost stations.",
-        "TRANSMIT sends a position beacon — BAKE keys PTT, the text field is its "
+        "TRANSMIT sends a position beacon — BEACON keys PTT, the text field is its "
         "optional comment. The position is the centre of the Maidenhead locator "
         "from Settings > General, so use six characters or more: four is a 1°×2° "
         "field, roughly 111×70 km. It is sent as an uncompressed position "
@@ -1097,8 +1097,8 @@ EN = [
         "The talk times go with them (they live in the browser); the learned "
         "voices do not — clearing a list is not the same statement as “this "
         "was wrong”, which is what the cross on a single card means.",
-        "VOICE, at the right-hand end, switches the speaker recognition on and "
-        "off (see below). Its lamp pulses green while it is listening; an "
+        "VOICE MATCH, at the right-hand end, switches the speaker recognition on "
+        "and off (see below). Its lamp pulses green while it is listening; an "
         "outlined button means it only observes, a filled one that it acts.",
     ]),
     ("p", "Correcting a callsign: click the call on the card and type over it "
@@ -1109,6 +1109,9 @@ EN = [
           "times added. The voice profile is renamed with it — otherwise a "
           "mis-heard call would keep collecting a voiceprint under a name that "
           "never existed while the real station never gets one."),
+    ("p", "The interface is in English throughout — labels, hints, messages and "
+          "error texts. This manual exists in German as well; the labels quoted "
+          "in it are the English ones, because those are what is on screen."),
     ("h2", "Voice ID — an over without a callsign"),
     ("p", "Not every over carries a spoken callsign, and the talk timer then "
           "counts onto whoever was marked last. Speaker recognition closes that "
@@ -1546,7 +1549,7 @@ DE = [
         "152 s 17 empfangene Rahmen, 5 beschädigte, 108 Rauschkandidaten — die "
         "reine CRC-Zahl sagte also weit mehr über den Störpegel als über "
         "verlorene Stationen.",
-        "SENDEN heißt Positionsbake: BAKE tastet PTT, das Textfeld ist der "
+        "SENDEN heißt Positionsbake: BEACON tastet PTT, das Textfeld ist der "
         "optionale Kommentar. Die Position ist die Mitte des "
         "Maidenhead-Locators aus Einstellungen > Allgemein, weshalb sechs "
         "Zeichen oder mehr nötig sind: Vier Zeichen sind ein 1°×2°-Feld, also "
@@ -1723,7 +1726,7 @@ DE = [
         "die gelernten Stimmen nicht: Eine Liste zu leeren ist nicht dieselbe "
         "Aussage wie „das war falsch“, die das ✕ auf einer einzelnen Karte "
         "trifft.",
-        "VOICE am rechten Ende schaltet die Stimmerkennung ein und aus (siehe "
+        "VOICE MATCH am rechten Ende schaltet die Stimmerkennung ein und aus (siehe "
         "unten). Die Lampe pulst grün, solange sie zuhört; ein umrandeter Knopf "
         "bedeutet, dass sie nur beobachtet, ein gefüllter, dass sie eingreift.",
     ]),
@@ -1736,6 +1739,10 @@ DE = [
           "Stimmprofil zieht mit um — sonst sammelte ein verhörtes Rufzeichen "
           "weiter einen Stimmabdruck unter einem Namen, den es nie gab, während "
           "die wirkliche Station nie einen bekommt."),
+    ("p", "Die Oberfläche ist durchgehend englisch — Beschriftungen, Hinweise, "
+          "Meldungen und Fehlertexte. Dieses Handbuch bleibt deutsch; die darin "
+          "genannten Beschriftungen sind die englischen, weil genau die auf dem "
+          "Bildschirm stehen."),
     ("h2", "Stimmerkennung — ein Durchgang ohne Rufzeichen"),
     ("p", "Nicht in jedem Durchgang fällt ein Rufzeichen, und die Redezeit "
           "zählt dann auf die zuletzt markierte Karte. Die Sprechererkennung "
@@ -1752,9 +1759,9 @@ DE = [
         "Unter etwa 3 s Sprache wird nichts geraten, der Durchgang entfällt. "
         "Ebenso ein Durchgang, in dem zwei Rufzeichen fielen — ihn zu "
         "beschriften würde beide Profile verderben.",
-        "Zwei Stufen. Beobachten entscheidet und meldet nur — das Urteil steht "
+        "Zwei Stufen. „Observe“ entscheidet und meldet nur — das Urteil steht "
         "über dem Kartenkasten und in den Detailangaben der Karte, bewegt wird "
-        "nichts. Zuordnen verschiebt zusätzlich Marke und Redezeit auf die "
+        "nichts. „Assign“ verschiebt zusätzlich Marke und Redezeit auf die "
         "erkannte Station; eine solche Karte wird gestrichelt umrandet und ist "
         "damit nie mit dem durchgezogenen Rot von „hat gerade sein Rufzeichen "
         "genannt“ zu verwechseln. Die Stufe wird unter Einstellungen > Audio > "

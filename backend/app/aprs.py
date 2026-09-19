@@ -253,7 +253,7 @@ def _parse_mice(dst: str, s: str, f: _Frame) -> bool:
 def parse_payload(f: _Frame) -> None:
     """Fill the frame from its information field; kind says what was found."""
     if not f.info:
-        f.kind = "leer"
+        f.kind = "empty"
         return
     s = f.info.decode("latin-1")
     t = s[0]
@@ -266,26 +266,26 @@ def parse_payload(f: _Frame) -> None:
     if t in ("!", "=", "/", "@"):
         # '/' and '@' carry a timestamp first (7 chars)
         pos = body[7:] if t in ("/", "@") else body
-        f.kind = "Position"
+        f.kind = "position"
         if pos[:1] in ("/", "\\") or (pos[:1].isalpha() and not pos[:2].isdigit()):
             if _parse_compressed(pos, f):
-                f.kind = "Position (komprimiert)"
+                f.kind = "position (compressed)"
                 return
         if not _parse_uncompressed(pos, f):
-            f.kind = "Position?"
+            f.kind = "position?"
             f.comment = pos.strip()
         return
     if t == ">":
-        f.kind, f.text = "Status", body.strip()
+        f.kind, f.text = "status", body.strip()
         return
     if t == ":":
-        f.kind = "Nachricht"
+        f.kind = "message"
         f.target = body[:9].strip()
         rest = body[9:]
         f.text = rest[1:].strip() if rest[:1] == ":" else rest.strip()
         return
     if t in (";", ")"):
-        f.kind = "Objekt" if t == ";" else "Item"
+        f.kind = "object" if t == ";" else "item"
         f.target = body[:9].strip()
         i = body.find("*")
         tail = body[10:] if t == ";" else body[body.find("!") + 1:]
@@ -293,12 +293,12 @@ def parse_payload(f: _Frame) -> None:
             f.comment = tail.strip()
         return
     if t == "T":
-        f.kind, f.comment = "Telemetrie", body.strip()
+        f.kind, f.comment = "telemetry", body.strip()
         return
     if t == "_":
-        f.kind, f.comment = "Wetter", body.strip()
+        f.kind, f.comment = "weather", body.strip()
         return
-    f.kind = f"unbekannt '{t}'"
+    f.kind = f"unknown '{t}'"
     f.comment = body.strip()
 
 
@@ -426,7 +426,7 @@ class APRSDecoder:
             src, sssid, _ = _addr(data[7:14])
             return (time.strftime("%H:%M:%S ")
                     + f"✗ {_call(src, sssid)}>{_call(dst, dssid)} "
-                    + f"beschädigt, CRC falsch ({len(data)} B)\n")
+                    + f"damaged, bad CRC ({len(data)} B)\n")
         return self._decode(data[:-2])
 
     # --- layer 3: AX.25 + APRS -------------------------------------------
@@ -478,11 +478,11 @@ def locator_to_latlon(loc: str) -> tuple[float, float]:
     loc = (loc or "").strip().replace(" ", "")
     n = len(loc)
     if n not in (4, 6, 8) or not loc[0:2].isalpha() or not loc[2:4].isdigit():
-        raise ValueError("Locator erwartet 4, 6 oder 8 Zeichen, z. B. JO62QM")
+        raise ValueError("Locator must be 4, 6 or 8 characters, e.g. JO62QM")
     if n >= 6 and not loc[4:6].isalpha():
-        raise ValueError("Locator: Zeichen 5-6 müssen Buchstaben sein")
+        raise ValueError("Locator: characters 5-6 must be letters")
     if n == 8 and not loc[6:8].isdigit():
-        raise ValueError("Locator: Zeichen 7-8 müssen Ziffern sein")
+        raise ValueError("Locator: characters 7-8 must be digits")
     u = loc.upper()
     lon = (ord(u[0]) - 65) * 20.0 - 180.0
     lat = (ord(u[1]) - 65) * 10.0 - 90.0
@@ -498,7 +498,7 @@ def locator_to_latlon(loc: str) -> tuple[float, float]:
         lat += int(u[7]) * (step_lat / 10.0)
         step_lon, step_lat = step_lon / 10.0, step_lat / 10.0
     if not (-90 <= lat <= 90 and -180 <= lon <= 180):
-        raise ValueError("Locator ergibt keine gültige Position")
+        raise ValueError("Locator does not resolve to a valid position")
     return lat + step_lat / 2.0, lon + step_lon / 2.0    # centre, not corner
 
 
@@ -526,7 +526,7 @@ def _addr_bytes(call: str, last: bool) -> bytes:
     except ValueError:
         n = 0
     if not 0 <= n <= 15 or not 1 <= len(base) <= 6 or not base.isalnum():
-        raise ValueError(f"ungültiges Rufzeichen: {call}")
+        raise ValueError(f"invalid callsign: {call}")
     b = bytearray(ord(c) << 1 for c in base.ljust(6))
     b.append((n << 1) | 0x60 | (1 if last else 0) | (0x80 if rep else 0))
     return bytes(b)
@@ -548,7 +548,7 @@ def position_report(lat: float, lon: float, symbol: str = "/-",
     """Uncompressed position without timestamp ('!'), the plainest thing that
     every APRS client understands. Symbol is table + code, e.g. '/-' house."""
     if not -90 <= lat <= 90 or not -180 <= lon <= 180:
-        raise ValueError("Position außerhalb des gültigen Bereichs")
+        raise ValueError("position out of range")
     la, lo = abs(lat), abs(lon)
     lad, lam = int(la), (la - int(la)) * 60.0
     lod, lom = int(lo), (lo - int(lo)) * 60.0

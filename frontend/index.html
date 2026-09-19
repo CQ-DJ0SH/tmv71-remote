@@ -64,7 +64,7 @@
     </div>
     <div class="audio-status"><span class="led" id="audio-led"></span><span id="audio-text">USB Audio</span></div>
     <div class="clock" id="clock">--:--:--</div>
-    <button class="gear rail-x" type="button" title="Kachelspalten einklappen" aria-label="ASR contact columns">▶</button>
+    <button class="gear rail-x" type="button" title="Hide the contact columns" aria-label="ASR contact columns">▶</button>
     <button class="gear theme-toggle" id="theme-toggle" title="Toggle light/dark" aria-label="Toggle theme">☾</button>
     <button class="gear hdr-hide" id="hdr-hide" title="Hide title bar" aria-label="Hide title bar">▴</button>
     <button class="gear" id="open-settings" title="Settings" aria-label="Settings">⚙</button>
@@ -97,7 +97,7 @@
 <aside class="asr-rail" id="asr-rail-l">
   <div class="rail-head"><span class="rail-title">ASR CONTACTS<span class="rail-n"></span></span></div>
   <div class="rail-body" aria-hidden="true"></div>
-  <div class="rail-foot"><span class="rail-total" title="Summe der Redezeiten — ohne als Moderator gekennzeichnete Stationen">Σ 00:00:00</span></div>
+  <div class="rail-foot"><span class="rail-total" title="Sum of all talk timers — moderators excluded">Σ 00:00:00</span></div>
 </aside>
 <aside class="asr-rail" id="asr-rail-r">
   <div class="rail-head"><span class="rail-title">ASR CONTACTS</span></div>
@@ -138,9 +138,9 @@
         </span>
         <div class="smeter" data-band="0" id="sm-0">
           <div class="sm-scale sm-s"><span>S</span><span>1</span><span>3</span><span>5</span><span>7</span><span>9</span><span>+20</span><span>+40</span><span>+60</span></div>
-          <div class="sm-bar sm-sbar" id="sm-sbar-0" title="Signal — FM-Quieting-Schätzung (S0–S9), sättigt bei Vollruhe"></div>
-          <div class="sm-bar" id="sm-bar-0" title="NF-Pegel (Audio) / TX: Mikrofon-Modulation"></div>
-          <div class="sm-scale sm-af" title="NF-Pegel in dBFS (Vollausschlag = 0 dB)"><span class="af-unit">AF</span><span>-40</span><span>-30</span><span>-20</span><span>-10</span><span>0 dB</span></div>
+          <div class="sm-bar sm-sbar" id="sm-sbar-0" title="Signal — FM-quieting estimate (S0–S9), saturates at full quieting"></div>
+          <div class="sm-bar" id="sm-bar-0" title="AF level (audio) / TX: microphone modulation"></div>
+          <div class="sm-scale sm-af" title="AF level in dBFS (full scale = 0 dB)"><span class="af-unit">AF</span><span>-40</span><span>-30</span><span>-20</span><span>-10</span><span>0 dB</span></div>
         </div>
       </div>
       <div class="sql-row" data-band="0">
@@ -209,9 +209,9 @@
         </span>
         <div class="smeter" data-band="1" id="sm-1">
           <div class="sm-scale sm-s"><span>S</span><span>1</span><span>3</span><span>5</span><span>7</span><span>9</span><span>+20</span><span>+40</span><span>+60</span></div>
-          <div class="sm-bar sm-sbar" id="sm-sbar-1" title="Signal — FM-Quieting-Schätzung (S0–S9), sättigt bei Vollruhe"></div>
-          <div class="sm-bar" id="sm-bar-1" title="NF-Pegel (Audio) / TX: Mikrofon-Modulation"></div>
-          <div class="sm-scale sm-af" title="NF-Pegel in dBFS (Vollausschlag = 0 dB)"><span class="af-unit">AF</span><span>-40</span><span>-30</span><span>-20</span><span>-10</span><span>0 dB</span></div>
+          <div class="sm-bar sm-sbar" id="sm-sbar-1" title="Signal — FM-quieting estimate (S0–S9), saturates at full quieting"></div>
+          <div class="sm-bar" id="sm-bar-1" title="AF level (audio) / TX: microphone modulation"></div>
+          <div class="sm-scale sm-af" title="AF level in dBFS (full scale = 0 dB)"><span class="af-unit">AF</span><span>-40</span><span>-30</span><span>-20</span><span>-10</span><span>0 dB</span></div>
         </div>
       </div>
       <div class="sql-row" data-band="1">
@@ -284,10 +284,10 @@
         </div>
         <div class="ptt-band-row">
           <button class="ptt-mute" id="rx-mute" type="button" aria-pressed="false"
-                  title="Empfang dauerhaft stummschalten (bleibt, bis er erneut gedrückt wird)">MUTE</button>
+                  title="Mute the received audio (stays until pressed again)">MUTE</button>
           <span class="ptt-band" id="ptt-band">PTT → BAND A</span>
           <button class="ptt-mute" id="sq-mute" type="button" aria-pressed="false"
-                  title="Laufende Aussendung ausblenden — hebt sich auf, sobald der Störer die Rauschsperre schließt (Dreiklang bei Freigabe)">DROP</button>
+                  title="Blank the transmission in progress — lifts as soon as that station stops keying, or after three seconds without speech (chime on release)">DROP</button>
         </div>
         <span class="ptt-warn" id="ptt-warn" hidden>⚠ TWO-TONE TEST</span>
       </div>
@@ -500,8 +500,8 @@
         <label class="acg">MARK<input type="range" id="digi-mark" min="800" max="2600" step="25" value="2125"><span class="gv" id="digi-mark-v">2125 Hz</span></label>
       </div>
       <div class="digi-params" id="digi-params-aprs" hidden>
-        <label class="switch-label digi-rx-toggle" title="Zweite Zeile je Rahmen: Typ, Symbol, Länge und die rohe Nutzlast"><span>DEBUG</span><input type="checkbox" id="aprs-debug" class="switch" checked></label>
-        <span class="digi-ro" id="aprs-stat" title="Rahmen: gültig empfangen · beschädigt: echte Aussendung mit falscher Prüfsumme (Kollision, schwaches Signal) · Rauschen: zufälliges Bitmuster zwischen zwei Flaggen, korrekt verworfen">0 Rahmen · 0 beschädigt · 0 Stationen · 0× Rauschen</span>
+        <label class="switch-label digi-rx-toggle" title="A second line per frame: type, symbol, length and the raw payload"><span>DEBUG</span><input type="checkbox" id="aprs-debug" class="switch" checked></label>
+        <span class="digi-ro" id="aprs-stat" title="frames: received intact · damaged: a real transmission with a bad checksum (collision, weak signal) · noise: a random bit pattern between two flags, correctly discarded">0 frames · 0 damaged · 0 stations · 0× noise</span>
       </div>
       <div class="digi-params" id="digi-params-pocsag" hidden>
         <label class="acd">BAUD
@@ -524,7 +524,7 @@
         <input type="text" id="digi-text" placeholder="text to transmit…" autocomplete="off" autocapitalize="characters">
         <button class="digi-send" id="digi-send" title="Encode &amp; transmit (keys PTT)">SEND</button>
       </div>
-      <p class="digi-hint">FM MCW (CW) · AFSK (RTTY) · FSK (POCSAG) — keys PTT while sending.<span class="digi-hint-pocsag" hidden> · DAPNET 439.9875 MHz</span><span class="digi-hint-aprs" hidden> · APRS: Empfang am flachen 9600-Ausgang.</span></p>
+      <p class="digi-hint">FM MCW (CW) · AFSK (RTTY) · FSK (POCSAG) — keys PTT while sending.<span class="digi-hint-pocsag" hidden> · DAPNET 439.9875 MHz</span><span class="digi-hint-aprs" hidden> · APRS: receive, off the flat 9600-baud output.</span></p>
     </div>
   </section>
 
@@ -611,25 +611,25 @@
     <div class="panel-head">
       <h2>ASR · CONTACTS</h2>
       <input class="asr-manual" id="asr-manual" type="text" maxlength="12"
-             placeholder="RUFZEICHEN" autocomplete="off" spellcheck="false"
+             placeholder="CALLSIGN" autocomplete="off" spellcheck="false"
              autocapitalize="characters" inputmode="text"
-             title="Rufzeichen von Hand eintragen, wenn die Erkennung es verpasst hat">
+             title="Enter a callsign by hand when the recognition misses one">
       <button class="scan-clear" id="asr-manual-add" type="button"
-              title="Rufzeichen als Karte eintragen (oder Eingabetaste)">LOG</button>
+              title="Add the callsign as a card (or press Enter)">LOG</button>
       <button class="scan-clear" id="asr-mod" type="button" aria-pressed="false" disabled
-              title="Karte anklicken, dann als Moderator kennzeichnen">MOD</button>
-      <button class="scan-clear" id="asr-stats" type="button" title="Redezeiten auswerten — Rangliste aller Stationen">STATS</button>
-      <button class="scan-clear" id="asr-profiles" type="button" title="Gelernte Stimmprofile ansehen und einzeln verwerfen">PROFILES</button>
-      <span class="asr-total" id="asr-total" title="Summe der Redezeiten in diesem Panel — ohne als Moderator (M) gekennzeichnete Stationen">Σ 00:00:00</span>
-      <button class="scan-clear" id="asr-log-clear" type="button" title="Alle Kontaktkarten aus der Ansicht entfernen">CLEAR ALL</button>
+              title="Click a card, then mark it as moderator">MOD</button>
+      <button class="scan-clear" id="asr-stats" type="button" title="Talk-time evaluation — every station ranked">STATS</button>
+      <button class="scan-clear" id="asr-profiles" type="button" title="Show the learned voice profiles, and discard them one by one">PROFILES</button>
+      <span class="asr-total" id="asr-total" title="Sum of the talk timers in this panel — stations marked as moderator (M) excluded">Σ 00:00:00</span>
+      <button class="scan-clear" id="asr-log-clear" type="button" title="Remove every contact card">CLEAR ALL</button>
       <button class="scan-clear" id="asr-voice" type="button" aria-pressed="false"
-              title="Stimmerkennung">VOICE MATCH<span class="vn" id="asr-spk-n"></span></button>
+              title="Voice recognition">VOICE MATCH<span class="vn" id="asr-spk-n"></span></button>
       <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="debug-body" title="Show / hide the recognised contacts">▲</button>
     </div>
     <div class="panel-body" id="debug-body">
       <div class="asr-voice-note" id="asr-voice-note"></div>
       <div class="asr-cards" id="asr-log" aria-live="polite" role="log"
-           data-empty="(noch keine erkannten Rufzeichen)"></div>
+           data-empty="(no callsigns recognised yet)"></div>
     </div>
   </section>
 
@@ -694,7 +694,7 @@
 <!-- learned voices: one profile per callsign, with the segmenter's own tally -->
 <div class="modal" id="asr-spk-dlg" role="dialog" aria-modal="true" aria-labelledby="asr-spk-title">
   <div class="modal-card spk-card">
-    <h3 id="asr-spk-title">STIMMPROFILE</h3>
+    <h3 id="asr-spk-title">VOICE PROFILES</h3>
     <div class="spk-list" id="spk-list"></div>
     <p class="spk-seg" id="spk-seg"></p>
     <div class="modal-actions">
@@ -706,14 +706,14 @@
 <!-- talk-time evaluation: ranking of the contact cards by accumulated over time -->
 <div class="modal" id="asr-stats-dlg" role="dialog" aria-modal="true" aria-labelledby="asr-stats-title">
   <div class="modal-card stats-card">
-    <h3 id="asr-stats-title">REDEZEITEN</h3>
+    <h3 id="asr-stats-title">TALK TIME</h3>
     <table class="stats-tab">
       <thead>
-        <tr><th class="st-n">#</th><th>Rufzeichen</th><th>Name</th><th class="st-bar">Anteil</th><th class="st-t">Zeit</th></tr>
+        <tr><th class="st-n">#</th><th>Callsign</th><th>Name</th><th class="st-bar">Share</th><th class="st-t">Time</th></tr>
       </thead>
       <tbody id="asr-stats-rows"></tbody>
     </table>
-    <p class="stats-empty" id="asr-stats-empty" hidden>Noch keine Kontakte im Panel.</p>
+    <p class="stats-empty" id="asr-stats-empty" hidden>No contacts in the panel yet.</p>
     <div class="stats-foot">
       <span id="asr-stats-cnt">—</span>
       <span class="stats-sum">&#931; <b id="asr-stats-sum">00:00:00</b></span>
@@ -848,14 +848,14 @@
       </div>
       <div class="mixer-field">
         <span class="logo-label">Voice ID</span>
-        <label>Stimmerkennung
+        <label>Voice ID
           <select id="set-spk-mode">
-            <option value="off">Aus</option>
-            <option value="observe">Beobachten (nur melden)</option>
-            <option value="act">Zuordnen (Marke + Timer)</option>
+            <option value="off">Off</option>
+            <option value="observe">Observe (report only)</option>
+            <option value="act">Assign (mark + timer)</option>
           </select>
         </label>
-        <p class="pane-hint">Ordnet einen Durchgang <em>ohne</em> genanntes Rufzeichen einer Station zu, deren Stimme schon einmal mit Rufzeichen zu hören war. Das Einlernen läuft nebenbei: Jeder erkannte Ruf beschriftet seine eigene Aufnahme. Ein Durchgang endet an der <em>Sprechpause</em>, nicht am Träger — über ein Relais bleibt BUSY sonst die ganze Runde stehen. Gemessen an zwei Mitschnitten derselben Runde: gleiche Station 0,62–0,79 Kosinus, fremde 0,33 im Mittel; bei Schwelle 0,55 und 0,10 Abstand 3 von 4 richtig, keine Fehlzuordnung, keine der 7 fremden Stationen verwechselt. Unter ~3 s Sprache wird nichts geraten. „Beobachten" entscheidet und meldet nur; erst „Zuordnen" verschiebt Marke und Redezeit — eine <em>von Hand</em> gewählte Kachel hat immer Vorrang. Die Stimmprofile bleiben auf dem Pi (<span id="spk-profiles">0</span> gespeichert) und werden mit der Karte gelöscht; ansehen und einzeln verwerfen lassen sie sich über PROFILES im ASR-Panel.</p>
+        <p class="pane-hint">Attributes an over with <em>no</em> spoken callsign to a station whose voice has been heard with one before. Enrolment costs nothing: every recognised call labels its own audio. An over ends at the <em>pause in speech</em>, not at the carrier — through a repeater BUSY stays up for the whole round. Measured on two recordings of the same round: same station 0.62–0.79 cosine, strangers 0.33 on average; at a threshold of 0.55 with a 0.10 margin, 3 of 4 identified, none wrongly, and none of the 7 unknown stations mistaken for a known one. Below ~3 s of speech nothing is guessed at. "Observe" decides and reports only; "assign" moves the mark and the talk timer — a card picked <em>by hand</em> always wins. The voice profiles stay on the Pi (<span id="spk-profiles">0</span> stored) and are dropped with their card; PROFILES in the ASR panel lists them and discards them one by one.</p>
 
       </div>
       <div class="mixer-field">

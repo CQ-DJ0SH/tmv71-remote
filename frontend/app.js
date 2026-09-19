@@ -847,9 +847,9 @@ async function loadMemories() {
         <td>${FMMODE[m.fm_mode] || "FM"}</td>
         <td>${STEP_HZ[m.step] ? STEP_HZ[m.step] / 1000 + " kHz" : "—"}</td>
         <td class="row-actions">
-          <button class="edit" data-ch="${m.channel}" title="Bearbeiten">✎</button>
-          <button class="recall" data-ch="${m.channel}" title="Auf Band A">→A</button>
-          <button class="recall-b" data-ch="${m.channel}" title="Auf Band B">→B</button>
+          <button class="edit" data-ch="${m.channel}" title="Edit">✎</button>
+          <button class="recall" data-ch="${m.channel}" title="Recall to band A">→A</button>
+          <button class="recall-b" data-ch="${m.channel}" title="Recall to band B">→B</button>
           <button class="del" data-ch="${m.channel}" title="Delete">✕</button>
         </td>`;
       body.appendChild(tr);
@@ -1576,7 +1576,7 @@ function refreshPowerUi() {
     if (audioWant || audioPc) audioDisconnect();
     if (hrf.on) { hrf.on = false; updateHrfPower(); hrfSync(); }
   }
-  btn.title = !avail ? "GPIO-Pin in den Einstellungen festlegen"
+  btn.title = !avail ? "Set the GPIO pin in Settings"
     : on === true ? "Radio is ON — click to turn off"
     : on === false ? "Radio is OFF — click to turn on"
     : "Radio on/off (GPIO)";
@@ -1604,7 +1604,7 @@ async function relabelQuickMemAfterBoot() {
 function bindPower() {
   $("#power-switch").addEventListener("click", async () => {
     if (!powerState?.available) {
-      toast("GPIO-Pin in den Einstellungen festlegen", "err");
+      toast("Set the GPIO pin in Settings", "err");
       $("#open-settings").click();
       return;
     }
@@ -1825,7 +1825,7 @@ function bindSettings() {
     const loc = ($("#set-locator")?.value || "").trim().toUpperCase();
     localStorage.setItem("tmv71.callsign", cs);
     try { await api("POST", "/api/callsign", { callsign: cs, locator: loc }); }
-    catch (e) { toast("Callsign/Locator: " + e.message, "err"); }
+    catch (e) { toast("Callsign/locator: " + e.message, "err"); }
     renderCallsign();
     // GPIO power pin (server-side, persisted)
     const gpioRaw = $("#set-gpio").value.trim();
@@ -2666,15 +2666,15 @@ function bindDigi() {
     const ti = $("#digi-text");
     if (ti) {
       ti.disabled = false;
-      ti.placeholder = mode === "aprs" ? "Kommentar für die Bake (optional)…"
+      ti.placeholder = mode === "aprs" ? "comment for the beacon (optional)…"
                                        : "text to transmit…";
     }
     const sb = $("#digi-send");
     if (sb) {
       sb.disabled = false;
-      sb.textContent = mode === "aprs" ? "BAKE" : "SEND";
+      sb.textContent = mode === "aprs" ? "BEACON" : "SEND";
       sb.title = mode === "aprs"
-        ? "Positionsbake aus dem Locator senden (tastet PTT)"
+        ? "Send a position beacon from the locator (keys PTT)"
         : "Encode & transmit (keys PTT)";
     }
     if (mode === "cw") { const el = $("#digi-text"); if (el) el.value = el.value.toUpperCase(); }
@@ -2746,7 +2746,7 @@ function bindDigi() {
   // The APRS beacon carries its own position; the text is only a comment, so an
   // empty field must not block it — in the other modes the text IS the message.
   const digiMode = () => $(".digi-mode.active")?.dataset.mode || "cw";
-  const sendLabel = () => (digiMode() === "aprs" ? "BAKE" : "SEND");
+  const sendLabel = () => (digiMode() === "aprs" ? "BEACON" : "SEND");
   const send = async () => {
     const t = txt.value.trim();
     if (!t && digiMode() !== "aprs") return;
@@ -2776,12 +2776,12 @@ function bindDigi() {
     $("#digi-params-pocsag").hidden = s.mode !== "pocsag";
     $("#digi-params-aprs").hidden = s.mode !== "aprs";
     if (sendBtn) {
-      sendBtn.textContent = s.mode === "aprs" ? "BAKE" : "SEND";
+      sendBtn.textContent = s.mode === "aprs" ? "BEACON" : "SEND";
       sendBtn.title = s.mode === "aprs"
-        ? "Positionsbake aus dem Locator senden (tastet PTT)"
+        ? "Send a position beacon from the locator (keys PTT)"
         : "Encode & transmit (keys PTT)";
     }
-    if (txt) txt.placeholder = s.mode === "aprs" ? "Kommentar für die Bake (optional)…"
+    if (txt) txt.placeholder = s.mode === "aprs" ? "comment for the beacon (optional)…"
                                                  : "text to transmit…";
     const ad = $("#aprs-debug"); if (ad && s.aprs_debug != null) ad.checked = !!s.aprs_debug;
     // the running totals belong here, not under every frame in the log
@@ -2839,9 +2839,9 @@ function aprsStatPaint(a) {
   if (!el || !a) return;
   // damaged real frames and noise candidates are different statements: the
   // first says stations were lost, the second only that the channel is noisy
-  el.textContent = `${a.frames} Rahmen · ${a.damaged} beschädigt · `
-    + (a.stations === 1 ? "1 Station" : `${a.stations} Stationen`)
-    + ` · ${a.noise}× Rauschen`;
+  el.textContent = `${a.frames} frames · ${a.damaged} damaged · `
+    + (a.stations === 1 ? "1 station" : `${a.stations} stations`)
+    + ` · ${a.noise}× noise`;
 }
 
 function connectDigiWS(decode) {
@@ -2982,9 +2982,9 @@ function reflectAsr(s) {
     live.hidden = false;
     live.classList.toggle("suspended", !!s.suspended);
     live.classList.toggle("off", !s.enabled && !s.suspended);
-    live.title = s.suspended ? "Rufzeichenerkennung ausgesetzt — Funkgerät ist aus"
+    live.title = s.suspended ? "Callsign recognition suspended — the radio is off"
                : s.enabled   ? "Callsign ASR active"
-                             : "Rufzeichenerkennung ausgeschaltet";
+                             : "Callsign recognition off";
   }
   $("#pb-asr")?.classList.toggle("on", !!s.enabled);        // PTT status-line ASR lamp
   $("#pb-asr")?.classList.toggle("suspended", !!s.suspended);
@@ -3068,10 +3068,10 @@ function bindCallsign() {
     try {
       reflectAsr(await api("POST", "/api/asr/speaker",
                            { enabled: v !== "off", act: v === "act" }));
-      toast(v === "act" ? "Stimmerkennung: zuordnen"
-          : v === "observe" ? "Stimmerkennung: beobachten"
-                            : "Stimmerkennung aus", v === "off" ? "" : "ok");
-    } catch (err) { toast("Stimmerkennung: " + err.message, "err"); }
+      toast(v === "act" ? "Voice ID: assign"
+          : v === "observe" ? "Voice ID: observe"
+                            : "Voice ID off", v === "off" ? "" : "ok");
+    } catch (err) { toast("Voice ID: " + err.message, "err"); }
   });
   const tgl = $("#set-asr-callsign");
   if (tgl) tgl.addEventListener("change", async e => {
@@ -3454,7 +3454,7 @@ function overStatsPaint() {
     bar.className = "st-bar";
     if (r.mod) {
       bar.className = "st-bar st-note";
-      bar.textContent = "nicht gewertet";
+      bar.textContent = "not counted";
     } else {
       // The bar is scaled against the LONGEST over, not against the sum: with
       // one dominant station every other bar would collapse to a sliver.
@@ -3470,8 +3470,8 @@ function overStatsPaint() {
   mods.forEach(r => addRow(r, "M"));
   const sum = $("#asr-stats-sum"); if (sum) sum.textContent = overFmt(total);
   const cnt = $("#asr-stats-cnt");
-  if (cnt) cnt.textContent = (rank.length === 1 ? "1 Station" : rank.length + " Stationen")
-    + (mods.length ? " · " + mods.length + " Moderator" : "");
+  if (cnt) cnt.textContent = (rank.length === 1 ? "1 station" : rank.length + " stations")
+    + (mods.length ? " · " + mods.length + " net control" : "");
 }
 
 let statsTimer = 0;
@@ -3504,20 +3504,20 @@ $("#asr-stats-dlg")?.addEventListener("mousedown", ev => {
 // plain-text copy of the ranking, for pasting into a net log or a mail
 $("#asr-stats-copy")?.addEventListener("click", async () => {
   const rows = overStatsRows();
-  if (!rows.length) { toast("Keine Kontakte zum Kopieren", "err"); return; }
+  if (!rows.length) { toast("No contacts to copy", "err"); return; }
   const line = (pos, r, tail = "") =>
     `${String(pos).padStart(2)}. ${r.call.padEnd(8)} ${overFmt(r.ms)}`
     + (r.name ? "  " + r.name : "") + tail;
   const rank = rows.filter(r => !r.mod);
   const txt = rank.map((r, i) => line(i + 1, r)).join("\n")
     + "\n" + " ".repeat(13)            // line the sum up under the times
-    + overFmt(rank.reduce((s, r) => s + r.ms, 0)) + "  (Summe)"
+    + overFmt(rank.reduce((s, r) => s + r.ms, 0)) + "  (total)"
     + rows.filter(r => r.mod)
-        .map(r => "\n" + line("M", r, "  (Moderator, nicht gewertet)")).join("");
+        .map(r => "\n" + line("M", r, "  (net control, not counted)")).join("");
   try {
     await navigator.clipboard.writeText(txt);
-    toast("Auswertung kopiert", "ok");
-  } catch { toast("Zwischenablage nicht verfügbar", "err"); }
+    toast("Evaluation copied", "ok");
+  } catch { toast("Clipboard not available", "err"); }
 });
 
 
@@ -3555,15 +3555,15 @@ function spkListPaint(k) {
       row.className = "spk-row";
       const c = document.createElement("b"); c.textContent = callDisp(call);
       const o = document.createElement("span");
-      o.textContent = n === 1 ? "1 Durchgang" : n + " Durchgänge";
+      o.textContent = n === 1 ? "1 over" : n + " overs";
       const x = document.createElement("button");
       x.type = "button"; x.className = "spk-x"; x.textContent = "✕";
-      x.title = "Stimmprofil von " + call + " verwerfen";
+      x.title = "Discard the voice profile of " + call;
       x.addEventListener("click", async () => {
         x.disabled = true;
         try { reflectSpk(await api("DELETE", "/api/asr/speaker/"
                                    + encodeURIComponent(call))); }
-        catch (err) { x.disabled = false; toast("Stimmprofil: " + err.message, "err"); }
+        catch (err) { x.disabled = false; toast("Voice profile: " + err.message, "err"); }
       });
       row.append(c, o, x);
       box.appendChild(row);
@@ -3571,17 +3571,17 @@ function spkListPaint(k) {
     if (!(k.calls || []).length) {
       const e = document.createElement("div");
       e.className = "spk-row spk-empty";
-      e.textContent = "noch keine Stimme gelernt";
+      e.textContent = "no voice learned yet";
       box.appendChild(e);
     }
   }
   const seg = $("#spk-seg"), g = k.seg;
   if (seg && g) {
     seg.textContent = g.overs
-      ? `Durchgänge: ${g.overs} · zu kurz ${g.short} · mit Rufzeichen ${g.enrol}`
-        + ` · zwei Rufzeichen ${g.multi} · ohne Rufzeichen ${g.nocall}`
-        + ` · davon zugeordnet ${g.accept}`
-      : "noch keine Durchgänge ausgewertet";
+      ? `overs: ${g.overs} · too short ${g.short} · with a callsign ${g.enrol}`
+        + ` · two callsigns ${g.multi} · without one ${g.nocall}`
+        + ` · of those assigned ${g.accept}`
+      : "no overs evaluated yet";
   }
 }
 
@@ -3595,10 +3595,10 @@ function reflectSpk(k) {
   const rv = $(".rail-voice");         // the lamp in the right rail's foot
   if (rv) {
     rv.classList.toggle("on", !!k.enabled);
-    rv.title = !k.available ? "Stimmerkennung: Sprechermodell fehlt"
-      : !k.enabled ? "Stimmerkennung aus"
-      : k.act ? `Stimmerkennung ordnet zu (${k.profiles} Stimmprofile)`
-              : `Stimmerkennung beobachtet nur (${k.profiles} Stimmprofile)`;
+    rv.title = !k.available ? "Voice ID: speaker model missing"
+      : !k.enabled ? "Voice ID off"
+      : k.act ? `Voice ID is assigning (${k.profiles} profiles)`
+              : `Voice ID is observing only (${k.profiles} profiles)`;
   }
   spkListPaint(k);
   // the panel button switches the recognition on and off; WHICH stage it runs
@@ -3610,10 +3610,10 @@ function reflectSpk(k) {
     b.classList.toggle("on", !!k.enabled);
     b.classList.toggle("act", !!(k.enabled && k.act));
     b.setAttribute("aria-pressed", k.enabled ? "true" : "false");
-    b.title = !k.available ? "Stimmerkennung: Sprechermodell fehlt auf dem Pi"
-      : !k.enabled ? "Stimmerkennung aus — einschalten"
-      : k.act ? `Stimmerkennung ordnet zu (${k.profiles} Stimmprofile) — ausschalten`
-              : `Stimmerkennung beobachtet nur (${k.profiles} Stimmprofile) — ausschalten`;
+    b.title = !k.available ? "Voice ID: speaker model missing on the Pi"
+      : !k.enabled ? "Voice ID off — switch on"
+      : k.act ? `Voice ID is assigning (${k.profiles} profiles) — switch off`
+              : `Voice ID is observing only (${k.profiles} profiles) — switch off`;
   }
   spkOn = !!k.enabled;
 }
@@ -3646,8 +3646,8 @@ $("#asr-spk-dlg")?.addEventListener("mousedown", ev => {
 $("#asr-voice")?.addEventListener("click", async () => {
   try {
     reflectAsr(await api("POST", "/api/asr/speaker", { enabled: !spkOn }));
-    toast(spkOn ? "Stimmerkennung an" : "Stimmerkennung aus", spkOn ? "ok" : "");
-  } catch (err) { toast("Stimmerkennung: " + err.message, "err"); }
+    toast(spkOn ? "Voice ID on" : "Voice ID off", spkOn ? "ok" : "");
+  } catch (err) { toast("Voice ID: " + err.message, "err"); }
 });
 
 // ---- speaker recognition (voice) ------------------------------------------
@@ -3664,16 +3664,16 @@ function asrVoice(m) {
     const card = asrCards.get(m.call);
     if (card) {
       card.dataset.vprof = m.n;                            // overs behind the profile
-      asrVoiceNote(card, `Stimmprofil: ${m.n} Durchgang${m.n === 1 ? "" : "e"}`);
+      asrVoiceNote(card, `Voice profile: ${m.n} over${m.n === 1 ? "" : "s"}`);
     }
     return;
   }
   if (m.event !== "match") return;
   const card = m.call ? asrCards.get(m.call) : null;
-  const line = !m.call ? "Stimme: kein Profil"
-    : `Stimme: ${callDisp(m.call)} ${m.score.toFixed(2)}`
-      + (m.second ? ` (vor ${callDisp(m.second)}, Abstand ${m.margin.toFixed(2)})` : "")
-      + (m.accept ? (m.act ? " — zugeordnet" : " — würde zuordnen") : " — zu unsicher");
+  const line = !m.call ? "Voice: no profile"
+    : `Voice: ${callDisp(m.call)} ${m.score.toFixed(2)}`
+      + (m.second ? ` (ahead of ${callDisp(m.second)}, margin ${m.margin.toFixed(2)})` : "")
+      + (m.accept ? (m.act ? " — assigned" : " — would assign") : " — not certain enough");
   // Stage 1 annotates and stops there, so the decision can be compared with what
   // actually happened before anything is allowed to act on it.
   if (card) asrVoiceNote(card, line);
@@ -3751,9 +3751,9 @@ function asrModSync() {
   b.disabled = !overCard;
   b.classList.toggle("on", on);
   b.setAttribute("aria-pressed", on ? "true" : "false");
-  b.title = !call ? "Karte anklicken, dann als Moderator kennzeichnen"
-    : on ? call + " ist Moderator — Redezeit wird nicht gewertet (Klick hebt auf)"
-         : call + " als Moderator kennzeichnen — Redezeit wird nicht gewertet";
+  b.title = !call ? "Click a card, then mark it as net control"
+    : on ? call + " is net control — its talk time is not counted (click to undo)"
+         : call + " — mark as net control, talk time not counted";
 }
 $("#asr-mod")?.addEventListener("click", () => {
   if (overCard) asrSetMod(overCard, !isMod(overCard));
@@ -3791,7 +3791,7 @@ function asrCardBuild(e) {
   card.style.setProperty("--ac-hue", av.hue);        // avatar AND card tint
   const head = mk("div", "ac-head");
   const callEl = mk("span", "ac-call", callDisp(e.call));
-  callEl.title = "Rufzeichen korrigieren";
+  callEl.title = "Correct the callsign";
   callEl.addEventListener("click", ev => { ev.stopPropagation(); asrEditCall(card); });
   head.append(avatar, callEl);
   // all three licence classes are shown; the holder's own one is lit
@@ -3808,7 +3808,7 @@ function asrCardBuild(e) {
   const dur = mk("button", "ac-dur");
   dur.innerHTML = CLOCK_SVG + '<span class="ac-dv">00:00:00</span>';
   dur.type = "button";
-  dur.title = "Redezeit dieser Station starten / stoppen";
+  dur.title = "Start / stop this station's talk timer";
   dur.addEventListener("click", ev => {
     ev.stopPropagation();
     overSetPin(card);                // starting a timer by hand is a manual pick
@@ -3824,8 +3824,8 @@ function asrCardBuild(e) {
   // with the name from the BNetzA list pre-filled
   const log = mk("button", "ac-log", "▶");
   log.type = "button";
-  log.title = "QSO mit " + e.call + " ins Wavelog eintragen";
-  log.setAttribute("aria-label", "QSO mit " + e.call + " loggen");
+  log.title = "Log the QSO with " + e.call + " to Wavelog";
+  log.setAttribute("aria-label", "Log QSO with " + e.call + "");
   log.addEventListener("click", async ev => {
     ev.stopPropagation();
     if (log.disabled) return;
@@ -3858,8 +3858,8 @@ function asrCardBuild(e) {
   });
   const del = mk("button", "ac-del", "✕");
   del.type = "button";
-  del.title = "Falsch erkannt — Karte entfernen";
-  del.setAttribute("aria-label", "Karte " + e.call + " entfernen");
+  del.title = "Misrecognised — remove the card";
+  del.setAttribute("aria-label", "Remove card " + e.call + "");
   del.addEventListener("click", ev => {
     ev.stopPropagation();
     asrDropCall(e.call);
@@ -3894,7 +3894,7 @@ function asrEditCall(card) {
       await api("PATCH", "/api/asr/log/" + encodeURIComponent(old), { call: nu });
     } catch (err) {
       el.textContent = callDisp(old);
-      toast("Rufzeichen: " + err.message, "err");
+      toast("Callsign: " + err.message, "err");
     }
   };
   inp.addEventListener("input", () => {
@@ -3978,16 +3978,16 @@ function asrTipShow(card) {
 function asrTipHide() { if (asrTip) asrTip.hidden = true; }
 
 function asrCardDebug(e) {
-  if (e.manual) return "von Hand eingetragen";
+  if (e.manual) return "entered by hand";
   const bits = [];
-  if (e.conf != null) bits.push("Konfidenz " + Number(e.conf).toFixed(2));
+  if (e.conf != null) bits.push("confidence " + Number(e.conf).toFixed(2));
   if (e.s) bits.push("Signal " + e.s);
   if (e.band) bits.push("Band " + e.band);
   const head = bits.join("  ·  ");
   const more = [];
-  if (e.text) more.push("gehört: «" + e.text + "»");
+  if (e.text) more.push("heard: «" + e.text + "»");
   if (e.nbest && e.nbest.length) more.push("N-Best: " + e.nbest.join(" "));
-  if (e.line && /⟵/.test(e.line)) more.push("korrigiert: " + e.line.trim());
+  if (e.line && /⟵/.test(e.line)) more.push("corrected: " + e.line.trim());
   return [head, ...more].filter(Boolean).join("\n");
 }
 
@@ -4089,7 +4089,7 @@ function railFoldPaint() {
   if (!b) return;
   // the arrow points the way the rails will move: out to the margins, or back
   b.textContent = folded ? "◀" : "▶";
-  b.title = folded ? "Kachelspalten ausklappen" : "Kachelspalten einklappen";
+  b.title = folded ? "Show the contact columns" : "Hide the contact columns";
 }
 function railFold(on) {
   $$(".asr-rail").forEach(r => r.classList.toggle("folded", on));
@@ -4099,7 +4099,11 @@ function railFold(on) {
   // once the box has grown back, not before.
   if (!on) setTimeout(asrRailBuild, 210);
 }
-try { if (localStorage.getItem(RAIL_KEY) === "1") railFold(true); } catch {}
+// Folded unless this browser has asked for them: the columns are an extra, and
+// an extra should not claim the margins of a window it was never invited into.
+let railStart = "1";
+try { railStart = localStorage.getItem(RAIL_KEY) ?? "1"; } catch {}
+if (railStart !== "0") railFold(true);
 railFoldPaint();
 // the state lives on the rail, not on the button — which since the move sits in
 // the title bar and has no rail to ask
@@ -4166,7 +4170,7 @@ function asrCardDrop(call) {
 async function asrDropCall(call) {
   asrCardDrop(call);                                 // remove at once, no wait
   try { await api("DELETE", "/api/asr/log/" + encodeURIComponent(call)); }
-  catch (err) { toast("Karte: " + err.message, "err"); }
+  catch (err) { toast("Card: " + err.message, "err"); }
 }
 
 function asrLog(e, fresh = true) {
@@ -4240,10 +4244,10 @@ async function asrManualAdd() {
     const r = await api("POST", "/api/asr/log", { call });
     // say whether the BNetzA list knew the call: a card without name and town
     // otherwise looks like the lookup failed rather than "not a German call"
-    toast(r.known ? `Karte ${r.call} angelegt`
-                  : `Karte ${r.call} angelegt — nicht in der Rufzeichenliste`,
+    toast(r.known ? `Card ${r.call} created`
+                  : `Card ${r.call} created — not in the callsign list`,
           r.known ? "ok" : "");
-  } catch (err) { toast("Karte: " + err.message, "err"); }
+  } catch (err) { toast("Card: " + err.message, "err"); }
 }
 asrManual?.addEventListener("keydown", ev => { if (ev.key === "Enter") asrManualAdd(); });
 $("#asr-manual-add")?.addEventListener("click", asrManualAdd);
@@ -4256,13 +4260,13 @@ $("#asr-log-clear")?.addEventListener("click", async () => {
   const n = asrCards.size;
   if (!n) return;
   const ok = await confirmDialog(
-    `Alle ${n} Kontaktkarten entfernen — auch auf dem Pi und in anderen Browsern?`
-    + " Die Redezeiten gehen dabei verloren; die gelernten Stimmen bleiben.",
-    { title: "CLEAR ALL", okText: "LÖSCHEN", cancelText: "ABBRECHEN", danger: true });
+    `Remove all ${n} contact cards — on the Pi and in other browsers too?`
+    + " The talk times are lost with them; the learned voices stay.",
+    { title: "CLEAR ALL", okText: "DELETE", cancelText: "CANCEL", danger: true });
   if (!ok) return;
   asrClearView();
   try { await api("DELETE", "/api/asr/log"); }
-  catch (err) { toast("Löschen: " + err.message, "err"); }
+  catch (err) { toast("Delete: " + err.message, "err"); }
 });
 // the local half of a clear — also runs when another client clears the log
 function asrClearView() {
