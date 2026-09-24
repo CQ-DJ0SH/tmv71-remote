@@ -476,7 +476,7 @@ class CallsignService:
         self._repeat_s = 90.0                  # suppress a repeat of the same call
         self._recent: list = []                # (ts, call) for repetition voting
         self._log: list = []                   # ASR debug log (ring buffer of last N)
-        self._calls: dict = {}                 # call -> {class,name,city} (empty = unverified)
+        self._calls: dict = {}       # call -> {class,name,city,zip,street} (empty: unverified)
         self._suspended = False                # off because the radio is powered down
         self._lock = asyncio.Lock()
         # --- speaker segmentation (see speaker_id.py) ---
@@ -656,7 +656,8 @@ class CallsignService:
     def _add_log(self, line: str, call: str = None, valid: bool = None,
                  klass: str = None, conf: float = None, s: str = None,
                  band: str = None, text: str = None, nbest: list = None,
-                 name: str = None, city: str = None, event: str = None,
+                 name: str = None, city: str = None, zip_code: str = None,
+                 street: str = None, event: str = None,
                  manual: bool = False) -> None:
         """Append an entry to the ASR log (ring buffer for the debug panel) and push
         it live to subscribers. The panel renders each contact as a card, so the
@@ -675,6 +676,10 @@ class CallsignService:
             entry["name"] = name
         if city:
             entry["city"] = city
+        if zip_code:
+            entry["zip"] = zip_code
+        if street:
+            entry["street"] = street
         if call is not None:
             entry["call"] = call
         if valid is not None:
@@ -716,7 +721,8 @@ class CallsignService:
         self.mark_manual(call)     # typing a call also says whose voice is on
         self._add_log("entered by hand", call=call, valid=True,
                       klass=info.get("class", ""), name=info.get("name", ""),
-                      city=info.get("city", ""), event="shown", manual=True)
+                      city=info.get("city", ""), zip_code=info.get("zip", ""),
+                      street=info.get("street", ""), event="shown", manual=True)
         return {"call": call, "known": bool(info)}
 
     def drop_call(self, call: str) -> int:
@@ -776,6 +782,7 @@ class CallsignService:
             if e.get("call") == old:
                 e["call"] = new
                 e["name"], e["city"] = info.get("name", ""), info.get("city", "")
+                e["zip"], e["street"] = info.get("zip", ""), info.get("street", "")
                 e["klass"] = info.get("class", "")
                 e["valid"] = True          # a human typed it — see add_manual()
                 n += 1
@@ -785,6 +792,8 @@ class CallsignService:
         self._spk.rename(old, new)
         self._broadcast({"t": "asrrename", "old": old, "new": new,
                          "name": info.get("name", ""), "city": info.get("city", ""),
+                         "zip": info.get("zip", ""),
+                         "street": info.get("street", ""),
                          "klass": info.get("class", ""),
                          "profiles": self._spk.stats()["profiles"]})
         return {"call": new, "renamed": n, "known": bool(info)}
@@ -1036,7 +1045,9 @@ class CallsignService:
                           call=call, valid=valid, klass=klass, conf=conf,
                           s=s_lbl, band=band_lbl, text=text, nbest=nbest,
                           name=(info or {}).get("name", ""),
-                          city=(info or {}).get("city", ""), event="muted")
+                          city=(info or {}).get("city", ""),
+                          zip_code=(info or {}).get("zip", ""),
+                          street=(info or {}).get("street", ""), event="muted")
             return
         self._seen[call] = now
         if len(self._seen) > 64:                      # prune stale entries
@@ -1044,17 +1055,22 @@ class CallsignService:
                           if now - v < self._repeat_s}
         # QRZ is NOT queried here — only on a manual lookup in the log panel. The
         # name/town/class come from the offline BNetzA list.
-        det = " · ".join(x for x in ((info or {}).get("name", ""),
-                                     (info or {}).get("city", "")) if x)
+        town = " ".join(x for x in ((info or {}).get("zip", ""),
+                                    (info or {}).get("city", "")) if x)
+        det = " · ".join(x for x in ((info or {}).get("name", ""), town) if x)
         self._add_log((det + corr) if det else ("shown" + corr),
                       call=call, valid=valid, klass=klass, conf=conf,
                       s=s_lbl, band=band_lbl, text=text, nbest=nbest,
                       name=(info or {}).get("name", ""),
-                      city=(info or {}).get("city", ""), event="shown")
+                      city=(info or {}).get("city", ""),
+                      zip_code=(info or {}).get("zip", ""),
+                      street=(info or {}).get("street", ""), event="shown")
         self._broadcast({"t": "callsign", "call": call, "conf": round(conf, 2),
                          "valid": valid,
                          "name": (info or {}).get("name", ""),
                          "city": (info or {}).get("city", ""),
+                         "zip": (info or {}).get("zip", ""),
+                         "street": (info or {}).get("street", ""),
                          "klass": (info or {}).get("class", "")})
 
 
@@ -1655,7 +1671,8 @@ async def log_qso(req: LogQsoRequest) -> dict:
             name=req.name or "", rst_sent=req.rst_sent or "59",
             rst_rcvd=req.rst_rcvd or "59", comment=req.comment or "",
             gridsquare=req.gridsquare or "", email=req.email or "",
-            qth=req.qth or "", country=req.country or "", power_w=req.power_w,
+            qth=req.qth or "", address=req.address or "",
+            country=req.country or "", power_w=req.power_w,
             station_callsign=settings.callsign or "")
     except LogError as e:
         raise HTTPException(502, str(e))

@@ -90,6 +90,7 @@ def build_adif(qso: dict, station_callsign: str = "", my_grid: str = "") -> str:
         ("NAME", qso.get("name")),
         ("GRIDSQUARE", qso.get("gridsquare")),
         ("QTH", qso.get("qth")),
+        ("ADDRESS", qso.get("address")),
         ("COUNTRY", qso.get("country")),
         ("EMAIL", qso.get("email")),
         ("COMMENT", qso.get("comment")),
@@ -493,7 +494,8 @@ class LogBook:
     def log(self, *, callsign: str, freq_hz: int | None, mode: str,
             name: str = "", rst_sent: str = "59", rst_rcvd: str = "59",
             comment: str = "", gridsquare: str = "", email: str = "",
-            qth: str = "", country: str = "", power_w: float | None = None,
+            qth: str = "", address: str = "", country: str = "",
+            power_w: float | None = None,
             station_callsign: str = "", my_grid: str = "") -> dict:
         now = datetime.now(timezone.utc)
         call = callsign.strip().upper()
@@ -514,6 +516,7 @@ class LogBook:
             "gridsquare": gridsquare.strip(),
             "email": email.strip(),
             "qth": qth.strip(),
+            "address": address.strip(),
             "country": country.strip(),
             "comment": comment.strip(),
         }

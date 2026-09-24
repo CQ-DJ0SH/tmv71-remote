@@ -3004,9 +3004,20 @@ function clearRxCall() {
   }
 }
 
+// "12249 Berlin" — the town as it is written on an envelope. The postcode stays
+// its own field everywhere else: the Wavelog QTH takes the plain town.
+function townLine(e) {
+  return [e.zip, e.city].filter(Boolean).join(" ");
+}
+
+// the mailing address for the ADIF ADDRESS field: "Street 1, 12249 Berlin"
+function addressLine(e) {
+  return [e.street, townLine(e)].filter(Boolean).join(", ");
+}
+
 // name · town · licence class from the offline BNetzA list
 function callDetails(m) {
-  return [m.name, m.city, m.klass ? "Kl. " + m.klass : ""].filter(Boolean).join(" · ");
+  return [m.name, townLine(m), m.klass ? "Kl. " + m.klass : ""].filter(Boolean).join(" · ");
 }
 
 function showRxCall(m) {
@@ -3028,11 +3039,12 @@ function showRxCall(m) {
 
 // Fill the logbook form and submit it. Used by the title-bar LOG button and by
 // the per-card button; no QRZ lookup, the name comes from the offline list.
-async function logCallDirect(call, name, qth) {
+async function logCallDirect(call, name, qth, address) {
   if (!call) { toast("No callsign detected", "err"); return false; }
   const inp = $("#log-call"); if (inp) inp.value = call;
   const nm = $("#log-name"); if (nm) nm.value = name || "";
   const qt = $("#log-qth"); if (qt) qt.value = qth || "";
+  const ad = $("#log-address"); if (ad) ad.value = address || "";
   // clear any stale details so the bare call (+ auto band/freq/mode) is logged
   ["#log-grid", "#log-comment"].forEach(s => { const el = $(s); if (el) el.value = ""; });
   toast("📖 Logging " + call + "…", "ok");
@@ -3801,7 +3813,7 @@ function asrCardBuild(e) {
   card.appendChild(head);
   asrSetKlass(card, e.klass);
   card.appendChild(mk("div", "ac-name", e.name || ""));
-  card.appendChild(mk("div", "ac-city", e.city || ""));
+  card.appendChild(mk("div", "ac-city", townLine(e)));
   const foot = mk("div", "ac-foot");
   // the duration doubles as the start/stop control for this card's talk timer —
   // a separate glyph button would clash with the ▶ that logs to Wavelog
@@ -3830,7 +3842,8 @@ function asrCardBuild(e) {
     ev.stopPropagation();
     if (log.disabled) return;
     log.disabled = true;
-    const ok = await logCallDirect(e.call, e.name || "", e.city || "");
+    const ok = await logCallDirect(e.call, e.name || "", e.city || "",
+                                   addressLine(e));
     log.disabled = false;
     card.classList.toggle("logged", !!ok);           // marks it as already logged
   });
@@ -3945,7 +3958,7 @@ function asrRenameCard(m) {
   const avEl = card.querySelector(".ac-avatar"); if (avEl) avEl.textContent = av.text;
   const cEl = card.querySelector(".ac-call"); if (cEl) cEl.textContent = callDisp(m.new);
   const nEl = card.querySelector(".ac-name"); if (nEl) nEl.textContent = m.name || "";
-  const tEl = card.querySelector(".ac-city"); if (tEl) tEl.textContent = m.city || "";
+  const tEl = card.querySelector(".ac-city"); if (tEl) tEl.textContent = townLine(m);
   asrSetKlass(card, m.klass);
   asrCards.set(m.new, card);
   if (asrMods.delete(m.old)) { asrMods.add(m.new); asrModSave(); }   // flag follows
@@ -4189,7 +4202,7 @@ function asrLog(e, fresh = true) {
     card.addEventListener("mouseleave", asrTipHide);
   } else if (e.name && !card.querySelector(".ac-name").textContent) {
     card.querySelector(".ac-name").textContent = e.name;      // late list data
-    card.querySelector(".ac-city").textContent = e.city || "";
+    card.querySelector(".ac-city").textContent = townLine(e);
   }
   if (e.klass) asrSetKlass(card, e.klass);
   const n = Number(card.dataset.count) + 1;
@@ -4516,13 +4529,14 @@ async function logQso() {
       gridsquare: $("#log-grid").value.trim() || lk.gridsquare || "",
       comment: $("#log-comment").value.trim(),
       qth: $("#log-qth").value.trim() || lk.qth || "",
+      address: $("#log-address")?.value.trim() || "",
       email: lk.email || "", country: lk.country || "",
     });
     if (r.ok) {
       ok = true;
       toast(`Logged ${call}`, "ok");
       lastLookup = null;
-      ["#log-call", "#log-name", "#log-grid", "#log-qth", "#log-comment"]
+      ["#log-call", "#log-name", "#log-grid", "#log-qth", "#log-address", "#log-comment"]
         .forEach(s => ($(s).value = ""));
       $("#log-rst-s").value = "59"; $("#log-rst-r").value = "59";
     } else {

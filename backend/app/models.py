@@ -352,6 +352,7 @@ class LogQsoRequest(BaseModel):
     gridsquare: Optional[str] = ""
     email: Optional[str] = ""
     qth: Optional[str] = ""
+    address: Optional[str] = ""     # street + postcode, from the BNetzA list
     country: Optional[str] = ""
     freq_hz: Optional[int] = Field(default=None, gt=0)
     mode: Optional[str] = None
