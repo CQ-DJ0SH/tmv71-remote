@@ -10,6 +10,7 @@ at runtime. Neither the PDF nor the cache is committed
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -88,6 +89,34 @@ def build_cache(pdf_path: str, cache: str) -> int:
     return len(calls)
 
 
+def json_path(cache: str = "") -> str:
+    """The JSON export sits next to the TSV cache (also gitignored)."""
+    return os.path.splitext(cache or cache_path())[0] + ".json"
+
+
+def export_json(cache: str = "", dst: str = "") -> int:
+    """Write the cache out as JSON. Returns the number of callsigns.
+
+    Built from the cache, not from the PDF: the slow part is the parse, and both
+    files are meant to hold exactly the same reading of the same list. The
+    header says which PDF and which run it came from, because the register is
+    reissued every few weeks and two exports are otherwise indistinguishable.
+    """
+    import time
+
+    cache = cache or cache_path()
+    dst = dst or json_path(cache)
+    calls = load("", cache)
+    doc = {"source": os.path.basename(default_pdf_path()),
+           "generated": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+           "count": len(calls), "calls": calls}
+    tmp = dst + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(doc, f, ensure_ascii=False, sort_keys=True)
+    os.replace(tmp, dst)                        # atomic
+    return len(calls)
+
+
 def load(pdf_path: str = "", cache: str = "") -> dict:
     """Read the cache -> ``{call: {"class", "name", "city", "street", "zip"}}``.
 
@@ -124,14 +153,23 @@ if __name__ == "__main__":
     # newer Rufzeichenliste:
     #     backend/.venv/bin/python -m app.callsign_list [PDF] [CACHE]
     # (run from the backend/ dir, or with backend on PYTHONPATH). With no args it
-    # uses the default PDF path and cache location.
+    # uses the default PDF path and cache location. Every run also writes the
+    # same list as JSON next to the cache; --json-only skips the PDF parse and
+    # re-exports from the cache that is already there.
     import sys
     import time
     logging.basicConfig(level=logging.INFO)
-    pdf = sys.argv[1] if len(sys.argv) > 1 else default_pdf_path()
-    dst = sys.argv[2] if len(sys.argv) > 2 else cache_path()
+    argv = [a for a in sys.argv[1:] if a != "--json-only"]
+    pdf = argv[0] if argv else default_pdf_path()
+    dst = argv[1] if len(argv) > 1 else cache_path()
+    t0 = time.time()
+    if "--json-only" in sys.argv:
+        n = export_json(dst)
+        print(f"exported {n} callsigns in {time.time() - t0:.1f}s -> {json_path(dst)}")
+        sys.exit(0)
     if not os.path.exists(pdf):
         sys.exit(f"PDF not found: {pdf}")
-    t0 = time.time()
     n = build_cache(pdf, dst)
     print(f"built {n} callsigns in {time.time() - t0:.1f}s -> {dst}")
+    export_json(dst)
+    print(f"exported {n} callsigns -> {json_path(dst)}")
