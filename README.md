@@ -133,11 +133,25 @@ On the TM-V71(A/E), set the menu items:
 - **519 (PC port baud rate) → 57600** — the CAT/serial rate this app uses
   (matches `TMV71_SERIAL_BAUD`).
 
-The USB sound interface is wired to the radio's front **Mic/Speaker** jacks, not
-the rear data connector. PTT is keyed over CAT (serial), and the TM-V71 only
-routes audio to/from the rear data connector when it is keyed by a **hardware**
-PTT — a serial PTT never switches that path. Using the front mic/speaker keeps
-RX/TX audio on the normal, band-limited voice chain regardless of how PTT is keyed.
+- **518 (data speed) → 1200** — this switches the whole audio path of the data
+  connector, not just the input sensitivity: 1200 runs over the normal,
+  band-limited voice chain (RX after de-emphasis), 9600 uses the flat
+  discriminator path meant for G3RUH packet.
+
+The USB sound interface uses **two** jacks, on opposite sides of the radio:
+
+| Direction | Radio connector | Pins |
+|---|---|---|
+| TX (card out → radio) | **MIC jack**, 8-pin modular, side of the control head | 6 = MIC, 5 = MIC GND |
+| RX (radio → card in) | **DATA jack**, 6-pin mini-DIN, rear panel | 5 = PR1 (1200 Bd), 2 = DE (GND) |
+
+TX needs about 40 dB of attenuation (line level → a few mV into 600 Ω); a 1:1
+transformer in that lead also breaks the ground loop between the Pi's supply and
+the radio. TX cannot use the data connector: PTT is keyed over CAT (serial), and
+the TM-V71 only routes **transmit** audio to the data connector when a
+**hardware** PTT keys it — a serial PTT never switches that path. RX is taken
+from PR1 because it is filtered, at a fixed level and independent of the volume
+knob. See the wiring diagram in the manual (chapter 4).
 
 ## Install
 

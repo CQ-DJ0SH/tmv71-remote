@@ -447,7 +447,73 @@ def draw_audio(pdf, lang):
     _diagram(pdf, 122, go)
 
 
-DIAGRAMS = {"system": draw_system, "audio": draw_audio}
+def draw_wiring(pdf, lang):
+    """Where the cables go: Pi -> USB sound card -> radio. The labels stay
+    English in both languages — connector and pin names are what is printed on
+    the radio and in its manual, and translating them would only invite a
+    mis-wire."""
+    de = lang == "de"
+
+    def go(pdf, y0):
+        def head(x, y, text):
+            pdf.set_xy(x, y)
+            pdf.set_font("DV", "B", 6.6)
+            pdf.set_text_color(*ACCENT)
+            pdf.cell(40, 3, text)
+        # --- Pi, left, between the three signal rows -------------------------
+        _box(pdf, 16, y0 + 24, 32, 26, "Raspberry Pi 5",
+             ["tmv71-remote", "HTTPS 8443"], accent=True)
+        # --- USB sound card + serial bridge ----------------------------------
+        _box(pdf, 58, y0 + 10, 38, 44, "USB sound card",
+             ["Sound Blaster Play! 3", "class compliant, 48 kHz", "",
+              "OUT  3.5 mm TRS", "line level, ~ 1 V", "", "IN   3.5 mm"])
+        _box(pdf, 58, y0 + 64, 38, 16, "USB-serial bridge",
+             ["FTDI FT-X", "/dev/ttyUSB0"])
+        # --- level interface, transmit path only -----------------------------
+        head(104, y0 + 7, "TX  transmit")
+        _box(pdf, 104, y0 + 12, 34, 22, "Isolation transformer + pad",
+             ["1:1, 600 Ohm", "~ 40 dB down"])
+        head(104, y0 + 44, "RX  receive")
+        head(104, y0 + 64, "CAT  control")
+        # --- the radio and its three sockets ---------------------------------
+        _frame(pdf, 152, y0 + 4, 42, 78, "Kenwood TM-V71")
+        _box(pdf, 154, y0 + 12, 38, 22, "MIC jack",
+             ["8-pin modular, side of head", "pin 6 MIC, ~ 2 mV / 600 Ohm",
+              "pin 5 MIC GND"])
+        _box(pdf, 154, y0 + 40, 38, 22, "DATA jack",
+             ["6-pin mini-DIN, rear", "pin 5 PR1, 1200 Bd out",
+              "pin 2 DE (ground)"])
+        _box(pdf, 154, y0 + 66, 38, 14, "PC port",
+             ["8-pin mini-DIN, rear"])
+        # --- the paths --------------------------------------------------------
+        _arrow(pdf, 48.5, y0 + 33, 57.5, y0 + 33, "USB")
+        pdf.set_draw_color(*LINE)
+        pdf.set_line_width(0.3)
+        pdf.line(32, y0 + 50, 32, y0 + 72)          # down the left, then across
+        _arrow(pdf, 32, y0 + 72, 57.5, y0 + 72, "USB")
+        _arrow(pdf, 96.5, y0 + 23, 103.5, y0 + 23)
+        _arrow(pdf, 138.5, y0 + 23, 153.5, y0 + 23)
+        _arrow(pdf, 153.5, y0 + 51, 96.5, y0 + 51, "PR1 ~ 0.3 Vpp, fixed")
+        _arrow(pdf, 96.5, y0 + 72, 153.5, y0 + 72, "CAT 57600 Bd + PTT")
+        _cap(pdf, 16, y0 + 86, 178,
+             ("TX geht in die Mikrofonbuchse, nicht in die Datenbuchse: Das Gerät "
+              "legt das Sendeaudio nur dann auf die Datenbuchse, wenn eine "
+              "HARDWARE-PTT tastet — hier wird die PTT über CAT getastet. RX "
+              "kommt von PR1, dem 1200-Baud-Pin: gefiltert, mit festem Pegel und "
+              "unabhängig vom Lautstärkeregler. Menü 518 (Data-Speed) auf 1200 "
+              "und Menü 519 (PC-Port-Baud) auf 57600 stellen."
+              if de else
+              "TX goes into the mic jack, not into the DATA jack: the radio only "
+              "routes transmit audio from the DATA jack while a HARDWARE PTT keys "
+              "it, and this station keys PTT over CAT. RX is taken from PR1, the "
+              "1200-baud pin — filtered, at a fixed level and untouched by the "
+              "volume knob. Set menu 518 (data speed) to 1200 and menu 519 (PC "
+              "port baud) to 57600."))
+    _diagram(pdf, 100, go)
+
+
+DIAGRAMS = {"system": draw_system, "audio": draw_audio,
+            "wiring": draw_wiring}
 
 
 def render(pdf, blocks):
@@ -729,6 +795,27 @@ EN = [
         "Optional: a HackRF One plus the hackrf host tools for the waterfall.",
         "Optional: vosk + the small German model (offline callsign recognition), "
         "and pypdf + the BNetzA Rufzeichenliste PDF (name/town/class + VOID check).",
+    ]),
+    ("h2", "Wiring the USB sound card"),
+    ("p", "The audio does not use one connector but two, and they sit on "
+          "opposite sides of the radio: transmit audio goes into the mic jack on "
+          "the side of the control head, received audio comes off the DATA jack "
+          "on the rear panel. That split is not a preference, it follows from how "
+          "the radio switches its paths — see the note under the diagram."),
+    ("diagram", "wiring", "en"),
+    ("ul", [
+        "The transmit path needs to lose about 40 dB: the card puts out line "
+        "level (~1 V), the mic input expects a few millivolts into 600 ohms. A "
+        "1:1 transformer in that lead also breaks the ground loop between the "
+        "Pi's supply and the radio, which is what an alternator whine or a "
+        "steady hum on your transmitted audio usually is.",
+        "PR1 (pin 5) carries the 1200-baud receive audio: filtered, at a fixed "
+        "level, and independent of the volume knob — so what the Pi hears does "
+        "not change when you turn the radio down. PR9 (pin 4) is the flat "
+        "9600-baud output straight off the discriminator and is the wrong pin "
+        "here unless you re-enable de-emphasis in software.",
+        "PTT is keyed over CAT on the PC port, so no PTT line is wired. Nothing "
+        "in the audio cabling can key the radio.",
     ]),
     ("h1", "5  Installation"),
     ("code", INSTALL),
@@ -1022,7 +1109,10 @@ EN = [
           "open, and it can also grade the mic-test audio. The callsign list is "
           "built once from the PDF with a converter (python -m app.callsign_list), "
           "which splits each entry into callsign, class, name, street, postcode "
-          "and town. The register is not consistent about its separator — most "
+          "and town, and writes the same list as JSON beside the cache for other "
+          "tools (--json-only re-exports it in a second, without re-reading the "
+          "PDF; the TSV stays what the service itself loads, being about 40% "
+          "faster to read). The register is not consistent about its separator — most "
           "entries use a semicolon between holder and address, a few hundred (club "
           "and relay stations) only a comma — so a comma in front of the postcode "
           "counts as a separator too, and a word hyphenated across a column break "
@@ -1353,6 +1443,30 @@ DE = [
         "erkennung) sowie pypdf + die BNetzA-Rufzeichenliste-PDF (Name/Ort/Klasse "
         "+ VOID-Prüfung).",
     ]),
+    ("h2", "Anschluss der USB-Soundkarte"),
+    ("p", "Das Audio nutzt nicht eine Buchse, sondern zwei — und die sitzen auf "
+          "gegenüberliegenden Seiten des Geräts: Das Sendesignal geht in die "
+          "Mikrofonbuchse an der Seite des Bedienteils, das Empfangssignal kommt "
+          "aus der Datenbuchse auf der Rückseite. Diese Aufteilung ist keine "
+          "Geschmacksfrage, sie folgt daraus, wie das Gerät seine Pfade "
+          "umschaltet — siehe die Anmerkung unter dem Bild. Die Beschriftung des "
+          "Schaltbilds bleibt englisch: So stehen die Buchsen- und Pinnamen im "
+          "Handbuch des Funkgeräts."),
+    ("diagram", "wiring", "de"),
+    ("ul", [
+        "Der Sendezweig muss rund 40 dB verlieren: Die Karte gibt Line-Pegel "
+        "(~1 V) ab, der Mikrofoneingang erwartet wenige Millivolt an 600 Ohm. "
+        "Ein 1:1-Übertrager in dieser Leitung trennt zugleich die Masseschleife "
+        "zwischen Pi-Netzteil und Funkgerät — sie ist meist die Ursache, wenn "
+        "das eigene Sendesignal brummt oder die Lichtmaschine mitpfeift.",
+        "PR1 (Pin 5) führt das 1200-Baud-Empfangsaudio: gefiltert, mit festem "
+        "Pegel und unabhängig vom Lautstärkeregler — was der Pi hört, ändert "
+        "sich also nicht, wenn man das Gerät leiser dreht. PR9 (Pin 4) ist der "
+        "flache 9600-Baud-Ausgang direkt vom Diskriminator und hier der falsche "
+        "Pin, solange die De-Emphasis nicht in Software wieder zugeschaltet wird.",
+        "PTT wird über CAT am PC-Port getastet, eine PTT-Leitung ist deshalb "
+        "nicht verdrahtet. Nichts in der Audioverkabelung kann das Gerät tasten.",
+    ]),
     ("h1", "5  Installation"),
     ("code", INSTALL),
     ("p", "Für einen neustartfesten Betrieb die systemd-Unit aus dem Ordner "
@@ -1668,7 +1782,11 @@ DE = [
           "offener Rauschsperre und kann auch das Mic-Test-Audio auswerten. Die "
           "Rufzeichenliste wird einmalig per Converter aus der PDF erzeugt "
           "(python -m app.callsign_list), der jeden Eintrag in Rufzeichen, Klasse, "
-          "Name, Straße, PLZ und Ort zerlegt. Das Register trennt nicht "
+          "Name, Straße, PLZ und Ort zerlegt und dieselbe Liste zusätzlich als "
+          "JSON neben den Cache schreibt, für andere Werkzeuge (--json-only "
+          "erzeugt sie in einer Sekunde neu, ohne die PDF noch einmal zu lesen; "
+          "geladen wird vom Dienst weiterhin die TSV-Fassung, sie ist rund 40 % "
+          "schneller zu lesen). Das Register trennt nicht "
           "einheitlich — meist steht ein Semikolon zwischen Inhaber und Anschrift, "
           "bei einigen hundert Klub- und Relaisstationen nur ein Komma —, deshalb "
           "gilt auch ein Komma vor der Postleitzahl als Trenner, und ein am "
