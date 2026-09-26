@@ -137,6 +137,7 @@ class CallsignRequest(BaseModel):
     """Operator callsign and locator, persisted server-side."""
     callsign: str = Field(default="", max_length=12)
     locator: Optional[str] = Field(default=None, max_length=8)
+    region: Optional[Literal["de", "us"]] = None   # ASR language + register
 
 
 class ThemeRequest(BaseModel):
@@ -352,7 +353,8 @@ class LogQsoRequest(BaseModel):
     gridsquare: Optional[str] = ""
     email: Optional[str] = ""
     qth: Optional[str] = ""
-    address: Optional[str] = ""     # street + postcode, from the BNetzA list
+    address: Optional[str] = ""     # street + postcode, from the register
+    state: Optional[str] = ""       # US state (ADIF STATE; empty in Germany)
     country: Optional[str] = ""
     freq_hz: Optional[int] = Field(default=None, gt=0)
     mode: Optional[str] = None

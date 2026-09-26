@@ -457,6 +457,17 @@ VOTE_WINDOW_S = 12.0     # repetition-voting window (an over's repeats fall insi
 VOID_MIN_VOTES = 2       # an unlisted (VOID) hit must repeat this often to be shown
 
 
+def _town_line(info: dict) -> str:
+    """How the town is written where the register comes from: "12249 Berlin"
+    in Germany, "Dayton, OH 45402" in the States."""
+    city, zip_, st = (info.get("city", ""), info.get("zip", ""),
+                      info.get("state", ""))
+    if st:
+        return " ".join(x for x in (", ".join(y for y in (city, st) if y),
+                                    zip_) if x)
+    return " ".join(x for x in (zip_, city) if x)
+
+
 class CallsignService:
     """Off-air callsign recognition via grammar-constrained Vosk ASR.
 
@@ -498,7 +509,7 @@ class CallsignService:
             return settings.asr_model_dir
         return os.path.normpath(os.path.join(
             os.path.dirname(__file__), "..", "..", "models",
-            "vosk-model-small-de-0.15"))
+            callsign_asr.region(settings.asr_region).model))
 
     @property
     def available(self) -> bool:
@@ -511,6 +522,7 @@ class CallsignService:
     def status(self) -> dict:
         return {"enabled": self.enabled, "available": self.available,
                 "ready": self._rec is not None, "suspended": self._suspended,
+                "region": settings.asr_region, "calls": len(self._calls),
                 "spk": self.spk_status()}
 
     def spk_status(self) -> dict:
@@ -596,22 +608,40 @@ class CallsignService:
             self._suspended = False
             await self.set_enabled(True, persist=False)
 
+    async def set_region(self, code: str) -> None:
+        """Switch country. Everything the region decides — model, words,
+        callsign shape, register — is held by the recognizer and the loaded
+        list, so both are dropped and rebuilt rather than patched in place."""
+        if code == settings.asr_region:
+            return
+        settings.asr_region = code
+        save_runtime(asr_region=code)
+        was, self._calls = self.enabled, {}
+        async with self._lock:
+            self._rec = None
+        if was:
+            await self.set_enabled(False, persist=False)
+            await self.set_enabled(True, persist=False)
+        self._add_log(f"region set to {code.upper()}")
+
     async def set_enabled(self, on: bool, persist: bool = True) -> dict:
         async with self._lock:
             if on and self._rec is None:
                 try:
                     self._rec = await asyncio.to_thread(
                         callsign_asr.CallsignRecognizer, self._model_dir(),
-                        settings.callsign)
+                        settings.callsign, 0.55, None, settings.asr_region)
                 except Exception as exc:  # noqa: BLE001
                     logging.getLogger("tmv71").warning(
                         "callsign ASR: model load failed: %s", exc)
                     raise HTTPException(500, f"Vosk model load failed: {exc}")
             if on and not self._calls:
-                # verify + enrich recognised calls from the official BNetzA list
-                # (loads a pre-built cache; empty on failure -> shown, unverified)
+                # verify + enrich recognised calls from the official register of
+                # the configured region — BNetzA or FCC (loads a pre-built cache;
+                # empty on failure -> the call is shown, unverified)
                 self._calls = await asyncio.to_thread(
-                    callsign_list.load, settings.asr_calllist_pdf, "")
+                    callsign_list.load, settings.asr_calllist_pdf,
+                    callsign_list.cache_path(settings.asr_region))
             if self._rec is not None:
                 # let N-best rescoring prefer an assigned callsign (reads the
                 # current dict, so a later reload is picked up)
@@ -657,7 +687,7 @@ class CallsignService:
                  klass: str = None, conf: float = None, s: str = None,
                  band: str = None, text: str = None, nbest: list = None,
                  name: str = None, city: str = None, zip_code: str = None,
-                 street: str = None, event: str = None,
+                 street: str = None, state: str = None, event: str = None,
                  manual: bool = False) -> None:
         """Append an entry to the ASR log (ring buffer for the debug panel) and push
         it live to subscribers. The panel renders each contact as a card, so the
@@ -680,6 +710,8 @@ class CallsignService:
             entry["zip"] = zip_code
         if street:
             entry["street"] = street
+        if state:
+            entry["state"] = state
         if call is not None:
             entry["call"] = call
         if valid is not None:
@@ -722,7 +754,8 @@ class CallsignService:
         self._add_log("entered by hand", call=call, valid=True,
                       klass=info.get("class", ""), name=info.get("name", ""),
                       city=info.get("city", ""), zip_code=info.get("zip", ""),
-                      street=info.get("street", ""), event="shown", manual=True)
+                      street=info.get("street", ""), state=info.get("state", ""),
+                      event="shown", manual=True)
         return {"call": call, "known": bool(info)}
 
     def drop_call(self, call: str) -> int:
@@ -783,6 +816,7 @@ class CallsignService:
                 e["call"] = new
                 e["name"], e["city"] = info.get("name", ""), info.get("city", "")
                 e["zip"], e["street"] = info.get("zip", ""), info.get("street", "")
+                e["state"] = info.get("state", "")
                 e["klass"] = info.get("class", "")
                 e["valid"] = True          # a human typed it — see add_manual()
                 n += 1
@@ -794,6 +828,7 @@ class CallsignService:
                          "name": info.get("name", ""), "city": info.get("city", ""),
                          "zip": info.get("zip", ""),
                          "street": info.get("street", ""),
+                         "state": info.get("state", ""),
                          "klass": info.get("class", ""),
                          "profiles": self._spk.stats()["profiles"]})
         return {"call": new, "renamed": n, "known": bool(info)}
@@ -1047,7 +1082,8 @@ class CallsignService:
                           name=(info or {}).get("name", ""),
                           city=(info or {}).get("city", ""),
                           zip_code=(info or {}).get("zip", ""),
-                          street=(info or {}).get("street", ""), event="muted")
+                          street=(info or {}).get("street", ""),
+                          state=(info or {}).get("state", ""), event="muted")
             return
         self._seen[call] = now
         if len(self._seen) > 64:                      # prune stale entries
@@ -1055,8 +1091,7 @@ class CallsignService:
                           if now - v < self._repeat_s}
         # QRZ is NOT queried here — only on a manual lookup in the log panel. The
         # name/town/class come from the offline BNetzA list.
-        town = " ".join(x for x in ((info or {}).get("zip", ""),
-                                    (info or {}).get("city", "")) if x)
+        town = _town_line(info or {})
         det = " · ".join(x for x in ((info or {}).get("name", ""), town) if x)
         self._add_log((det + corr) if det else ("shown" + corr),
                       call=call, valid=valid, klass=klass, conf=conf,
@@ -1064,13 +1099,15 @@ class CallsignService:
                       name=(info or {}).get("name", ""),
                       city=(info or {}).get("city", ""),
                       zip_code=(info or {}).get("zip", ""),
-                      street=(info or {}).get("street", ""), event="shown")
+                      street=(info or {}).get("street", ""),
+                      state=(info or {}).get("state", ""), event="shown")
         self._broadcast({"t": "callsign", "call": call, "conf": round(conf, 2),
                          "valid": valid,
                          "name": (info or {}).get("name", ""),
                          "city": (info or {}).get("city", ""),
                          "zip": (info or {}).get("zip", ""),
                          "street": (info or {}).get("street", ""),
+                         "state": (info or {}).get("state", ""),
                          "klass": (info or {}).get("class", "")})
 
 
@@ -1584,7 +1621,8 @@ async def set_auto_power_off(req: AutoPowerOffRequest) -> dict:
 
 @app.get("/api/callsign")
 async def get_callsign() -> dict:
-    return {"callsign": settings.callsign, "locator": settings.locator}
+    return {"callsign": settings.callsign, "locator": settings.locator,
+            "region": settings.asr_region}
 
 
 @app.post("/api/callsign")
@@ -1602,7 +1640,10 @@ async def set_callsign(req: CallsignRequest) -> dict:
                 raise HTTPException(400, str(e))
         settings.locator = loc
         save_runtime(locator=loc)
-    return {"callsign": cs, "locator": settings.locator}
+    if req.region is not None:
+        await callsign_svc.set_region(req.region)
+    return {"callsign": cs, "locator": settings.locator,
+            "region": settings.asr_region}
 
 
 # ---- logbook (Wavelog logging + QRZ.com lookup) --------------------------
@@ -1672,7 +1713,8 @@ async def log_qso(req: LogQsoRequest) -> dict:
             rst_rcvd=req.rst_rcvd or "59", comment=req.comment or "",
             gridsquare=req.gridsquare or "", email=req.email or "",
             qth=req.qth or "", address=req.address or "",
-            country=req.country or "", power_w=req.power_w,
+            state=req.state or "", country=req.country or "",
+            power_w=req.power_w,
             station_callsign=settings.callsign or "")
     except LogError as e:
         raise HTTPException(502, str(e))

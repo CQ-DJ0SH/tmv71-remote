@@ -18,17 +18,19 @@ from typing import List, Tuple
 
 import numpy as np
 
-# Phonetic word -> letter/digit. Where the small German model lacks the canonical
-# spelling we use an in-vocabulary alternate that sounds the same: foxtrot→foxtrott,
-# xray→x, quebec→québec, juliett→julia/julius. All entries verified present in the
-# model's lexicon (grammar build reports zero out-of-vocabulary words).
-# ITU/NATO phonetic alphabet only (plus German digits). The German
-# Buchstabiertafel and the short German letter names were dropped: their short,
+# --- regions ---------------------------------------------------------------
+# One country's air differs from another's in three places: the model, the words
+# operators spell with, and what a callsign may look like. They are kept
+# together here so adding a country is one entry, not a hunt through the file.
+#
+# DE: phonetic word -> letter/digit. Where the small German model lacks the
+# canonical spelling we use an in-vocabulary alternate that sounds the same:
+# foxtrot→foxtrott, xray→x, quebec→québec, juliett→julia/julius. All entries
+# verified present in the model's lexicon (grammar build reports zero
+# out-of-vocabulary words). ITU/NATO alphabet only (plus German digits): the
+# German Buchstabiertafel and the short letter names were dropped, their short,
 # homophone-prone words (es/er, single vowels …) caused most false matches.
-# The small DE model lacks the canonical spellings of Foxtrot/Juliet/Quebec/
-# X-Ray, so the closest in-vocabulary lexemes stand in (foxtrott, julia/julius,
-# québec, x); victor/viktor and whiskey/whisky are the same sound either way.
-WORD_MAP = {
+_DE_WORDS = {
     "alpha": "A", "alfa": "A", "bravo": "B", "charlie": "C", "delta": "D",
     "echo": "E", "foxtrott": "F", "fox": "F", "golf": "G", "hotel": "H",
     "india": "I", "julia": "J", "julius": "J", "kilo": "K", "lima": "L",
@@ -40,14 +42,29 @@ WORD_MAP = {
     # mis-heard as another letter or swallowing the next word. It maps to X and is
     # merged into a preceding "x" in _extract (so "x ray" = one X, not XX).
     "ray": "X",
-    # digits (spoken German)
-    "null": "0", "eins": "1", "zwei": "2", "drei": "3", "vier": "4",
+    # digits (spoken German). "zwo" for 2 is not a quirk, it is how operators say
+    # it on the air — the word exists to keep "zwei" and "drei" apart on a noisy
+    # channel. It is in the model's lexicon; without it here the grammar swallowed
+    # it as [unk] and the digit was simply lost from the callsign.
+    "null": "0", "eins": "1", "zwei": "2", "zwo": "2", "drei": "3", "vier": "4",
     "fünf": "5", "sechs": "6", "sieben": "7", "acht": "8", "neun": "9",
 }
-# Grammar handed to Vosk: our word list plus "[unk]" so anything else in the
-# transmission (rag-chew, reports) is absorbed instead of forced onto a phonetic
-# word. ensure_ascii=False keeps "fünf"/"québec" as real UTF-8 (Vosk needs it).
-GRAMMAR = json.dumps(list(WORD_MAP) + ["[unk]"], ensure_ascii=False)
+# US: the same alphabet in the English model's spellings. It has "juliet" and
+# "juliette" but not "juliett", and no "x-ray"/"xray" — so X keeps the same
+# two-syllable treatment as in German. "niner" is the American "zwo": a digit
+# given its own word so it cannot be lost against another one.
+_US_WORDS = {
+    "alpha": "A", "alfa": "A", "bravo": "B", "charlie": "C", "delta": "D",
+    "echo": "E", "foxtrot": "F", "fox": "F", "golf": "G", "hotel": "H",
+    "india": "I", "juliet": "J", "juliette": "J", "kilo": "K", "lima": "L",
+    "mike": "M", "november": "N", "oscar": "O", "papa": "P", "quebec": "Q",
+    "romeo": "R", "sierra": "S", "tango": "T", "uniform": "U", "victor": "V",
+    "whiskey": "W", "whisky": "W", "x": "X", "ray": "X", "yankee": "Y",
+    "zulu": "Z",
+    "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4",
+    "five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9",
+    "niner": "9",
+}
 
 # German amateur callsign, restricted to the BNetzA allocation blocks. Always
 # 5–6 characters (never 4): D + prefix-block + a 2..3-letter suffix. Valid blocks:
@@ -55,7 +72,51 @@ GRAMMAR = json.dumps(list(WORD_MAP) + ["[unk]"], ensure_ascii=False)
 #   DP 0,1,2,8      DR 1-6       (no DE, DI, DQ; no DA3/DA9)
 # Pinning the exact blocks kills a large class of ASR false matches (e.g. DE*/DI*,
 # DA3, DP7, DR9) and the too-short 4-char reads.
-CALL_RE = re.compile(r"D(?:A[0-24-8]|[BCDFGHJKLMNO][0-9]|P[0-28]|R[1-6])[A-Z]{2,3}")
+_DE_CALL = r"D(?:A[0-24-8]|[BCDFGHJKLMNO][0-9]|P[0-28]|R[1-6])[A-Z]{2,3}"
+# US callsign: prefix K, N, W or A + second letter A-L, then a region digit and a
+# one- to three-letter suffix. A single-letter prefix needs two suffix letters
+# here (K1AB, not K1A): 1x1 calls are special-event only and temporary, while
+# allowing four-character reads would hand noise a whole class of false matches.
+# Two-letter prefixes keep the 1-letter suffix, because 2x1 calls (AA1A, KB2C)
+# are held by a great many operators.
+_US_CALL = r"(?:(?:[KNW][A-Z]|A[A-L])[0-9][A-Z]{1,3}|[KNW][0-9][A-Z]{2,3})"
+
+
+class Region:
+    """A country's model, spelling words and callsign shape, in one place."""
+
+    def __init__(self, code: str, model: str, words: dict, call: str,
+                 classes: dict):
+        self.code = code
+        self.model = model                  # default model directory name
+        self.words = words
+        # our word list plus "[unk]" so anything else in the transmission
+        # (rag-chew, reports) is absorbed instead of forced onto a phonetic word.
+        # ensure_ascii=False keeps "fünf"/"québec" as real UTF-8 (Vosk needs it).
+        self.grammar = json.dumps(list(words) + ["[unk]"], ensure_ascii=False)
+        self.call_re = re.compile(call)
+        self.classes = classes              # licence class code -> label
+
+
+REGIONS = {
+    "de": Region("de", "vosk-model-small-de-0.15", _DE_WORDS, _DE_CALL,
+                 {"A": "A", "E": "E", "N": "N"}),
+    "us": Region("us", "vosk-model-small-en-us-0.15", _US_WORDS, _US_CALL,
+                 {"N": "Novice", "T": "Technician", "P": "Tech Plus",
+                  "G": "General", "A": "Advanced", "E": "Extra"}),
+}
+DEFAULT_REGION = "de"
+
+
+def region(code: str = "") -> Region:
+    return REGIONS.get((code or DEFAULT_REGION).lower(), REGIONS[DEFAULT_REGION])
+
+
+# Kept for callers that predate the region split (and for tests): the German
+# tables under their old names.
+WORD_MAP = _DE_WORDS
+GRAMMAR = REGIONS["de"].grammar
+CALL_RE = REGIONS["de"].call_re
 
 # A callsign is spelled as one contiguous group. Recognised letters carry no word
 # boundary, so a call read out twice ("DN6YI DN6YI") would run together into
@@ -135,11 +196,12 @@ class CallsignRecognizer:
     """
 
     def __init__(self, model_dir: str, own_call: str = "", min_conf: float = 0.55,
-                 is_valid=None):
+                 is_valid=None, region_code: str = DEFAULT_REGION):
         from vosk import Model, KaldiRecognizer, SetLogLevel  # lazy dependency
         SetLogLevel(-1)                       # silence per-frame + grammar logs
+        self.region = region(region_code)
         self._model = Model(model_dir)
-        self._rec = KaldiRecognizer(self._model, TARGET_SR, GRAMMAR)
+        self._rec = KaldiRecognizer(self._model, TARGET_SR, self.region.grammar)
         self._rec.SetWords(True)              # per-word confidence for gating
         self._rec.SetMaxAlternatives(N_ALTERNATIVES)   # N-best for rescoring
         self.own = normalize_call(own_call)
@@ -158,8 +220,7 @@ class CallsignRecognizer:
         hypothesis. Optional; without it, ranking falls back to confidence."""
         self._is_valid = is_valid
 
-    @staticmethod
-    def _tile(s: str):
+    def _tile(self, s: str):
         """Split `s` into back-to-back callsigns covering it completely, else None.
 
         Disambiguates a group spoken without a pause: greedy matching would read
@@ -173,7 +234,7 @@ class CallsignRecognizer:
                 return memo[i]
             res = None
             for k in (6, 5):                   # longest first; 5 = shortest legal
-                if i + k <= end and CALL_RE.fullmatch(s[i:i + k]):
+                if i + k <= end and self.region.call_re.fullmatch(s[i:i + k]):
                     rest = solve(i + k)
                     if rest is not None:
                         res = [(i, i + k)] + rest
@@ -216,7 +277,7 @@ class CallsignRecognizer:
         items = []
         for w in hyp.get("result") or []:
             word = w.get("word", "")
-            ch = WORD_MAP.get(word)
+            ch = self.region.words.get(word)
             if not ch:
                 continue
             # merge the "-ray" of "X-ray" into a preceding "x" -> one X (not XX)
@@ -238,7 +299,8 @@ class CallsignRecognizer:
             # a clean tiling of the whole group wins; else scan for calls in it
             spans = self._tile(s)
             if spans is None:
-                spans = [(m.start(), m.end()) for m in CALL_RE.finditer(s)]
+                spans = [(m.start(), m.end())
+                         for m in self.region.call_re.finditer(s)]
             for a, b in spans:
                 seg = confs[a:b]
                 avg = sum(seg) / len(seg) if seg else 0.0

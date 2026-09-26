@@ -22,6 +22,7 @@ let last = null;          // last RadioStatus
 let memBase = 0;          // quick-key channel offset: 0 normally, 50 in the air band
 let airbandRx = false;    // Band A in the air band → receive-only, TX blocked
 let txActive = false;
+let lastRegion = "de";    // ASR region as the server last reported it
 let linkDown = false;     // backend status WebSocket is down (shown to the user)
 let pttTimerStart = 0, pttTimerIv = null;   // PTT up-timer (counts up while TX)
 function fmtMMSS(s) {
@@ -1764,6 +1765,7 @@ function bindSettings() {
       const c = await api("GET", "/api/callsign");   // callsign and locator
       if (c.callsign !== undefined) $("#set-callsign").value = c.callsign;
       if (c.locator != null) $("#set-locator").value = c.locator;
+      if (c.region) { $("#set-region").value = c.region; lastRegion = c.region; }
     } catch { /* fall back to the cached callsign */ }
     $("#set-gpio").value = powerState?.pin ?? "";
     $("#set-apo-on").checked = !!powerState?.auto_off_enabled;
@@ -1823,8 +1825,19 @@ function bindSettings() {
     }
     const cs = $("#set-callsign").value.trim().toUpperCase();
     const loc = ($("#set-locator")?.value || "").trim().toUpperCase();
+    const reg = $("#set-region")?.value || "de";
     localStorage.setItem("tmv71.callsign", cs);
-    try { await api("POST", "/api/callsign", { callsign: cs, locator: loc }); }
+    // the region reloads the speech model and the register, so it is worth
+    // saying so — the switch takes a moment and changes what the ASR accepts
+    const regChanged = reg !== lastRegion;
+    try {
+      await api("POST", "/api/callsign", { callsign: cs, locator: loc, region: reg });
+      if (regChanged) {
+        lastRegion = reg;
+        toast(reg === "us" ? "Region → United States (FCC)"
+                           : "Region → Germany (BNetzA)", "ok");
+      }
+    }
     catch (e) { toast("Callsign/locator: " + e.message, "err"); }
     renderCallsign();
     // GPIO power pin (server-side, persisted)
@@ -2964,6 +2977,11 @@ function connectSelcallWS(decode, isMuted, setMute) {
 // ---- callsign auto-detect (Vosk ASR) --------------------------------------
 function reflectAsr(s) {
   if (!s) return;
+  if (s.region && s.region !== asrRegion) {
+    asrRegion = s.region;                 // redraw: the class boxes differ
+    lastRegion = s.region;
+    asrCardsRebuildKlass();
+  }
   const tgl = $("#set-asr-callsign");
   if (tgl) { tgl.checked = !!s.enabled; tgl.disabled = !s.available; }
   if (s.spk) reflectSpk(s.spk);
@@ -3004,9 +3022,13 @@ function clearRxCall() {
   }
 }
 
-// "12249 Berlin" — the town as it is written on an envelope. The postcode stays
-// its own field everywhere else: the Wavelog QTH takes the plain town.
+// The town as it is written on an envelope where the register comes from:
+// "12249 Berlin" in Germany, "Dayton, OH 45402" in the States. City, postcode
+// and state stay separate fields everywhere else — the Wavelog QTH takes the
+// plain town and the state goes into the ADIF STATE field of its own.
 function townLine(e) {
+  if (e.state) return [[e.city, e.state].filter(Boolean).join(", "), e.zip]
+    .filter(Boolean).join(" ");
   return [e.zip, e.city].filter(Boolean).join(" ");
 }
 
@@ -3039,12 +3061,13 @@ function showRxCall(m) {
 
 // Fill the logbook form and submit it. Used by the title-bar LOG button and by
 // the per-card button; no QRZ lookup, the name comes from the offline list.
-async function logCallDirect(call, name, qth, address) {
+async function logCallDirect(call, name, qth, address, state) {
   if (!call) { toast("No callsign detected", "err"); return false; }
   const inp = $("#log-call"); if (inp) inp.value = call;
   const nm = $("#log-name"); if (nm) nm.value = name || "";
   const qt = $("#log-qth"); if (qt) qt.value = qth || "";
   const ad = $("#log-address"); if (ad) ad.value = address || "";
+  const stt = $("#log-state"); if (stt) stt.value = state || "";
   // clear any stale details so the bare call (+ auto band/freq/mode) is logged
   ["#log-grid", "#log-comment"].forEach(s => { const el = $(s); if (el) el.value = ""; });
   toast("📖 Logging " + call + "…", "ok");
@@ -3782,11 +3805,43 @@ function asrAvatar(call) {
   return { text: suffix.slice(0, 2), hue: h % 360 };
 }
 
-const KLASSEN = ["A", "E", "N"];                      // German licence classes
+// Licence classes, in the order they are held: Germany issues A/E/N, the USA
+// Novice, Technician, General, Advanced and Extra. The boxes carry the code and
+// the lit one names itself in its tooltip; Tech Plus (P) is a Technician.
+const KLASS_SETS = {de: ["A", "E", "N"], us: ["N", "T", "G", "A", "E"]};
+const KLASS_NAMES = {
+  de: {A: "Class A", E: "Class E", N: "Class N (trainee)"},
+  us: {N: "Novice", T: "Technician", P: "Technician Plus", G: "General",
+       A: "Advanced", E: "Amateur Extra"},
+};
+let asrRegion = "de";                                 // as the backend reports it
+const klassList = () => KLASS_SETS[asrRegion] || KLASS_SETS.de;
 function asrSetKlass(card, klass) {
-  const on = (klass || "").toUpperCase();
+  let on = (klass || "").toUpperCase();
+  if (asrRegion === "us" && on === "P") on = "T";     // Tech Plus lights T
+  const names = KLASS_NAMES[asrRegion] || {};
+  const box = card.querySelector(".ac-klass");
+  if (box) box.title = (klass && names[klass.toUpperCase()]) || "Licence class";
   card.querySelectorAll(".ac-klass .ack").forEach(
     el => el.classList.toggle("on", el.textContent === on));
+}
+
+// The class boxes belong to the region, so a switch has to reach the cards
+// that are already on screen — they would otherwise keep Germany's A/E/N.
+function asrCardsRebuildKlass() {
+  document.querySelectorAll(".asr-card").forEach(card => {
+    const box = card.querySelector(".ac-klass");
+    if (!box) return;
+    const lit = box.querySelector(".ack.on");
+    const was = lit ? lit.textContent : "";
+    box.textContent = "";
+    for (const k of klassList()) {
+      const i = document.createElement("i");
+      i.className = "ack"; i.textContent = k;
+      box.appendChild(i);
+    }
+    asrSetKlass(card, was);
+  });
 }
 
 function asrCardBuild(e) {
@@ -3806,9 +3861,9 @@ function asrCardBuild(e) {
   callEl.title = "Correct the callsign";
   callEl.addEventListener("click", ev => { ev.stopPropagation(); asrEditCall(card); });
   head.append(avatar, callEl);
-  // all three licence classes are shown; the holder's own one is lit
+  // every licence class of the region is shown; the holder's own one is lit
   const kl = mk("span", "ac-klass");
-  for (const k of KLASSEN) kl.appendChild(mk("i", "ack", k));
+  for (const k of klassList()) kl.appendChild(mk("i", "ack", k));
   head.appendChild(kl);
   card.appendChild(head);
   asrSetKlass(card, e.klass);
@@ -3843,7 +3898,7 @@ function asrCardBuild(e) {
     if (log.disabled) return;
     log.disabled = true;
     const ok = await logCallDirect(e.call, e.name || "", e.city || "",
-                                   addressLine(e));
+                                   addressLine(e), e.state || "");
     log.disabled = false;
     card.classList.toggle("logged", !!ok);           // marks it as already logged
   });
@@ -4530,13 +4585,15 @@ async function logQso() {
       comment: $("#log-comment").value.trim(),
       qth: $("#log-qth").value.trim() || lk.qth || "",
       address: $("#log-address")?.value.trim() || "",
+      state: $("#log-state")?.value.trim().toUpperCase() || "",
       email: lk.email || "", country: lk.country || "",
     });
     if (r.ok) {
       ok = true;
       toast(`Logged ${call}`, "ok");
       lastLookup = null;
-      ["#log-call", "#log-name", "#log-grid", "#log-qth", "#log-address", "#log-comment"]
+      ["#log-call", "#log-name", "#log-grid", "#log-qth", "#log-address",
+       "#log-state", "#log-comment"]
         .forEach(s => ($(s).value = ""));
       $("#log-rst-s").value = "59"; $("#log-rst-r").value = "59";
     } else {

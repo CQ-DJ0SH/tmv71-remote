@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import re
+from collections.abc import Mapping
 
 log = logging.getLogger("tmv71")
 
@@ -29,15 +30,26 @@ _ZIP = re.compile(r"\b(\d{5})\s+")
 _WRAP = re.compile(r"(?<=[A-Za-zÄÖÜäöüß])- (?=[A-ZÄÖÜa-zäöüß])")
 
 
-def default_pdf_path() -> str:
-    """Where the Rufzeichenliste PDF is expected (overridable in settings)."""
-    return "/opt/rufzeichenliste_afu.pdf"
+# Where each register is expected on disk, and what its cache is called. The
+# two sources could hardly be less alike — Germany publishes a 685-page PDF, the
+# FCC a zip of pipe-separated tables — but both end up in the same cache, so
+# everything above this module sees one list.
+SOURCES = {
+    "de": ("/opt/rufzeichenliste_afu.pdf", "rufzeichenliste.txt"),
+    "us": ("/opt/l_amat.zip", "fcc-amateur.txt"),
+}
 
 
-def cache_path() -> str:
+def default_pdf_path(region: str = "de") -> str:
+    """Where the register is expected (overridable in settings)."""
+    return SOURCES.get(region, SOURCES["de"])[0]
+
+
+def cache_path(region: str = "de") -> str:
     """Extracted cache, kept next to the models dir (gitignored)."""
+    name = SOURCES.get(region, SOURCES["de"])[1]
     return os.path.normpath(os.path.join(
-        os.path.dirname(__file__), "..", "..", "models", "rufzeichenliste.txt"))
+        os.path.dirname(__file__), "..", "..", "models", name))
 
 
 def _parse_rest(rest: str) -> tuple:
@@ -84,9 +96,79 @@ def build_cache(pdf_path: str, cache: str) -> int:
     with open(tmp, "w", encoding="utf-8") as f:
         for c in sorted(calls):
             kl, name, city, street, code = details.get(c, ("", "", "", "", ""))
-            f.write("\t".join((c, kl, name, city, street, code)) + "\n")
+            # the seventh column is the state, which a German licence has not
+            f.write("\t".join((c, kl, name, city, street, code, "")) + "\n")
     os.replace(tmp, cache)                      # atomic
     return len(calls)
+
+
+def build_cache_fcc(zip_path: str, cache: str) -> int:
+    """Parse the FCC ULS amateur dump (l_amat.zip) into the same cache.
+
+    Three of its tables are needed and they are read in that order: HD says
+    which licences are actually active (the dump carries every expired and
+    cancelled one too — barely half of its records are live), AM carries the
+    operator class, EN the name and address. All three are streamed line by
+    line: together they are some 500 MB unpacked, and holding them would cost
+    more memory than the Pi has to spare.
+
+    Unlike the German PDF this needs no text extraction at all, so it takes
+    seconds rather than a minute and a half.
+    """
+    import zipfile
+
+    def rows(zf, name):
+        with zf.open(name) as fh:
+            for raw in fh:
+                yield raw.decode("latin-1").rstrip("\r\n").split("|")
+
+    live: dict = {}
+    with zipfile.ZipFile(zip_path) as zf:
+        for f in rows(zf, "HD.dat"):                 # 4 call, 5 licence status
+            if len(f) > 5 and f[5] == "A" and f[4]:
+                live[f[4]] = ["", "", "", "", "", ""]   # class,name,city,street,zip,state
+        for f in rows(zf, "AM.dat"):                 # 5 operator class
+            if len(f) > 5 and f[4] in live:
+                live[f[4]][0] = f[5]
+        for f in rows(zf, "EN.dat"):
+            # 7 entity name, 8 first, 10 last, 15 street, 16 city, 17 state, 18 zip
+            if len(f) <= 18 or f[4] not in live:
+                continue
+            rec = live[f[4]]
+            person = " ".join(x for x in (f[8], f[10]) if x)
+            rec[1] = _name_case(person or f[7])[:60]
+            rec[2] = _name_case(f[16])[:40]
+            rec[3] = _name_case(f[15])[:60]
+            rec[4] = f[18][:5]                       # ZIP+4 is more than we show
+            rec[5] = f[17][:2]
+    os.makedirs(os.path.dirname(cache) or ".", exist_ok=True)
+    tmp = cache + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        for c in sorted(live):
+            kl, name, city, street, code, state = live[c]
+            fh.write("\t".join((c, kl, name, city, street, code, state)) + "\n")
+    os.replace(tmp, cache)                          # atomic
+    return len(live)
+
+
+def _name_case(s: str) -> str:
+    """FCC records are all upper case; a card full of capitals shouts.
+
+    Title case with the exceptions that matter in names and addresses: Mc/Mac
+    keep their inner capital, Roman numerals and the state-style abbreviations
+    stay as they are, and a lone letter (middle initial, "N" in a street name)
+    is left alone.
+    """
+    out = []
+    for w in (s or "").strip().split():
+        if len(w) <= 1 or w in ("II", "III", "IV", "JR", "SR", "NE", "NW",
+                                "SE", "SW", "PO", "US", "USA"):
+            out.append(w if len(w) > 1 else w)
+        elif w.startswith("MC") and len(w) > 3:
+            out.append("Mc" + w[2:].capitalize())
+        else:
+            out.append(w.capitalize())
+    return " ".join(out)
 
 
 def json_path(cache: str = "") -> str:
@@ -94,7 +176,7 @@ def json_path(cache: str = "") -> str:
     return os.path.splitext(cache or cache_path())[0] + ".json"
 
 
-def export_json(cache: str = "", dst: str = "") -> int:
+def export_json(cache: str = "", dst: str = "", src: str = "") -> int:
     """Write the cache out as JSON. Returns the number of callsigns.
 
     Built from the cache, not from the PDF: the slow part is the parse, and both
@@ -107,9 +189,11 @@ def export_json(cache: str = "", dst: str = "") -> int:
     cache = cache or cache_path()
     dst = dst or json_path(cache)
     calls = load("", cache)
-    doc = {"source": os.path.basename(default_pdf_path()),
+    # the mapping unpacks a line at a time (see CallList), so the export is
+    # built as a generator would be — one entry expanded, written, dropped
+    doc = {"source": os.path.basename(src or default_pdf_path()),
            "generated": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-           "count": len(calls), "calls": calls}
+           "count": len(calls), "calls": {c: calls[c] for c in sorted(calls)}}
     tmp = dst + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, sort_keys=True)
@@ -117,13 +201,44 @@ def export_json(cache: str = "", dst: str = "") -> int:
     return len(calls)
 
 
-def load(pdf_path: str = "", cache: str = "") -> dict:
-    """Read the cache -> ``{call: {"class", "name", "city", "street", "zip"}}``.
+class CallList(Mapping):
+    """The register in memory: callsign -> {class, name, city, street, zip, state}.
+
+    Each entry is kept as the one packed line it was read from and split only
+    when someone asks for it. That is not premature thrift: the German register
+    holds 70,000 callsigns, the American one 823,000, and a dict of dicts for
+    the latter costs about half a gigabyte on a Pi that is also holding two
+    Vosk models. Packed, the same list is a fraction of that, and a lookup
+    happens a few times per over — never in the audio path.
+    """
+
+    __slots__ = ("_raw",)
+    FIELDS = ("class", "name", "city", "street", "zip", "state")
+
+    def __init__(self, raw: dict):
+        self._raw = raw
+
+    def __getitem__(self, call: str) -> dict:
+        p = self._raw[call].split("\t")
+        return {k: (p[i] if i < len(p) else "") for i, k in enumerate(self.FIELDS)}
+
+    def __iter__(self):
+        return iter(self._raw)
+
+    def __len__(self) -> int:
+        return len(self._raw)
+
+    def __contains__(self, call) -> bool:       # the hot one: N-best rescoring
+        return call in self._raw
+
+
+def load(pdf_path: str = "", cache: str = "") -> Mapping:
+    """Read the cache into a :class:`CallList`.
 
     Read-only: it never (re)builds — building is a multi-minute PDF parse and must
     not stall startup. Run the converter manually to (re)build after supplying a
-    new PDF: ``python -m app.callsign_list``. If the cache is missing, returns an
-    empty dict and the caller skips verification (fails open).
+    new register: ``python -m app.callsign_list``. If the cache is missing,
+    returns an empty mapping and the caller skips verification (fails open).
     """
     cache = cache or cache_path()
     try:
@@ -131,45 +246,53 @@ def load(pdf_path: str = "", cache: str = "") -> dict:
             log.warning("callsign list: no cache at %s — ASR verification disabled; "
                         "build it with `python -m app.callsign_list`", cache)
             return {}
-        out: dict = {}
+        raw: dict = {}
         with open(cache, encoding="utf-8") as f:
             for line in f:
-                p = line.rstrip("\n").split("\t")
-                if p and p[0]:
-                    out[p[0]] = {"class": p[1] if len(p) > 1 else "",
-                                 "name": p[2] if len(p) > 2 else "",
-                                 "city": p[3] if len(p) > 3 else "",
-                                 "street": p[4] if len(p) > 4 else "",
-                                 "zip": p[5] if len(p) > 5 else ""}
-        log.info("callsign list: loaded %d callsigns", len(out))
-        return out
+                call, _, rest = line.rstrip("\n").partition("\t")
+                if call:
+                    raw[call] = rest
+        log.info("callsign list: loaded %d callsigns", len(raw))
+        return CallList(raw)
     except Exception as exc:                    # noqa: BLE001
         log.warning("callsign list: load failed: %s", exc)
     return {}
 
 
 if __name__ == "__main__":
-    # Rebuild the cache from the PDF. Run to refresh the list after downloading a
-    # newer Rufzeichenliste:
-    #     backend/.venv/bin/python -m app.callsign_list [PDF] [CACHE]
+    # Rebuild the cache from the register. Run it after downloading a newer one:
+    #     backend/.venv/bin/python -m app.callsign_list [--region de|us] [SRC] [CACHE]
     # (run from the backend/ dir, or with backend on PYTHONPATH). With no args it
-    # uses the default PDF path and cache location. Every run also writes the
-    # same list as JSON next to the cache; --json-only skips the PDF parse and
-    # re-exports from the cache that is already there.
+    # uses the region's default source and cache location. The source decides how
+    # it is read: a .zip is the FCC ULS dump, anything else the BNetzA PDF. Every
+    # run also writes the same list as JSON next to the cache; --json-only skips
+    # the parse and re-exports from the cache that is already there.
     import sys
     import time
     logging.basicConfig(level=logging.INFO)
-    argv = [a for a in sys.argv[1:] if a != "--json-only"]
-    pdf = argv[0] if argv else default_pdf_path()
-    dst = argv[1] if len(argv) > 1 else cache_path()
+    args = sys.argv[1:]
+    reg = "de"
+    if "--region" in args:
+        i = args.index("--region")
+        reg = args[i + 1] if i + 1 < len(args) else "de"
+        del args[i:i + 2]
+    json_only = "--json-only" in args
+    args = [a for a in args if a != "--json-only"]
     t0 = time.time()
-    if "--json-only" in sys.argv:
-        n = export_json(dst)
+    if json_only:
+        # re-export only: the one path this takes is the CACHE, not the register
+        dst = args[0] if args else cache_path(reg)
+        n = export_json(dst, src=default_pdf_path(reg))
         print(f"exported {n} callsigns in {time.time() - t0:.1f}s -> {json_path(dst)}")
         sys.exit(0)
-    if not os.path.exists(pdf):
-        sys.exit(f"PDF not found: {pdf}")
-    n = build_cache(pdf, dst)
+    src = args[0] if args else default_pdf_path(reg)
+    dst = args[1] if len(args) > 1 else cache_path(reg)
+    if not os.path.exists(src):
+        sys.exit(f"register not found: {src}")
+    if src.lower().endswith(".zip"):
+        n = build_cache_fcc(src, dst)
+    else:
+        n = build_cache(src, dst)
     print(f"built {n} callsigns in {time.time() - t0:.1f}s -> {dst}")
-    export_json(dst)
+    export_json(dst, src=src)
     print(f"exported {n} callsigns -> {json_path(dst)}")

@@ -481,8 +481,8 @@ def draw_wiring(pdf, lang):
              ["8-pin modular, side of head", "pin 6 MIC, ~ 2 mV / 600 Ohm",
               "pin 5 MIC GND"])
         _box(pdf, 154, y0 + 40, 38, 22, "DATA jack",
-             ["6-pin mini-DIN, rear", "pin 5 PR1, 1200 Bd out",
-              "pin 2 DE (ground)"])
+             ["6-pin mini-DIN, rear", "pin 4 PR9, flat — APRS",
+              "pin 5 PR1, filtered", "pin 2 DE (ground)"])
         _box(pdf, 154, y0 + 66, 38, 14, "PC port",
              ["8-pin mini-DIN, rear"])
         # --- the paths --------------------------------------------------------
@@ -493,22 +493,23 @@ def draw_wiring(pdf, lang):
         _arrow(pdf, 32, y0 + 72, 57.5, y0 + 72, "USB")
         _arrow(pdf, 96.5, y0 + 23, 103.5, y0 + 23)
         _arrow(pdf, 138.5, y0 + 23, 153.5, y0 + 23)
-        _arrow(pdf, 153.5, y0 + 51, 96.5, y0 + 51, "PR1 ~ 0.3 Vpp, fixed")
+        _arrow(pdf, 153.5, y0 + 51, 96.5, y0 + 51, "flat, fixed level")
         _arrow(pdf, 96.5, y0 + 72, 153.5, y0 + 72, "CAT 57600 Bd + PTT")
         _cap(pdf, 16, y0 + 86, 178,
              ("TX geht in die Mikrofonbuchse, nicht in die Datenbuchse: Das Gerät "
               "legt das Sendeaudio nur dann auf die Datenbuchse, wenn eine "
               "HARDWARE-PTT tastet — hier wird die PTT über CAT getastet. RX "
-              "kommt von PR1, dem 1200-Baud-Pin: gefiltert, mit festem Pegel und "
-              "unabhängig vom Lautstärkeregler. Menü 518 (Data-Speed) auf 1200 "
-              "und Menü 519 (PC-Port-Baud) auf 57600 stellen."
+              "kommt von PR9, dem flachen 9600-Baud-Pin: fester Pegel, "
+              "unabhängig vom Lautstärkeregler, ohne De-Emphasis und ohne "
+              "CTCSS-Filter — das ist der bessere Zweig für APRS. Menü 519 "
+              "(PC-Port-Baud) auf 57600 stellen."
               if de else
               "TX goes into the mic jack, not into the DATA jack: the radio only "
               "routes transmit audio from the DATA jack while a HARDWARE PTT keys "
-              "it, and this station keys PTT over CAT. RX is taken from PR1, the "
-              "1200-baud pin — filtered, at a fixed level and untouched by the "
-              "volume knob. Set menu 518 (data speed) to 1200 and menu 519 (PC "
-              "port baud) to 57600."))
+              "it, and this station keys PTT over CAT. RX is taken from PR9, the "
+              "flat 9600-baud pin: fixed level, untouched by the volume knob, and "
+              "with neither de-emphasis nor the CTCSS filter in the way — the "
+              "better feed for APRS. Set menu 519 (PC port baud) to 57600."))
     _diagram(pdf, 100, go)
 
 
@@ -565,6 +566,16 @@ def render(pdf, blocks):
             pdf.set_text_color(*DARK)
             pdf.multi_cell(0, 7, rest[0], align="L")
             pdf.ln(1.5)
+        elif kind == "h3":
+            # a sub-heading inside a section: no tick, no outline entry — it
+            # marks a turn in the argument, not a place to navigate to
+            pdf.ln(2)
+            if pdf.get_y() > pdf.h - pdf.b_margin - 20:
+                pdf.add_page()
+            pdf.set_font("DV", "B", 10.8)
+            pdf.set_text_color(*ACCENT)
+            pdf.multi_cell(0, 6, rest[0], align="L")
+            pdf.ln(0.8)
         elif kind == "p":
             pdf.set_font("DV", "", 10.5)
             pdf.set_text_color(*DARK)
@@ -809,11 +820,24 @@ EN = [
         "1:1 transformer in that lead also breaks the ground loop between the "
         "Pi's supply and the radio, which is what an alternator whine or a "
         "steady hum on your transmitted audio usually is.",
-        "PR1 (pin 5) carries the 1200-baud receive audio: filtered, at a fixed "
-        "level, and independent of the volume knob — so what the Pi hears does "
-        "not change when you turn the radio down. PR9 (pin 4) is the flat "
-        "9600-baud output straight off the discriminator and is the wrong pin "
-        "here unless you re-enable de-emphasis in software.",
+        "Both receive pins sit at a fixed level, independent of the volume "
+        "knob, so what the Pi hears does not change when you turn the radio "
+        "down. They differ in what the radio has already done to the audio. "
+        "PR9 (pin 4) is the flat output straight off the discriminator; PR1 "
+        "(pin 5) has been through de-emphasis and the CTCSS filter.",
+        "Take PR9 if APRS matters. De-emphasis tilts the two AFSK tones "
+        "against each other — 2200 Hz arrives some 5 dB below 1200 Hz — and "
+        "that twist costs decodes at the edge of the noise; the flat pin hands "
+        "the demodulator both tones as they were sent. It is also the pin the "
+        "rest of this program is built around: the software puts the "
+        "de-emphasis back for voice (on by default), high-passes the "
+        "sub-audible CTCSS tone the flat output passes, and gates the audio "
+        "from the radio's BUSY line instead of relying on the squelch — which "
+        "on the speaker path would chop a frame in half.",
+        "If PR9 stays silent on your unit, set menu 518 (data speed) to 9600: "
+        "on some radios that menu switches the receive path as well. It costs "
+        "nothing here either way, because the transmit audio never touches the "
+        "DATA jack.",
         "PTT is keyed over CAT on the PC port, so no PTT line is wired. Nothing "
         "in the audio cabling can key the radio.",
     ]),
@@ -1017,7 +1041,8 @@ EN = [
     ("h2", "APRS"),
     ("p", "The fourth digimode, in software: the TM-V71 has no built-in TNC — "
           "that is the TM-D710 — so the whole stack runs on the Pi. Feed it the "
-          "flat 9600-baud data output rather than the speaker path: no "
+          "flat 9600-baud data output rather than the speaker path — pin 4 "
+          "(PR9) of the rear DATA jack, see the wiring diagram in chapter 4: no "
           "de-emphasis, and no squelch chopping a frame in half."),
     ("ul", [
         "RECEIVE decodes Bell 202 AFSK (1200 baud, mark 1200 Hz, space "
@@ -1107,7 +1132,7 @@ EN = [
           "licence class (A/E/N); a call that is not assigned is still shown but flagged "
           "VOID. Your own callsign is ignored, it runs only while the squelch is "
           "open, and it can also grade the mic-test audio. The callsign list is "
-          "built once from the PDF with a converter (python -m app.callsign_list), "
+          "built once from the register with a converter (python -m app.callsign_list), "
           "which splits each entry into callsign, class, name, street, postcode "
           "and town, and writes the same list as JSON beside the cache for other "
           "tools (--json-only re-exports it in a second, without re-reading the "
@@ -1119,6 +1144,37 @@ EN = [
           "is joined again. "
           "QRZ.com is used only for a manual lookup in the logbook, never by the "
           "ASR."),
+    ("h3", "Region: Germany or the United States"),
+    ("p", "Everything the recognition needs is country-specific, so it is "
+          "switched in one place: Settings > General > Callsign region. The "
+          "setting picks the speech model, the words operators spell with, the "
+          "shape a callsign may have and the register it is checked against. "
+          "Switching takes a moment — the model is reloaded and the register "
+          "re-read — and the voice profiles are untouched, the speaker model "
+          "knowing nothing of language."),
+    ("ul", [
+        "Germany: vosk-model-small-de-0.15, German digits, the BNetzA blocks "
+        "(DA–DR plus two or three letters), verified against the "
+        "Rufzeichenliste, classes A / E / N.",
+        "United States: vosk-model-small-en-us-0.15, English digits, a "
+        "callsign of K, N, W or A with a second letter A–L, then the region "
+        "digit and one to three letters, verified against the FCC ULS register, "
+        "classes Novice / Technician / General / Advanced / Extra. A single-"
+        "letter prefix needs two suffix letters here (K1AB, not K1A): 1x1 calls "
+        "are special-event and temporary, and allowing four-character reads "
+        "would hand noise a whole class of false matches.",
+        "Each language has one digit that exists only to survive a noisy "
+        "channel, and both are in the grammar: \"zwo\" for 2 in German, "
+        "\"niner\" for 9 in English. Leaving them out is not harmless — the "
+        "word is then absorbed as unknown and the digit drops out of the "
+        "callsign entirely.",
+    ]),
+    ("p", "Measured on the bench with synthesised speech, the American chain "
+          "reads \"kilo one juliet tango\" as K1JT and pulls Joseph Taylor, "
+          "Princeton NJ, Extra out of the FCC register; an invented call is "
+          "flagged VOID as it should be. Two repetitions run together without a "
+          "pause still merge into one over-long run, exactly as in German — on "
+          "the air the gap between them separates them."),
     ("p", "Powering the radio down suspends the recognition — there is no RX "
           "audio to analyse — and switching it back on resumes it. Your setting "
           "is not overwritten by this, so detection does not quietly stay off "
@@ -1281,8 +1337,11 @@ EN = [
           "QTH, country and e-mail from QRZ.com (XML data API) and 'worked before' "
           "/ DXCC from Wavelog. The ADDRESS field beside QTH takes the holder's "
           "street and postcode; logging a contact straight from an ASR card fills "
-          "it in from the BNetzA list, and it travels as the ADIF field ADDRESS "
+          "it in from the register, and it travels as the ADIF field ADDRESS "
           "while QTH keeps the plain town, so Wavelog's statistics stay clean. "
+          "STATE beside it carries the US state as the ADIF field of the same "
+          "name — Wavelog counts states for WAS, and a state buried in the "
+          "address line would not be counted. It stays empty in Germany. "
           "LOG QSO sends the contact as ADIF. A green dot "
           "shows when Wavelog is reachable; the panel lists the most recent QSOs "
           "(with the looked-up details, deletable individually or via CLEAR) and "
@@ -1291,7 +1350,8 @@ EN = [
           "in Settings > Logging. Credentials are stored only on the Pi "
           "(runtime.json), never committed."),
     ("h2", "Settings"),
-    ("p", "Tabs: General (callsign, API backend URL, serial port/baud, GPIO power, "
+    ("p", "Tabs: General (callsign, locator, callsign region, API backend URL, "
+          "serial port/baud, GPIO power, "
           "auto power-off, logo, GitHub self-update, Root-CA download), Audio "
           "(device, USB mixer, voice filters, test tone, audio timing), Rig-Info, "
           "Rig-Memory, Rig-DTMF, Logging (Wavelog + QRZ.com), and Pi-Hardware "
@@ -1459,11 +1519,25 @@ DE = [
         "Ein 1:1-Übertrager in dieser Leitung trennt zugleich die Masseschleife "
         "zwischen Pi-Netzteil und Funkgerät — sie ist meist die Ursache, wenn "
         "das eigene Sendesignal brummt oder die Lichtmaschine mitpfeift.",
-        "PR1 (Pin 5) führt das 1200-Baud-Empfangsaudio: gefiltert, mit festem "
-        "Pegel und unabhängig vom Lautstärkeregler — was der Pi hört, ändert "
-        "sich also nicht, wenn man das Gerät leiser dreht. PR9 (Pin 4) ist der "
-        "flache 9600-Baud-Ausgang direkt vom Diskriminator und hier der falsche "
-        "Pin, solange die De-Emphasis nicht in Software wieder zugeschaltet wird.",
+        "Beide Empfangspins liegen auf festem Pegel, unabhängig vom "
+        "Lautstärkeregler — was der Pi hört, ändert sich also nicht, wenn man "
+        "das Gerät leiser dreht. Sie unterscheiden sich darin, was das Gerät "
+        "vorher mit dem Audio gemacht hat: PR9 (Pin 4) ist der flache Ausgang "
+        "direkt vom Diskriminator, PR1 (Pin 5) hat De-Emphasis und CTCSS-Filter "
+        "hinter sich.",
+        "Für APRS PR9 nehmen. Die De-Emphasis kippt die beiden AFSK-Töne "
+        "gegeneinander — 2200 Hz kommt rund 5 dB unter 1200 Hz an —, und dieser "
+        "Schräglauf kostet Dekodierungen dicht am Rauschen; der flache Pin gibt "
+        "dem Demodulator beide Töne so, wie sie gesendet wurden. Auf diesen Pin "
+        "ist auch der Rest des Programms ausgelegt: Die Software setzt die "
+        "De-Emphasis für Sprache wieder davor (standardmäßig an), filtert den "
+        "CTCSS-Ton heraus, den der flache Ausgang durchlässt, und tastet das "
+        "Audio über die BUSY-Leitung des Geräts statt über die Rauschsperre — "
+        "die würde auf dem Lautsprecherweg einen Rahmen mitten entzweihacken.",
+        "Bleibt PR9 an deinem Gerät stumm, Menü 518 (Data-Speed) auf 9600 "
+        "stellen: Bei manchen Geräten schaltet dieses Menü auch den "
+        "Empfangsweg um. Hier kostet das nichts, weil das Sendeaudio die "
+        "Datenbuchse ohnehin nie berührt.",
         "PTT wird über CAT am PC-Port getastet, eine PTT-Leitung ist deshalb "
         "nicht verdrahtet. Nichts in der Audioverkabelung kann das Gerät tasten.",
     ]),
@@ -1682,7 +1756,8 @@ DE = [
     ("p", "Die vierte Betriebsart, vollständig in Software: Der TM-V71 hat "
           "keinen eingebauten TNC — das ist der TM-D710 —, der ganze Stapel "
           "läuft also auf dem Pi. Zuführen sollte man den flachen "
-          "9600-Baud-Datenausgang statt des Lautsprecherwegs: keine "
+          "9600-Baud-Datenausgang statt des Lautsprecherwegs — Pin 4 (PR9) der "
+          "hinteren Datenbuchse, siehe das Schaltbild in Kapitel 4: keine "
           "De-Emphasis, und keine Rauschsperre, die einen Rahmen zerhackt."),
     ("ul", [
         "EMPFANG dekodiert Bell-202-AFSK (1200 Baud, Mark 1200 Hz, Space "
@@ -1780,7 +1855,7 @@ DE = [
           "ein nicht zugeteiltes Rufzeichen wird dennoch angezeigt, aber als VOID "
           "markiert. Das eigene Rufzeichen wird ignoriert, es läuft nur bei "
           "offener Rauschsperre und kann auch das Mic-Test-Audio auswerten. Die "
-          "Rufzeichenliste wird einmalig per Converter aus der PDF erzeugt "
+          "Rufzeichenliste wird einmalig per Converter aus dem Register erzeugt "
           "(python -m app.callsign_list), der jeden Eintrag in Rufzeichen, Klasse, "
           "Name, Straße, PLZ und Ort zerlegt und dieselbe Liste zusätzlich als "
           "JSON neben den Cache schreibt, für andere Werkzeuge (--json-only "
@@ -1793,6 +1868,38 @@ DE = [
           "Spaltenumbruch getrenntes Wort wird wieder zusammengesetzt. "
           "QRZ.com wird nur bei der manuellen "
           "Abfrage im Logbuch genutzt, nie von der ASR."),
+    ("h3", "Region: Deutschland oder USA"),
+    ("p", "Alles, was die Erkennung an Landeskunde braucht, hängt zusammen und "
+          "wird deshalb an einer Stelle umgeschaltet: Einstellungen > Allgemein "
+          "> Callsign region. Die Einstellung wählt das Sprachmodell, die "
+          "Wörter, mit denen buchstabiert wird, die erlaubte Form eines "
+          "Rufzeichens und das Register, gegen das geprüft wird. Der Wechsel "
+          "dauert einen Moment — das Modell wird neu geladen, das Register neu "
+          "gelesen — und lässt die Stimmprofile unberührt: Das Sprechermodell "
+          "kennt keine Sprache."),
+    ("ul", [
+        "Deutschland: vosk-model-small-de-0.15, deutsche Ziffern, die "
+        "BNetzA-Blöcke (DA–DR plus zwei oder drei Buchstaben), geprüft gegen "
+        "die Rufzeichenliste, Klassen A / E / N.",
+        "USA: vosk-model-small-en-us-0.15, englische Ziffern, ein Rufzeichen "
+        "aus K, N, W oder A mit zweitem Buchstaben A–L, dann die Regionsziffer "
+        "und ein bis drei Buchstaben, geprüft gegen das FCC-ULS-Register, "
+        "Klassen Novice / Technician / General / Advanced / Extra. Ein "
+        "einbuchstabiges Präfix braucht hier zwei Endbuchstaben (K1AB, nicht "
+        "K1A): 1x1-Rufzeichen sind Sonderrufzeichen auf Zeit, und vier Zeichen "
+        "zuzulassen schenkte dem Rauschen eine ganze Klasse von Falschtreffern.",
+        "Jede Sprache hat eine Ziffer, die es nur des Rauschens wegen gibt, und "
+        "beide stehen in der Grammatik: „zwo\" für 2 im Deutschen, „niner\" "
+        "für 9 im Englischen. Sie wegzulassen ist nicht harmlos — das Wort wird "
+        "dann als unbekannt geschluckt, und die Ziffer fehlt im Rufzeichen.",
+    ]),
+    ("p", "Auf dem Tisch mit synthetischer Sprache gemessen, liest die "
+          "amerikanische Kette „kilo one juliet tango\" als K1JT und holt "
+          "Joseph Taylor, Princeton NJ, Extra aus dem FCC-Register; ein "
+          "erfundenes Rufzeichen wird korrekt als VOID markiert. Zwei ohne "
+          "Pause aneinandergereihte Wiederholungen verschmelzen weiterhin zu "
+          "einem zu langen Lauf, genau wie im Deutschen — auf dem Band trennt "
+          "sie die Sprechpause."),
     ("p", "Wird das Funkgerät abgeschaltet, setzt die Erkennung aus — es gibt "
           "kein RX-Audio zu analysieren — und nimmt beim Einschalten wieder auf. "
           "Die gespeicherte Einstellung wird dabei nicht überschrieben, die "
@@ -1975,9 +2082,12 @@ DE = [
           "Name, Locator, QTH, Land und E-Mail von QRZ.com (XML-Daten-API) sowie "
           "'schon gearbeitet' / DXCC von Wavelog. Das Feld ADDRESS neben QTH "
           "nimmt Straße und Postleitzahl des Inhabers auf; wird direkt aus einer "
-          "ASR-Karte geloggt, füllt es sich aus der BNetzA-Liste. Es geht als "
+          "ASR-Karte geloggt, füllt es sich aus dem Register. Es geht als "
           "ADIF-Feld ADDRESS mit, während in QTH nur der Ort steht, damit die "
-          "Auswertungen in Wavelog sauber bleiben. LOG QSO überträgt den Kontakt als "
+          "Auswertungen in Wavelog sauber bleiben. STATE daneben führt den "
+          "US-Bundesstaat als gleichnamiges ADIF-Feld — Wavelog zählt "
+          "Bundesstaaten für WAS, und ein in der Adresszeile vergrabener Staat "
+          "würde nicht mitgezählt. In Deutschland bleibt das Feld leer. LOG QSO überträgt den Kontakt als "
           "ADIF. Ein grüner Punkt zeigt, ob Wavelog erreichbar ist; das Panel "
           "listet die letzten QSOs (mit den ermittelten Details, einzeln oder per "
           "CLEAR löschbar) sowie die QSO-Zähler von Wavelog (heute/Monat/Jahr/"
@@ -1986,7 +2096,8 @@ DE = [
           "Zugangsdaten liegen nur auf dem Pi (runtime.json) und werden nie "
           "committet."),
     ("h2", "Einstellungen"),
-    ("p", "Reiter: Allgemein (Rufzeichen, API-Backend-URL, serieller Port/Baud, "
+    ("p", "Reiter: Allgemein (Rufzeichen, Locator, Callsign region, "
+          "API-Backend-URL, serieller Port/Baud, "
           "GPIO-Power, Auto-Abschaltung, Logo, GitHub-Update, Root-CA-Download), "
           "Audio (Gerät, USB-Mixer, Sprachfilter, Testton, Audio-Timing), Rig-Info, "
           "Rig-Speicher, Rig-DTMF, Logging (Wavelog + QRZ.com) und Pi-Hardware "

@@ -133,25 +133,26 @@ On the TM-V71(A/E), set the menu items:
 - **519 (PC port baud rate) → 57600** — the CAT/serial rate this app uses
   (matches `TMV71_SERIAL_BAUD`).
 
-- **518 (data speed) → 1200** — this switches the whole audio path of the data
-  connector, not just the input sensitivity: 1200 runs over the normal,
-  band-limited voice chain (RX after de-emphasis), 9600 uses the flat
-  discriminator path meant for G3RUH packet.
 
 The USB sound interface uses **two** jacks, on opposite sides of the radio:
 
 | Direction | Radio connector | Pins |
 |---|---|---|
 | TX (card out → radio) | **MIC jack**, 8-pin modular, side of the control head | 6 = MIC, 5 = MIC GND |
-| RX (radio → card in) | **DATA jack**, 6-pin mini-DIN, rear panel | 5 = PR1 (1200 Bd), 2 = DE (GND) |
+| RX (radio → card in) | **DATA jack**, 6-pin mini-DIN, rear panel | 4 = PR9 (flat), 2 = DE (GND) |
 
 TX needs about 40 dB of attenuation (line level → a few mV into 600 Ω); a 1:1
 transformer in that lead also breaks the ground loop between the Pi's supply and
 the radio. TX cannot use the data connector: PTT is keyed over CAT (serial), and
 the TM-V71 only routes **transmit** audio to the data connector when a
 **hardware** PTT keys it — a serial PTT never switches that path. RX is taken
-from PR1 because it is filtered, at a fixed level and independent of the volume
-knob. See the wiring diagram in the manual (chapter 4).
+from **PR9**, the flat pin straight off the discriminator: de-emphasis would
+tilt the two AFSK tones against each other and cost APRS decodes, so the
+software puts the de-emphasis back for voice instead (on by default) and
+high-passes the sub-audible CTCSS tone the flat output passes. Both receive
+pins are at a fixed level, independent of the volume knob. If PR9 is silent on
+your unit, set menu 518 (data speed) to 9600 — on some radios that menu also
+switches the receive path. See the wiring diagram in the manual (chapter 4).
 
 ## Install
 
@@ -256,32 +257,54 @@ biggest factor for good accuracy from a data-port feed.
 **Setup.** From the repo root on the Pi:
 
 ```bash
-# 1) speech model — dependency + small German model into ./models (gitignored, ~90 MB)
+# 1) speech model — dependency + the model of your region into ./models
+#    (gitignored, ~45 MB each). Germany:
 backend/.venv/bin/pip install vosk
 mkdir -p models && cd models
 curl -LO https://alphacephei.com/vosk/models/vosk-model-small-de-0.15.zip
 unzip vosk-model-small-de-0.15.zip && rm vosk-model-small-de-0.15.zip && cd ..
+#    United States:
+cd models
+curl -LO https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+unzip vosk-model-small-en-us-0.15.zip && rm vosk-model-small-en-us-0.15.zip && cd ..
 
 # 2) speaker model (optional — voice ID for overs with no spoken callsign, ~14 MB)
 cd models
 curl -LO https://alphacephei.com/vosk/models/vosk-model-spk-0.4.zip
 unzip vosk-model-spk-0.4.zip && rm vosk-model-spk-0.4.zip && cd ..
 
-# 3) callsign list (optional — enables name/town/class + VOID verification)
+# 3) callsign register (optional — enables name/address/class + VOID verification)
+#    Germany: the BNetzA Rufzeichenliste PDF at /opt/rufzeichenliste_afu.pdf
 backend/.venv/bin/pip install pypdf
-# place the current BNetzA Rufzeichenliste PDF at /opt/rufzeichenliste_afu.pdf, then
-# run the converter once to build the cache (~700 pages, a few minutes):
 cd backend && .venv/bin/python -m app.callsign_list && cd ..   # -> models/rufzeichenliste.txt
+#    United States: the FCC ULS amateur dump (no pypdf needed, ~200 MB download)
+curl -Lo /opt/l_amat.zip https://data.fcc.gov/download/pub/uls/complete/l_amat.zip
+cd backend && .venv/bin/python -m app.callsign_list --region us && cd ..  # -> models/fcc-amateur.txt
 ```
 
-The backend expects the model at `models/vosk-model-small-de-0.15` (override with
+**Region.** *Settings > General > Callsign region* switches the whole chain in
+one place — speech model, the phonetic words operators spell with, the shape a
+callsign may have, and the register it is checked against:
+
+| | Germany (`de`) | United States (`us`) |
+|---|---|---|
+| Model | `vosk-model-small-de-0.15` | `vosk-model-small-en-us-0.15` |
+| Digits | null … neun, **zwo** for 2 | zero … nine, **niner** for 9 |
+| Callsign | BNetzA blocks, DA–DR + 2–3 letters | K/N/W/A[A–L] + digit + 1–3 letters |
+| Register | BNetzA PDF → `models/rufzeichenliste.txt` | FCC ULS zip → `models/fcc-amateur.txt` |
+| Licence class | A / E / N | Novice, Tech, General, Advanced, Extra |
+
+Switching takes a moment: the model is reloaded and the register re-read. The
+speaker model is language-independent and is not touched.
+
+The backend expects the model at `models/<the region's model>` (override with
 `TMV71_ASR_MODEL_DIR`). On a Raspberry Pi 4 the model loads in ~1–2 s and runs
 comfortably in real time on one core (only while enabled). The callsign list is
 optional: without it, detection still works but nothing is verified/flagged VOID.
 
-**Verification against the official callsign list.** Every recognised call is
-checked against the **BNetzA *Rufzeichenliste*** (the register of assigned German
-callsigns) — a call that is actually assigned shows normally (in the RX band's
+**Verification against the official callsign register.** Every recognised call is
+checked against the register of the region — the **BNetzA *Rufzeichenliste*** in
+Germany, the **FCC ULS** amateur dump in the States — a call that is actually assigned shows normally (in the RX band's
 colour); one that is **not** in the list is still shown but flagged **·VOID** (in
 red), so mishears stand out at a glance. Supply the current list PDF on the Pi at
 `/opt/rufzeichenliste_afu.pdf` (override with `TMV71_ASR_CALLLIST_PDF`) and run
@@ -291,9 +314,17 @@ At runtime only the cache is read (~30 ms for ~70k calls) — it is **never rebu
 automatically** (a multi-minute parse must not stall startup). If no cache is
 present, verification is skipped (nothing is flagged VOID).
 
-To **refresh** the list later, drop in a newer PDF and re-run the converter from
-step 2 above (`python -m app.callsign_list`; custom paths:
-`python -m app.callsign_list <PDF> <CACHE>`), then restart the service.
+The American register needs no text extraction: `l_amat.zip` is a set of
+pipe-separated tables, so the converter reads it in about 25 s (against 85 s for
+the German PDF) and keeps the 823,000 licences that are actually active — the
+dump carries every expired and cancelled one too. Both end up in the same cache
+format, `CALL⇥CLASS⇥NAME⇥CITY⇥STREET⇥ZIP⇥STATE`, and each run also writes the
+list as JSON beside it for other tools.
+
+To **refresh** the list later, drop in a newer register and re-run the converter
+(`python -m app.callsign_list [--region us]`; custom paths:
+`python -m app.callsign_list [--region us] <SOURCE> <CACHE>`), then restart the
+service. The FCC publishes a fresh full dump every week.
 
 > Best-effort assist on voice — expect the occasional miss; the strict callsign
 > pattern plus the assigned-list check filter most noise. **QRZ.com is not queried

@@ -98,11 +98,16 @@ class Settings(BaseSettings):
     # Detects German callsigns (spoken phonetic alphabet + German digits) while the
     # squelch is open, looks them up on QRZ, and shows them in the title bar.
     asr_callsign_enabled: bool = False
-    # Vosk model directory. Empty -> <repo>/models/vosk-model-small-de-0.15.
+    # Which country the station is listening in. It picks the Vosk model, the
+    # phonetic words operators spell with, the shape a callsign may have and the
+    # register used to verify it: "de" = BNetzA, "us" = FCC ULS.
+    asr_region: str = "de"
+    # Vosk model directory. Empty -> <repo>/models/<the region's model>.
     asr_model_dir: str = ""
-    # Official BNetzA callsign list (PDF) used to verify recognised callsigns; a
-    # recognised call not in the list is flagged VOID. Empty -> default path.
-    # Neither the PDF nor its extracted cache is committed (gitignored).
+    # Official callsign register used to verify recognised callsigns; a call not
+    # in it is flagged VOID. The BNetzA PDF or the FCC ULS zip, depending on the
+    # region. Empty -> the region's default path. Neither the register nor its
+    # extracted cache is committed (gitignored).
     asr_calllist_pdf: str = ""
 
     # Speaker recognition ("voice"): attribute an over that carries no spoken
@@ -166,6 +171,7 @@ _RUNTIME_KEYS = ("serial_port", "serial_baud", "gpio_power_pin",
                  "tx_lowpass_enabled", "rx_lowpass_enabled", "rx_deemph_enabled",
                  "tx_preemph_enabled", "tx_comp_enabled",
                  "rx_deemph_us", "rx_squelch_enabled", "asr_callsign_enabled",
+                 "asr_region",
                  "rx_buffer_ms",
                  "wavelog_url", "wavelog_key", "wavelog_station_id",
                  "qrz_api_key", "qrz_username", "qrz_password",
