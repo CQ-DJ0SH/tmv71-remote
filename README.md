@@ -52,14 +52,23 @@ the theme toggle in the header (light is the default).*
   QTH, e-mail and country. A "worked before" check and the latest contacts/totals
   are shown inline; recent entries are kept locally so they survive restarts.
 - **Off-air callsign recognition (optional, Vosk)** — a speech-recognition pass on
-  the RX audio that reads out spoken **German callsigns** spelled in the
-  **ITU/NATO phonetic alphabet** with German digits ("Delta Bravo null Sierra
-  Papa"). A grammar-constrained [Vosk](https://alphacephei.com/vosk/) model keeps
+  the RX audio that reads out callsigns spelled in the **ITU/NATO phonetic
+  alphabet** ("Delta Bravo null Sierra Papa", "Kilo one Juliet Tango"). A
+  grammar-constrained [Vosk](https://alphacephei.com/vosk/) model keeps
   recognition usable on noisy FM voice; each hit shows in the title bar (in the
-  active RX band's colour) and as a toast. Recognised calls are verified against
-  the official **BNetzA callsign list** — one that isn't assigned is flagged
-  **·VOID**. Runs only while the squelch is open, ignores your own callsign, and
-  can also grade the mic-test audio. Off by default. See [Callsign recognition](#callsign-recognition-vosk).
+  active RX band's colour) and as a toast. Runs only while the squelch is open,
+  ignores your own callsign, and can also grade the mic-test audio. Off by
+  default. See [Callsign recognition](#callsign-recognition-vosk).
+  - **Germany or the United States**, switched in one place (*Settings >
+    General > Callsign region*): it picks the speech model
+    (`vosk-model-small-de-0.15` / `vosk-model-small-en-us-0.15`), the digits
+    operators actually say (**zwo** for 2, **niner** for 9 — a missing one drops
+    the digit out of the callsign), the shape a call may have (BNetzA blocks /
+    K·N·W·A[A–L] + digit + 1–3 letters) and the register it is checked against:
+    the **BNetzA Rufzeichenliste** (69,904 calls) or the **FCC ULS** amateur
+    dump (823,264 active licences). A call that is not in the register is still
+    shown, flagged **·VOID**. Switching reloads model and register in about
+    three seconds; the voice profiles are language-independent and survive it.
 - **No build step for the control UI** — the SPA is plain HTML/CSS/JS served
   directly by the backend. No Node toolchain required on the Pi.
 - **Installable PWA / mobile-ready** — runs as an installable Progressive Web App
@@ -107,8 +116,9 @@ Protocol reference: [LA3QMA/TM-V71_TM-D710-Kenwood](https://github.com/LA3QMA/TM
   in-process via `aiortc` (pip) — no audio server needed.
 - Optional: a **HackRF One** plus the `hackrf` host tools for the SDR waterfall
   (see [SDR waterfall](#sdr-waterfall-optional-hackrf)).
-- Optional: **`vosk`** + the small German speech model for off-air callsign
-  recognition (see [Callsign recognition](#callsign-recognition-vosk)).
+- Optional: **`vosk`** + the small speech model of your region (German or
+  US English) for off-air callsign recognition
+  (see [Callsign recognition](#callsign-recognition-vosk)).
 
 ### Python dependencies
 
@@ -228,21 +238,25 @@ Optional processing (Settings → Audio; the decoders always get the raw signal)
 ## Callsign recognition (Vosk)
 
 An optional, offline speech-recognition pass on the RX audio that detects spoken
-**German callsigns** (prefix D) and surfaces them in the UI. It is off by default;
-enable **Callsign detect** in *Settings → Audio*.
+callsigns — **German** (prefix D) or **US** (K/N/W/A…), whichever region is set —
+and surfaces them in the UI. It is off by default; enable **Callsign detect** in
+*Settings → Audio*, and pick the region in *Settings → General*.
 
 **How it works.** Callsigns are read out letter-by-letter over the air, so free
 dictation would be hopeless on noisy FM. Instead a [Vosk](https://alphacephei.com/vosk/)
 recognizer is **grammar-constrained** to just the spelling vocabulary — the
-**ITU/NATO phonetic alphabet** (Alfa…Zulu) plus German digits — which stays
+**ITU/NATO phonetic alphabet** (Alfa…Zulu) plus the region's digits — which stays
 reliable even on weak signals (the German spelling alphabet and letter names were
-dropped: their short, homophone-prone words caused most false matches).
-Recognised words are mapped back to letters and a valid German callsign is pulled
-out. Every
+dropped: their short, homophone-prone words caused most false matches). Both
+languages include the digit word operators use to survive a noisy channel,
+**zwo** for 2 and **niner** for 9; without it in the grammar the word is absorbed
+as unknown and the digit drops silently out of the callsign.
+Recognised words are mapped back to letters and a valid callsign for the region
+is pulled out. Every
 hit is shown in a framed field in the title bar (coloured to the active RX band)
 and announced as a toast; the toast and the field's tooltip are **enriched from
-the offline BNetzA list** with the holder's **name, town and licence class**
-(A/E/N) — no online lookup (QRZ is only used for a manual lookup in the log
+the offline register** with the holder's **name, address and licence class**
+(A/E/N in Germany; Novice … Extra in the States) — no online lookup (QRZ is only used for a manual lookup in the log
 panel). Hits are de-duplicated for ~90 s, your **own callsign is ignored**, and
 recognition only runs while the squelch reports **BUSY** (open). It can also grade
 the **mic-test** audio, so you can try it with your own voice without a signal.
