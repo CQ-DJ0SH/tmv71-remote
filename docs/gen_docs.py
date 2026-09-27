@@ -469,14 +469,19 @@ def draw_wiring(pdf, lang):
               "OUT  3.5 mm TRS", "line level, ~ 1 V", "", "IN   3.5 mm"])
         _box(pdf, 58, y0 + 64, 38, 16, "USB-serial bridge",
              ["FTDI FT-X", "/dev/ttyUSB0"])
+        _box(pdf, 58, y0 + 88, 38, 16, "13.8 V supply",
+             ["radio only", "not the Pi"])
         # --- level interface, transmit path only -----------------------------
         head(104, y0 + 7, "TX  transmit")
         _box(pdf, 104, y0 + 12, 34, 22, "Isolation transformer + pad",
              ["1:1, 600 Ohm", "~ 40 dB down"])
         head(104, y0 + 44, "RX  receive")
         head(104, y0 + 64, "CAT  control")
+        head(104, y0 + 85, "PWR  on / off")
+        _box(pdf, 104, y0 + 88, 34, 16, "Relay or high-side MOSFET",
+             ["driver + flyback diode", "switches the PLUS lead"])
         # --- the radio and its three sockets ---------------------------------
-        _frame(pdf, 152, y0 + 4, 42, 78, "Kenwood TM-V71")
+        _frame(pdf, 152, y0 + 4, 42, 100, "Kenwood TM-V71")
         _box(pdf, 154, y0 + 12, 38, 22, "MIC jack",
              ["8-pin modular, side of head", "pin 6 MIC, ~ 2 mV / 600 Ohm",
               "pin 5 MIC GND"])
@@ -485,6 +490,8 @@ def draw_wiring(pdf, lang):
               "pin 5 PR1, filtered", "pin 2 DE (ground)"])
         _box(pdf, 154, y0 + 66, 38, 14, "PC port",
              ["8-pin mini-DIN, rear"])
+        _box(pdf, 154, y0 + 88, 38, 14, "DC input",
+             ["13.8 V, up to ~ 13 A"])
         # --- the paths --------------------------------------------------------
         _arrow(pdf, 48.5, y0 + 33, 57.5, y0 + 33, "USB")
         pdf.set_draw_color(*LINE)
@@ -495,22 +502,35 @@ def draw_wiring(pdf, lang):
         _arrow(pdf, 138.5, y0 + 23, 153.5, y0 + 23)
         _arrow(pdf, 153.5, y0 + 51, 96.5, y0 + 51, "flat, fixed level")
         _arrow(pdf, 96.5, y0 + 72, 153.5, y0 + 72, "CAT 57600 Bd + PTT")
-        _cap(pdf, 16, y0 + 86, 178,
+        _arrow(pdf, 96.5, y0 + 96, 103.5, y0 + 96)            # + from the supply
+        _arrow(pdf, 138.5, y0 + 96, 153.5, y0 + 96, "switched +")
+        # the control line leaves the Pi, runs under the supply and comes up
+        # into the driver from below — it carries no power, only 3.3 V logic
+        pdf.line(24, y0 + 50, 24, y0 + 112)
+        pdf.line(24, y0 + 112, 121, y0 + 112)
+        _arrow(pdf, 121, y0 + 112, 121, y0 + 104.5, "GPIO 25 · 3.3 V", above=False)
+        _cap(pdf, 16, y0 + 116, 178,
              ("TX geht in die Mikrofonbuchse, nicht in die Datenbuchse: Das Gerät "
               "legt das Sendeaudio nur dann auf die Datenbuchse, wenn eine "
               "HARDWARE-PTT tastet — hier wird die PTT über CAT getastet. RX "
               "kommt von PR9, dem flachen 9600-Baud-Pin: fester Pegel, "
               "unabhängig vom Lautstärkeregler, ohne De-Emphasis und ohne "
               "CTCSS-Filter — das ist der bessere Zweig für APRS. Menü 519 "
-              "(PC-Port-Baud) auf 57600 stellen."
+              "(PC-Port-Baud) auf 57600 stellen. Geschaltet wird die PLUS-"
+              "Leitung: Pi und Funkgerät teilen sich über Audio- und CAT-Kabel "
+              "bereits die Masse, ein Schalter in der Minusleitung wäre darüber "
+              "überbrückt."
               if de else
               "TX goes into the mic jack, not into the DATA jack: the radio only "
               "routes transmit audio from the DATA jack while a HARDWARE PTT keys "
               "it, and this station keys PTT over CAT. RX is taken from PR9, the "
               "flat 9600-baud pin: fixed level, untouched by the volume knob, and "
               "with neither de-emphasis nor the CTCSS filter in the way — the "
-              "better feed for APRS. Set menu 519 (PC port baud) to 57600."))
-    _diagram(pdf, 100, go)
+              "better feed for APRS. Set menu 519 (PC port baud) to 57600. The "
+              "PLUS lead is the one that gets switched: Pi and radio already "
+              "share ground through the audio and CAT cables, so a switch in "
+              "the negative lead would simply be bridged by them."))
+    _diagram(pdf, 132, go)
 
 
 DIAGRAMS = {"system": draw_system, "audio": draw_audio,
@@ -807,7 +827,7 @@ EN = [
         "Optional: vosk + the small German model (offline callsign recognition), "
         "and pypdf + the BNetzA Rufzeichenliste PDF (name/town/class + VOID check).",
     ]),
-    ("h2", "Wiring the USB sound card"),
+    ("h2", "Wiring the USB sound card and the power switch"),
     ("p", "The audio does not use one connector but two, and they sit on "
           "opposite sides of the radio: transmit audio goes into the mic jack on "
           "the side of the control head, received audio comes off the DATA jack "
@@ -840,6 +860,29 @@ EN = [
         "DATA jack.",
         "PTT is keyed over CAT on the PC port, so no PTT line is wired. Nothing "
         "in the audio cabling can key the radio.",
+        "Power: the radio cannot be switched on over its serial port, so its "
+        "13.8 V line is switched instead, from a GPIO pin (BCM 25 by default, "
+        "Settings > General). The PLUS lead is the one to break. Pi and radio "
+        "already share ground through the audio and CAT cables, so a switch in "
+        "the negative lead would be bridged by them — the radio would keep "
+        "drawing its current through the audio screen, which is both wrong and "
+        "dangerous.",
+        "Size it for the transmitter, not the receiver: a TM-V71 draws around "
+        "13 A at 50 W. An automotive relay (20–30 A contacts) or a high-side "
+        "P-channel MOSFET rated well above that, with short, thick leads.",
+        "A GPIO pin cannot drive a relay coil — 3.3 V at a few milliamps "
+        "against 80–150 mA. Between them belongs a logic-level N-MOSFET or a "
+        "ready-made opto-isolated relay board, and a flyback diode across the "
+        "coil; without it the coil's collapsing field puts a spike straight "
+        "back into the driver. A board that switches when its input is pulled "
+        "LOW is common, and supported: set the active level in Settings.",
+        "Never power the Pi from the switched side. It would cut its own "
+        "supply the moment it switched the radio off, and nothing would switch "
+        "it back on.",
+        "The pin is claimed without being driven at startup, so restarting the "
+        "backend — or reconfiguring the pin — never toggles the radio. Auto "
+        "power-off runs on the Pi itself and therefore keeps working with every "
+        "browser closed.",
     ]),
     ("h1", "5  Installation"),
     ("code", INSTALL),
@@ -1503,7 +1546,7 @@ DE = [
         "erkennung) sowie pypdf + die BNetzA-Rufzeichenliste-PDF (Name/Ort/Klasse "
         "+ VOID-Prüfung).",
     ]),
-    ("h2", "Anschluss der USB-Soundkarte"),
+    ("h2", "Anschluss der USB-Soundkarte und der Stromschaltung"),
     ("p", "Das Audio nutzt nicht eine Buchse, sondern zwei — und die sitzen auf "
           "gegenüberliegenden Seiten des Geräts: Das Sendesignal geht in die "
           "Mikrofonbuchse an der Seite des Bedienteils, das Empfangssignal kommt "
@@ -1540,6 +1583,31 @@ DE = [
         "Datenbuchse ohnehin nie berührt.",
         "PTT wird über CAT am PC-Port getastet, eine PTT-Leitung ist deshalb "
         "nicht verdrahtet. Nichts in der Audioverkabelung kann das Gerät tasten.",
+        "Stromversorgung: Über die serielle Schnittstelle lässt sich das Gerät "
+        "nicht einschalten, deshalb wird seine 13,8-V-Leitung geschaltet, von "
+        "einem GPIO-Pin aus (voreingestellt BCM 25, Einstellungen > Allgemein). "
+        "Aufzutrennen ist die PLUS-Leitung. Pi und Funkgerät teilen sich über "
+        "Audio- und CAT-Kabel bereits die Masse; ein Schalter in der "
+        "Minusleitung wäre darüber überbrückt — das Gerät zöge seinen Strom "
+        "durch den Audioschirm, was falsch und gefährlich zugleich ist.",
+        "Ausgelegt wird nach dem Sender, nicht nach dem Empfänger: Ein TM-V71 "
+        "zieht bei 50 W rund 13 A. Also ein Kfz-Relais (20–30 A Kontakte) oder "
+        "ein P-Kanal-MOSFET in der Plusleitung mit deutlich Reserve, dazu kurze, "
+        "dicke Leitungen.",
+        "Ein GPIO-Pin kann keine Relaisspule treiben — 3,3 V bei wenigen "
+        "Milliampere gegen 80–150 mA. Dazwischen gehört ein "
+        "Logic-Level-N-MOSFET oder ein fertiges Optokoppler-Relaisboard, und "
+        "über die Spule eine Freilaufdiode; ohne sie schlägt das zusammen"
+        "brechende Spulenfeld als Spannungsspitze in den Treiber zurück. "
+        "Boards, die bei LOW am Eingang schalten, sind verbreitet und werden "
+        "unterstützt: Der aktive Pegel ist in den Einstellungen wählbar.",
+        "Den Pi niemals von der geschalteten Seite versorgen. Er schnitte sich "
+        "beim Abschalten des Funkgeräts die eigene Versorgung ab, und niemand "
+        "schaltete ihn wieder ein.",
+        "Der Pin wird beim Start belegt, aber nicht angesteuert — ein Neustart "
+        "des Backends oder ein Umkonfigurieren des Pins schaltet das Funkgerät "
+        "also nie um. Die Auto-Abschaltung läuft auf dem Pi selbst und "
+        "funktioniert deshalb auch bei geschlossenem Browser.",
     ]),
     ("h1", "5  Installation"),
     ("code", INSTALL),

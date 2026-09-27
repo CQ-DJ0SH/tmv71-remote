@@ -150,8 +150,14 @@ The USB sound interface uses **two** jacks, on opposite sides of the radio:
 |---|---|---|
 | TX (card out → radio) | **MIC jack**, 8-pin modular, side of the control head | 6 = MIC, 5 = MIC GND |
 | RX (radio → card in) | **DATA jack**, 6-pin mini-DIN, rear panel | 4 = PR9 (flat), 2 = DE (GND) |
+| Power on/off (optional) | the radio's **13.8 V PLUS lead**, via relay or high-side MOSFET | GPIO BCM 25 (configurable) |
 
-TX needs about 40 dB of attenuation (line level → a few mV into 600 Ω); a 1:1
+Power is switched on the **plus** lead, never the minus: Pi and radio already
+share ground through the audio and CAT cables, which would bridge a switch in
+the negative lead. Size it for the transmitter (~13 A at 50 W) and drive the
+relay coil from a logic-level MOSFET or an opto-isolated board with a flyback
+diode — a GPIO pin cannot drive a coil. Don't power the Pi from the switched
+side. TX needs about 40 dB of attenuation (line level → a few mV into 600 Ω); a 1:1
 transformer in that lead also breaks the ground loop between the Pi's supply and
 the radio. TX cannot use the data connector: PTT is keyed over CAT (serial), and
 the TM-V71 only routes **transmit** audio to the data connector when a
