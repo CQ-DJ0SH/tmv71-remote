@@ -1012,6 +1012,10 @@ function bindEditor() {
 // NON-Bluetooth input — the phone's built-in mic — which never triggers SCO. The
 // headset then stays on A2DP the whole time; the radio mic comes from the phone.
 let audioPc = null, audioMic = null;
+// The stream as the microphone handed it over, kept apart from the one that is
+// actually sent: with a boost in between they are two different streams, and
+// the raw one still has to be stopped or the mic stays hot.
+let audioMicRaw = null, micCtx = null, micGainNode = null;
 let audioWant = false;          // user wants audio on → auto-reconnect on drops
 let audioReconnectT = null;     // pending reconnect timer
 let audioReconnectDelay = 400;  // reconnect backoff (ms), reset on a good connect
@@ -1076,6 +1080,56 @@ async function captureBuiltinMic() {
   return stream;
 }
 
+// Gain applied in the browser, ahead of the Opus encoder. It exists because
+// iOS hands out a quiet signal once its voice processing is off — which this
+// app switches off on phones and tablets so a Bluetooth headset stays on A2DP
+// — and because lifting a very quiet signal only on the Pi lifts everything
+// Opus added on the way as well. Stored per app (browser vs installed PWA),
+// like the TX AGC toggle.
+const micBoostKey = () => "tmv71.micBoost." + (isPwaMode() ? "pwa" : "browser");
+function micBoost() {
+  const v = Number(localStorage.getItem(micBoostKey()));
+  if (Number.isFinite(v) && v >= 1 && v <= 16) return v;
+  // Nothing chosen yet: a Mac or PC needs none — the browser's own gain control
+  // is doing the work there — while iOS, with its voice processing off, starts
+  // out far too quiet. Four is a starting point to tune from, not a truth.
+  const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent || "") || isTouchMac();
+  return ios ? 4 : 1;
+}
+// Build mic -> gain -> limiter -> track. The limiter is not for sound, it is
+// there so a boost chosen for quiet speech cannot clip on a loud one.
+function boostMic(stream) {
+  const g = micBoost();
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (g <= 1 || !AC) return stream;
+  try {
+    micCtx = new AC();
+    micCtx.resume?.().catch(() => {});
+    const src = micCtx.createMediaStreamSource(stream);
+    micGainNode = micCtx.createGain();
+    micGainNode.gain.value = g;
+    const lim = micCtx.createDynamicsCompressor();
+    lim.threshold.value = -6; lim.knee.value = 0; lim.ratio.value = 20;
+    lim.attack.value = 0.003; lim.release.value = 0.25;
+    const dst = micCtx.createMediaStreamDestination();
+    src.connect(micGainNode).connect(lim).connect(dst);
+    return dst.stream;
+  } catch (e) {
+    // an AudioContext can be refused (autoplay policy, no gesture yet): send
+    // the plain microphone rather than no microphone at all
+    micCtx = micGainNode = null;
+    return stream;
+  }
+}
+function setMicBoost(g) {
+  try { localStorage.setItem(micBoostKey(), String(g)); } catch {}
+  if (micGainNode) micGainNode.gain.value = g;   // live, no renegotiation
+  const el = $("#mic-boost-val"); if (el) el.textContent = g + "×";
+  // going from 1 to more (or back) needs the graph built or removed, which
+  // means a fresh capture — only worth doing while audio is actually running
+  if (audioPc && ((g > 1) !== !!micGainNode)) { audioDropped(); }
+}
+
 function audioConnected() {
   return !!audioPc && ["connected", "completed"].includes(audioPc.connectionState);
 }
@@ -1106,6 +1160,8 @@ function teardownAudio() {
   if (audioGraceT) { clearTimeout(audioGraceT); audioGraceT = null; }
   if (audioPc) { try { audioPc.close(); } catch {} audioPc = null; }
   if (audioMic) { audioMic.getTracks().forEach(tr => tr.stop()); audioMic = null; }
+  if (audioMicRaw) { audioMicRaw.getTracks().forEach(tr => tr.stop()); audioMicRaw = null; }
+  if (micCtx) { try { micCtx.close(); } catch {} micCtx = null; micGainNode = null; }
   const a = $("#rx-audio"); if (a) a.srcObject = null;
 }
 function scheduleAudioReconnect() {
@@ -1140,7 +1196,8 @@ async function audioConnect() {
     if (t) t.disabled = false; return;
   }
   try {
-    audioMic = mic;
+    audioMicRaw = mic;
+    audioMic = boostMic(mic);        // browser-side gain, ahead of the encoder
     audioPc = new RTCPeerConnection();
     audioMic.getTracks().forEach(tr => audioPc.addTrack(tr, audioMic));
     audioPc.addEventListener("track", e => { $("#rx-audio").srcObject = e.streams[0]; });
@@ -1192,7 +1249,9 @@ function audioDisconnect() {       // user-initiated: stop and don't reconnect
 }
 function setGainUi(key, val) {
   const sl = document.getElementById(key + "-gain");
-  const dec = sl && Number(sl.step) >= 1 ? 0 : 1;   // whole-step sliders show no decimal
+  // whole-step sliders show no decimal — except below 1×, where the AGC may
+  // sit while it holds a loud signal back: "0×" would read as silence
+  const dec = (sl && Number(sl.step) >= 1 && Math.abs(Number(val)) >= 1) ? 0 : 1;
   const el = document.getElementById(key + "-gain-val");
   if (el) el.textContent = Number(val).toFixed(dec) + "×";
   if (sl) {
@@ -1215,7 +1274,7 @@ async function loadAudioDevices() {
   if (m) sel.value = m.value;
   else if (d.current) {
     const o = document.createElement("option");
-    o.value = d.current; o.textContent = d.current + " (aktuell)";
+    o.value = d.current; o.textContent = d.current + " (current)";
     sel.appendChild(o); sel.value = d.current;
   }
 }
@@ -1385,6 +1444,18 @@ function bindAudio() {
     try { await api("POST", "/api/audio/device", { device: e.target.value }); toast("Audio device switched", "ok"); }
     catch (err) { toast("Audio device: " + err.message, "err"); loadAudioDevices(); }
   });
+  const mb = $("#mic-boost");
+  if (mb) {
+    mb.value = String(micBoost());
+    const paint = () => {
+      const el = $("#mic-boost-val"); if (el) el.textContent = mb.value + "×";
+      const pct = (mb.value - mb.min) / (mb.max - mb.min) * 100;
+      mb.style.setProperty("--gpct", pct + "%");
+    };
+    paint();
+    mb.addEventListener("input", paint);
+    mb.addEventListener("change", () => setMicBoost(Number(mb.value)));
+  }
   ["rx", "tx"].forEach(k => {
     const sl = document.getElementById(k + "-gain");
     sl.addEventListener("input", () => setGainUi(k, sl.value));
