@@ -18,7 +18,7 @@ ACCENT = (16, 110, 78)        # muted green
 DARK = (28, 39, 49)
 GREY = (110, 122, 132)
 CODEBG = (244, 246, 248)
-VERSION = "3.2"
+VERSION = "3.5"
 
 
 RULE = (206, 216, 222)        # hairlines for header/footer
