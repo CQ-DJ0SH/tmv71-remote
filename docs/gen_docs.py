@@ -916,6 +916,24 @@ EN = [
     ("code", RUNTLS),
     ("p", "Open https://<pi-ip>:8443/ and accept the certificate once."),
     ("h1", "7  The Web Interface"),
+    ("h2", "What a narrow window does"),
+    ("p", "The panels have a size they were drawn in and they keep it. A band "
+          "panel cannot shrink anyway — its digit tuner is some 500 px of "
+          "fixed parts — while the PTT and audio panels beside it have no such "
+          "backbone: their buttons wrap and their sliders give way. Left to "
+          "themselves, the two below squeezed while the two above stood still, "
+          "which is what made a narrow window look lopsided. All four now share "
+          "one floor of 540 px, and below about 1160 px of window they stack "
+          "into a single full-width column instead of being cramped side by "
+          "side."),
+    ("p", "The title bar gives way in the same spirit. Its middle plate keeps "
+          "its own width, so it used to run over the callsign on one side and "
+          "the clock on the other; its lettering and padding now shrink with "
+          "the window, as far as the nameplate screws allow. The clock itself "
+          "disappears below 1400 px — it is the one thing up there nobody "
+          "operates, and every device showing this page has a clock of its own "
+          "a glance away. Below 760 px the mobile deck takes over entirely "
+          "(chapter 8)."),
     ("h2", "Band panels (VFO A / VFO B)"),
     ("p", "Each band shows the frequency on a 7-segment display with two stacked "
           "meters under a shared S-scale: a real S-meter (S0–S9) in the active "
@@ -1698,6 +1716,26 @@ DE = [
     ("code", RUNTLS),
     ("p", "https://<pi-ip>:8443/ öffnen und das Zertifikat einmal akzeptieren."),
     ("h1", "7  Die Weboberfläche"),
+    ("h2", "Was ein schmales Fenster bewirkt"),
+    ("p", "Die Panels haben eine Größe, in der sie gezeichnet wurden, und die "
+          "behalten sie. Ein Band-Panel kann ohnehin nicht schrumpfen — seine "
+          "Ziffernreihe besteht aus rund 500 px fester Teile —, während die "
+          "Panels für PTT und Audio daneben kein solches Rückgrat haben: Ihre "
+          "Tasten brechen um, ihre Regler geben nach. Sich selbst überlassen, "
+          "quetschten sich die unteren beiden, während die oberen stehen "
+          "blieben; genau das ließ ein schmales Fenster schief aussehen. Alle "
+          "vier haben jetzt dieselbe Untergrenze von 540 px, und unterhalb von "
+          "etwa 1160 px Fensterbreite stehen sie in einer Spalte über die volle "
+          "Breite untereinander, statt nebeneinander gedrängt."),
+    ("p", "Die Titelzeile gibt im selben Sinne nach. Ihr mittleres Schild "
+          "behielt seine Breite und schob sich deshalb über das Rufzeichen auf "
+          "der einen und die Uhr auf der anderen Seite; Schrift und Polsterung "
+          "schrumpfen nun mit dem Fenster, so weit es die Schrauben des "
+          "Schildes zulassen. Die Uhr selbst verschwindet unterhalb von "
+          "1400 px — sie ist das Einzige dort oben, das man nicht bedient, und "
+          "jedes Gerät, das diese Seite anzeigt, hat eine eigene Uhr in "
+          "Blickweite. Unter 760 px übernimmt ganz das mobile Deck (Kapitel "
+          "8)."),
     ("h2", "Band-Panels (VFO A / VFO B)"),
     ("p", "Jedes Band zeigt die Frequenz auf einer 7-Segment-Anzeige mit zwei "
           "übereinander liegenden Anzeigen unter einer gemeinsamen S-Skala: einem "

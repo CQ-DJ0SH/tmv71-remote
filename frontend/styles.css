@@ -230,14 +230,21 @@ body.theme-light .launch{background:radial-gradient(120% 90% at 50% 34%, #ffffff
   background:linear-gradient(180deg,#0c1115f7,#0c1115ec);
   backdrop-filter:blur(8px);
 }
-.brand{display:flex; align-items:center; gap:14px; justify-self:start}
-.status-cluster{justify-self:end}
+/* both outer columns may shrink; without this they keep their content width
+   and the middle plate has nothing to give way to */
+.brand{display:flex; align-items:center; gap:14px; justify-self:start; min-width:0}
+.status-cluster{justify-self:end; min-width:0}
 
 /* centered, prominent app title (cyan like Band B) */
 .title-center{
   justify-self:center; display:flex; flex-direction:row; align-items:center;
   justify-content:center; gap:5px; text-align:center; min-width:0;
-  position:relative; padding:9px 46px;
+  /* The plate keeps its own width in the middle column, so in a narrow window
+     it used to run over the callsign on one side and the clock on the other.
+     It now gives way with the window: the padding shrinks to 30 px, which is
+     where the nameplate screws (18 px at 9 px from the edge) stop it, and the
+     lettering shrinks with it. */
+  position:relative; padding:9px clamp(30px,3.4vw,46px);
   background:linear-gradient(180deg,var(--panel-2),var(--panel));
   border:1px solid var(--edge); border-radius:12px;
   box-shadow:
@@ -251,7 +258,7 @@ body.theme-light .launch{background:radial-gradient(120% 90% at 50% 34%, #ffffff
 .screw-l{left:9px;  top:50%; transform:translateY(-50%)}
 .screw-r{right:9px; top:50%; transform:translateY(-50%)}
 .app-title{
-  font-family:'Neuropol', var(--font-disp); font-weight:400; font-size:clamp(20px,3vw,32px);
+  font-family:'Neuropol', var(--font-disp); font-weight:400; font-size:clamp(15px,2.5vw,32px);
   letter-spacing:.14em; line-height:1; color:#bcd6c6;
   text-shadow:none; white-space:nowrap;
 }
@@ -433,11 +440,20 @@ body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}}
   padding-top:clamp(8px,1.5vw,16px);   /* half the gap below the title separator */
   display:grid; gap:22px;
   --row-h:377px;                      /* band-panel height; keeps the grid square */
-  grid-template-columns:1fr 1fr;
+  /* A column never goes below this. The band panels set the figure: their
+     digit tuner (seven digit boxes, the up/down pair and the VFO/MEMORY
+     switch) is about 500 px of fixed parts, so a band panel simply stops
+     shrinking there. The PTT and audio panels have no such backbone — their
+     buttons wrap and their sliders give way — so they used to squeeze while
+     the two panels above them stayed put, which is what made a narrow window
+     look lopsided. With the floor here, all four behave alike. */
+  --col-min:540px;
+  grid-template-columns:repeat(2, minmax(var(--col-min), 1fr));
   grid-template-rows:auto var(--row-h) auto auto auto auto auto auto auto;
   grid-template-areas: "bands bands" "ptt audio" "hackrf hackrf" "sel sel" "digi digi" "log log" "scan scan" "debug debug" "foot foot";
 }
-.bands{grid-area:bands; display:grid; grid-template-columns:1fr 1fr; gap:22px}
+.bands{grid-area:bands; display:grid; gap:22px;
+  grid-template-columns:repeat(2, minmax(var(--col-min), 1fr))}
 .ptt-zone{grid-area:ptt}
 .audio{grid-area:audio}
 .hackrf-zone{grid-area:hackrf}
@@ -903,7 +919,18 @@ body.theme-light .asr-tip{background:#ffffffF2; border-color:#c5cfd8; box-shadow
 /* the info heading + environment list are only used on the mobile deck page */
 .foot-title, .foot-env{display:none}
 .foot-links{display:contents}
-@media (max-width:860px) and (min-width:761px){
+/* Below the width where two panels still fit side by side at their own size,
+   stack them rather than squeezing: one full-size column reads better than two
+   cramped ones, and the panels keep the proportions they were drawn in. */
+/* The clock goes before anything else gets tight: it is the one thing in the
+   title bar nobody operates, it is what the nameplate runs into first, and
+   every device showing this page has a clock of its own a glance away. Well
+   above the width where the console itself rearranges, so the title bar stays
+   clear rather than only just fitting. */
+@media (max-width:1400px) and (min-width:761px){
+  .topbar .clock{display:none}
+}
+@media (max-width:1160px) and (min-width:761px){
   .console{grid-template-columns:1fr; grid-template-rows:none;
            /* every grid-area used by a panel must appear here: a name that is
               missing places the panel in an implicit track OUTSIDE the grid */
@@ -1973,6 +2000,21 @@ body.theme-light .rng input{color-scheme:light}
 .audio-status .led.on{background:var(--ok);box-shadow:0 0 10px var(--ok)}
 .audio-status .led.off{background:var(--tx);box-shadow:0 0 10px var(--tx)}
 /* connect row: device selector (left, grows wide) + connect button (right) */
+/* The connect row measures itself against the PANEL, not the window: the same
+   panel is wide in the desktop console, narrow in the mobile deck and narrower
+   still on a tablet in portrait, and only its own width says whether the row
+   still fits. When it gets tight the gaps close up and the button gives back
+   some padding, so CONNECT keeps its place on the line instead of dropping
+   below it; narrower still, the BAND label goes — the two buttons beside it
+   say what it is. */
+.audio{container-type:inline-size}
+@container (max-width:560px){
+  .audio-conn{gap:8px}
+  #audio-toggle{min-width:84px; padding:5px 8px}
+}
+@container (max-width:440px){
+  .audio-conn .audio-band-field > span{display:none}   /* the "BAND" label */
+}
 .audio-conn{display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap}
 .audio-conn .acd{display:flex; align-items:center; gap:8px; flex:0 0 auto;
   white-space:nowrap;
@@ -1981,11 +2023,11 @@ body.theme-light .rng input{color-scheme:light}
   font-family:var(--font-mono); font-size:12px; color:var(--text);
   background:var(--field-bg); border:1px solid var(--accent); border-radius:7px; padding:6px 8px}
 .audio-conn .acd select:focus{outline:none; border-color:var(--accent)}
-/* "AUDIO" caption just before the CONNECT button (pushed to the right edge) */
-.audio-cap{font-family:var(--font-ui); font-size:10px; letter-spacing:.16em; color:var(--text-dim)}
-.audio-conn .audio-cap{margin-left:auto}
+/* The row's right-hand anchor. It used to be an "AUDIO" caption before the
+   button, which only repeated the panel title and cost the width that made
+   CONNECT wrap onto a line of its own on a tablet. */
 #audio-toggle{
-  margin-left:0; font-family:var(--font-ui); font-size:10px; letter-spacing:.12em; cursor:pointer;
+  margin-left:auto;          /* holds the right edge of the connect row */ font-family:var(--font-ui); font-size:10px; letter-spacing:.12em; cursor:pointer;
   color:var(--text); background:var(--ctrl-bg); border:1px solid var(--accent); border-radius:6px; padding:5px 10px; transition:.15s;
   /* fixed width so CONNECT / DISCONNECT are the same size and the device text
      doesn't shift when the connection state changes */

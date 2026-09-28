@@ -355,7 +355,6 @@
         <span>AGC</span>
         <input type="checkbox" id="tx-auto" class="switch">
       </label>
-      <span class="audio-cap">AUDIO</span>
       <button id="audio-toggle">CONNECT</button>
     </div>
     <audio id="rx-audio" autoplay></audio>
@@ -813,9 +812,9 @@
       <div class="mixer-field">
         <span class="logo-label">Microphone path (this browser)</span>
         <div class="form-grid">
-          <label class="span-2">Processing<select id="mic-mode">
-            <option value="auto">Browser default — loud, levelled (iOS: Apple's voice processing)</option>
-            <option value="off">Off — Bluetooth-safe, unshaped, quieter</option>
+          <label>Processing<select id="mic-mode">
+            <option value="auto">Browser default</option>
+            <option value="off">Off — Bluetooth-safe</option>
           </select></label>
         </div>
         <p class="pane-hint">Two paths, and which is better depends on the station. BROWSER DEFAULT leaves echo cancellation, noise suppression and automatic gain to the browser; on a desktop that is what makes a gain of 1 correct, and on iOS it is Apple's voice unit, which levels the signal properly but also shapes the speech and pulls a Bluetooth headset onto the mono HFP profile (receive quality drops with it). OFF forces all three off: a headset stays on A2DP and nothing shapes your audio, but the raw microphone of an iPhone or iPad is quiet, because on iOS the loudness lives in exactly that processing. Android starts at OFF, iOS and desktop at BROWSER DEFAULT. Changing it re-takes the microphone, so the audio link reconnects briefly.</p>
