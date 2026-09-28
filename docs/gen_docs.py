@@ -1330,18 +1330,17 @@ EN = [
     ("p", "Not every over carries a spoken callsign, and the talk timer then "
           "counts onto whoever was marked last. Speaker recognition closes that "
           "gap: the voiceprint of an over is compared against the stations whose "
-          "callsign HAS been heard. Enrolment costs nothing — every recognised "
-          "call labels its own audio, so the profiles build themselves while the "
-          "panel is simply used."),
+          "callsign HAS been heard. The profiles build themselves while the "
+          "panel is simply used — but not from every over that carries a call: "
+          "which call belongs to the SPEAKER is the whole question (see the "
+          "enrolment rule below)."),
     ("ul", [
         "An over ends at the PAUSE in speech, not at the carrier. Through a "
         "repeater BUSY stays up for the whole QSO, so the falling edge never "
         "comes and every station would land in one segment with their voices "
         "averaged together. The pause boundary works in simplex too, where the "
         "carrier drop simply arrives first.",
-        "Under about 3 s of speech nothing is guessed at: the over is skipped. "
-        "An over in which two callsigns were heard is skipped as well, because "
-        "labelling it would spoil both profiles.",
+        "Under about 3 s of speech nothing is guessed at: the over is skipped.",
         "Two stages. Observe only decides and reports — the verdict appears "
         "above the card tray and in the card's hover detail, and nothing moves. "
         "Assign additionally moves the mark and the talk timer onto the "
@@ -1356,6 +1355,41 @@ EN = [
         "It needs the callsign recognition switched on (it listens to the same "
         "audio tap), and it costs about 1.3 s of one core per over, afterwards.",
     ]),
+    ("h3", "Which callsign may become a profile"),
+    ("p", "The first version of this learned from any over that carried exactly "
+          "one callsign, and the profiles of different stations came out "
+          "0.66–0.84 alike — too close to tell apart. The fault is not in the "
+          "maths but in operating practice: the callsign spoken in an over is "
+          "very often the OTHER station's. “DL1ABC, are you there?” files the "
+          "caller's voice under the called station, and two such overs are "
+          "enough to smear a profile into a mixture of two people."),
+    ("p", "Where the callsign falls in the over is the signal that separates "
+          "the two cases. An operator signs off with their own call and names "
+          "the other one when calling up. A label is therefore accepted only:"),
+    ("ul", [
+        "in the last 40 % of the over, or within its final 3 seconds — the "
+        "sign-off position;",
+        "from at least 4 s of speech: a profile is the yardstick every later "
+        "over is measured against, so it is held to more than a match is;",
+        "for a callsign the register actually knows, so a mishear cannot "
+        "become a phantom profile;",
+        "never for your own callsign.",
+    ]),
+    ("p", "Two callsigns in one over — the everyday “DL1ABC from DL2XYZ” — are "
+          "read in ITU order, where the called station comes first and the "
+          "speaker signs last. That is a convention, not evidence, so it is "
+          "accepted only in its clean form (exactly two calls, the other one "
+          "confined to the first half) and counted separately as “by order” in "
+          "the panel's statistics: how much of the learning rests on a "
+          "convention stays visible, and the whole line names every reason an "
+          "over was skipped rather than only counting them."),
+    ("p", "A card picked BY HAND is exempt from all of it — it is a person "
+          "saying whose voice this is, where everything above only infers it. "
+          "Neither length, nor position, nor the register is tested against a "
+          "pick, and of two picks in one over the later one wins. A pick during "
+          "an over labels that over; up to 12 s after one it labels the over "
+          "that just ended, because the correction usually arrives a moment too "
+          "late."),
     ("p", "Measured on two off-air recordings of the same round (14 + 11 overs, "
           "four stations in both): the same station across recordings scored "
           "0.62–0.79 cosine, different stations 0.33 on average and 0.64 at "
@@ -2095,18 +2129,17 @@ DE = [
     ("p", "Nicht in jedem Durchgang fällt ein Rufzeichen, und die Redezeit "
           "zählt dann auf die zuletzt markierte Karte. Die Sprechererkennung "
           "schließt diese Lücke: Der Stimmabdruck eines Durchgangs wird mit den "
-          "Stationen verglichen, deren Rufzeichen schon einmal zu hören war. Das "
-          "Einlernen kostet nichts — jeder erkannte Ruf beschriftet seine eigene "
-          "Aufnahme, die Profile bauen sich also im laufenden Betrieb auf."),
+          "Stationen verglichen, deren Rufzeichen schon einmal zu hören war. Die "
+          "Profile bauen sich im laufenden Betrieb auf — aber nicht aus jedem "
+          "Durchgang, in dem ein Rufzeichen fällt: Welches Rufzeichen dem "
+          "SPRECHER gehört, ist die ganze Frage (siehe die Lernregel unten)."),
     ("ul", [
         "Ein Durchgang endet an der SPRECHPAUSE, nicht am Träger. Über ein "
         "Relais bleibt BUSY die ganze Verbindung stehen, die fallende Flanke "
         "kommt also nie, und alle Stationen lägen in einem Segment mit zu Brei "
         "gemittelten Stimmen. Die Pausengrenze trägt auch im Simplexbetrieb, wo "
         "der Trägerabfall schlicht früher kommt.",
-        "Unter etwa 3 s Sprache wird nichts geraten, der Durchgang entfällt. "
-        "Ebenso ein Durchgang, in dem zwei Rufzeichen fielen — ihn zu "
-        "beschriften würde beide Profile verderben.",
+        "Unter etwa 3 s Sprache wird nichts geraten, der Durchgang entfällt.",
         "Zwei Stufen. „Observe“ entscheidet und meldet nur — das Urteil steht "
         "über dem Kartenkasten und in den Detailangaben der Karte, bewegt wird "
         "nichts. „Assign“ verschiebt zusätzlich Marke und Redezeit auf die "
@@ -2124,6 +2157,44 @@ DE = [
         "selben Audio-Abgriff mit) und kostet je Durchgang etwa 1,3 s auf einem "
         "Kern, im Anschluss.",
     ]),
+    ("h3", "Welches Rufzeichen ein Profil werden darf"),
+    ("p", "Die erste Fassung lernte aus jedem Durchgang, in dem genau ein "
+          "Rufzeichen fiel — und die Profile verschiedener Stationen kamen sich "
+          "auf 0,66 bis 0,84 nahe, zu dicht, um sie zu trennen. Der Fehler "
+          "liegt nicht in der Rechnung, sondern in der Betriebspraxis: Das "
+          "Rufzeichen in einem Durchgang ist sehr oft das der GEGENSTATION. "
+          "„DL1ABC, bist du da?“ legt die Stimme des Rufenden unter der "
+          "gerufenen Station ab, und zwei solche Durchgänge genügen, um ein "
+          "Profil zur Mischung zweier Menschen zu verschmieren."),
+    ("p", "Die Stelle im Durchgang trennt die beiden Fälle. Wer sich "
+          "verabschiedet, nennt sein eigenes Rufzeichen; wer anruft, nennt das "
+          "andere. Eine Beschriftung wird deshalb nur angenommen:"),
+    ("ul", [
+        "in den letzten 40 % des Durchgangs oder in seinen letzten 3 Sekunden "
+        "— dort steht die Verabschiedung;",
+        "bei mindestens 4 s Sprache: Ein Profil ist der Maßstab, an dem jeder "
+        "spätere Durchgang gemessen wird — an ihn wird deshalb mehr angelegt "
+        "als an einen einzelnen Vergleich;",
+        "für ein Rufzeichen, das im Register steht, damit ein Fehlhörer kein "
+        "Phantomprofil anlegt;",
+        "nie für das eigene Rufzeichen.",
+    ]),
+    ("p", "Zwei Rufzeichen in einem Durchgang — das alltägliche „DL1ABC von "
+          "DL2XYZ“ — werden in ITU-Reihenfolge gelesen: die gerufene Station "
+          "zuerst, der Sprecher zeichnet zuletzt. Das ist eine Konvention und "
+          "kein Beleg, wird also nur in ihrer sauberen Form angenommen (genau "
+          "zwei Rufzeichen, das andere auf die erste Hälfte beschränkt) und in "
+          "der Statistik des Panels als „by order“ getrennt gezählt: Wie viel "
+          "des Gelernten auf einer Konvention ruht, bleibt damit sichtbar, und "
+          "die ganze Zeile benennt jeden Grund, aus dem ein Durchgang "
+          "übersprungen wurde, statt ihn nur mitzuzählen."),
+    ("p", "Eine VON HAND gewählte Kachel ist davon ausgenommen — sie ist die "
+          "Aussage eines Menschen darüber, wem die Stimme gehört, während alles "
+          "Vorstehende es nur erschließt. Weder Länge noch Position noch das "
+          "Register werden auf sie angewandt, und von zwei Wahlen im selben "
+          "Durchgang gewinnt die spätere. Eine Wahl während des Durchgangs "
+          "beschriftet diesen, bis zu 12 s danach den gerade beendeten — die "
+          "Korrektur kommt meist einen Augenblick zu spät."),
     ("p", "Gemessen an zwei Mitschnitten derselben Runde (14 + 11 Durchgänge, "
           "vier Stationen in beiden): dieselbe Station über zwei Aufnahmen "
           "hinweg 0,62–0,79 Kosinus, verschiedene Stationen im Mittel 0,33 und "
