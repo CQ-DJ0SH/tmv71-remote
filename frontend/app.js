@@ -584,7 +584,7 @@ async function setFreqHz(band, hz) {
   try {
     await api("POST", "/api/frequency", { band, freq_hz: hz });
     toast(`Band ${band ? "B" : "A"} → ${(hz / 1e6).toFixed(4)} MHz`, "ok");
-  } catch (e) { toast("Frequenz: " + e.message, "err"); }
+  } catch (e) { toast("Frequency: " + e.message, "err"); }
 }
 
 // ---- per-digit frequency tuner --------------------------------------------
@@ -1738,7 +1738,7 @@ async function loadDtmf() {
     row.innerHTML =
       `<span class="dtmf-ch">${m.channel}</span>` +
       `<input maxlength="16" placeholder="—" aria-label="DTMF memory ${m.channel}">` +
-      `<button class="dtmf-save" data-ch="${m.channel}">SPEICHERN</button>`;
+      `<button class="dtmf-save" data-ch="${m.channel}">SAVE</button>`;
     const inp = row.querySelector("input"), btn = row.querySelector(".dtmf-save");
     inp.value = m.code || "";
     inp.addEventListener("input", () => {
@@ -3612,10 +3612,16 @@ function spkListPaint(k) {
   }
   const seg = $("#spk-seg"), g = k.seg;
   if (seg && g) {
+    // What was learned, and what was deliberately not: an over is only filed
+    // under a callsign when that call is the speaker's own by the look of it
+    // (see the enrolment rule), so the skipped counts are the interesting ones.
+    const learned = (g.enrol || 0) + (g.order || 0);
     seg.textContent = g.overs
-      ? `overs: ${g.overs} · too short ${g.short} · with a callsign ${g.enrol}`
-        + ` · two callsigns ${g.multi} · without one ${g.nocall}`
-        + ` · of those assigned ${g.accept}`
+      ? `overs: ${g.overs} · learned ${learned} (by order ${g.order || 0})`
+        + ` · skipped: too short ${g.short}, brief ${g.brief || 0},`
+        + ` early mention ${g.early || 0}, two callsigns ${g.multi},`
+        + ` unlisted ${g.void || 0}`
+        + ` · without a callsign ${g.nocall} · of those assigned ${g.accept}`
       : "no overs evaluated yet";
   }
 }

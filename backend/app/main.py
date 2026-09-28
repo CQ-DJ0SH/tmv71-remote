@@ -496,12 +496,14 @@ class CallsignService:
         self._seg_t0 = 0.0            # monotonic start of that over
         self._seg_speech = 0.0        # seconds of speech in it
         self._seg_quiet = 0.0         # seconds since speech last stopped
-        self._marks: list = []        # (ts, call) the ASR heard, for labelling
+        self._marks: list = []        # (ts, call, by_hand) labels for the over
         # Why so few voices get learned is the first question the panel raises,
         # so the segmenter counts what it did with each over instead of leaving
         # it to guesswork.
         self._seg_stat = {"overs": 0, "short": 0, "nocall": 0, "multi": 0,
-                          "enrol": 0, "match": 0, "accept": 0, "manual": 0}
+                          "enrol": 0, "match": 0, "accept": 0, "manual": 0,
+                          # why a labelled over was still not learned from
+                          "brief": 0, "early": 0, "void": 0, "order": 0}
         self._spk_last = None         # (ts, vector) of the last unlabelled over
 
     def _model_dir(self) -> str:
@@ -551,7 +553,10 @@ class CallsignService:
             return {"call": call, "learned": ""}
         now = time.monotonic()
         if self._seg:                       # an over is in progress
-            self._marks.append((now, call))
+            # flagged as picked by hand: the enrolment rule weighs a heard
+            # callsign by where in the over it fell, which is a guess about
+            # who was speaking. A human pick is not a guess, so it is exempt.
+            self._marks.append((now, call, True))
             return {"call": call, "learned": "current"}
         last = self._spk_last
         if last and now - last[0] <= self.MANUAL_BACK_S:
@@ -770,7 +775,7 @@ class CallsignService:
         self._log = [e for e in self._log if e.get("call") != call]
         self._seen.pop(call, None)                 # allow an immediate re-report
         self._recent = [(t, c) for (t, c) in self._recent if c != call]
-        self._marks = [(t, c) for (t, c) in self._marks if c != call]
+        self._marks = [m for m in self._marks if m[1] != call]
         # a card removed as "misrecognised" must not leave its voiceprint behind
         self._spk.forget(call)
         self._broadcast({"t": "asrdrop", "call": call,
@@ -822,7 +827,7 @@ class CallsignService:
                 n += 1
         self._seen[new] = self._seen.pop(old, time.monotonic())
         self._recent = [(t, new if c == old else c) for (t, c) in self._recent]
-        self._marks = [(t, new if c == old else c) for (t, c) in self._marks]
+        self._marks = [(t, new if c == old else c, h) for (t, c, h) in self._marks]
         self._spk.rename(old, new)
         self._broadcast({"t": "asrrename", "old": old, "new": new,
                          "name": info.get("name", ""), "city": info.get("city", ""),
@@ -913,6 +918,20 @@ class CallsignService:
     # no piece falling under the 2.5 s minimum. Splitting one over in two is
     # harmless — both halves match the same profile — merging two is not.
     PAUSE_S = 0.6
+    # --- what may become a profile ---------------------------------------
+    # A profile is the yardstick every later over is measured against, so it is
+    # held to more than a match is. The first attempt learned from any over
+    # that carried exactly one callsign, and the profiles of different stations
+    # ended up 0.66-0.84 alike — too close to tell apart. The reason is in the
+    # operating practice: the callsign in an over is very often the OTHER
+    # station's. "DL1ABC, are you there?" files the caller's voice under the
+    # called station, and two or three such overs are enough to smear a profile
+    # into a mixture of two people.
+    ENROL_SPEECH_S = 4.0   # a mean built from less is not worth keeping
+    ENROL_TAIL = 0.40      # the label must fall in the last 40 % of the over,
+    ENROL_TAIL_S = 3.0     # or within 3 s of its end: that is where an
+                           # operator signs with their OWN call, while the
+                           # start of an over is where the other one is named
     FRAME_S = 0.05        # level resolution; see _seg_tick
     MAX_SEG_S = speaker_id.MAX_SEG_S
     def _seg_tick(self, pcm, active: bool) -> None:
@@ -960,6 +979,51 @@ class CallsignService:
             return
         self._seg_close()
 
+    @staticmethod
+    def _enrol_label(marks, t0: float, t1: float, speech: float, own: str,
+                     known) -> tuple:
+        """Which callsign this over may be filed under, and why not.
+
+        `marks` is [(ts, call, by_hand)] collected anywhere in the over's
+        window, `t0`/`t1` its bounds. Returns (call, reason) with call None when nothing may be
+        learned; the reason names the counter to raise.
+        """
+        heard = sorted(marks)
+        if own:
+            heard = [m for m in heard if m[1] != own]          # never ourselves
+        if not heard:
+            return None, "nocall"
+        # A card picked by hand says whose voice this is; everything below only
+        # infers it. So the pick is taken as it stands — no length, position or
+        # register test second-guesses a human.
+        by_hand = [m for m in heard if m[2]]
+        if by_hand:
+            return by_hand[-1][1], "manual"
+        distinct = {c for (_t, c, _h) in heard}
+        call, why = heard[-1][1], "enrol"
+        if len(distinct) > 1:
+            # Two stations named in one over. Usually that is a call-up, and
+            # the order carries the answer: the called station is named first,
+            # the speaker signs with their own call last. We accept that only
+            # in its clean form — exactly two calls, the other one confined to
+            # the first half — and count it apart, so how much of the learning
+            # rests on the convention stays visible.
+            others = [t for (t, c, _h) in heard if c != call]
+            if len(distinct) != 2 or not others \
+                    or max(others) > t0 + max(t1 - t0, 0.1) * 0.6:
+                return None, "multi"
+            why = "order"
+        if speech < CallsignService.ENROL_SPEECH_S:
+            return None, "brief"
+        if known and call not in known:
+            return None, "void"        # a mishear must not become a profile
+        span = max(t1 - t0, 0.1)
+        last = heard[-1][0]
+        if last < t1 - max(span * (1.0 - CallsignService.ENROL_TAIL),
+                           span - CallsignService.ENROL_TAIL_S):
+            return None, "early"
+        return call, why
+
     def _seg_close(self) -> None:
         """The over ended (pause long enough, or the carrier dropped)."""
         buf, speech, t0 = self._seg, self._seg_speech, self._seg_t0
@@ -980,17 +1044,19 @@ class CallsignService:
         # closed. Waiting briefly is what lets that over count as labelled.
         await asyncio.sleep(0.7)
         lo, hi = t0 - 0.3, t1 + 0.8
-        calls = {c for (t, c) in self._marks if lo <= t <= hi}
+        win = [m for m in self._marks if lo <= m[0] <= hi]
         # consume them: the window of the NEXT over overlaps this one (it may
         # start 0.6 s after this one closed), and a call counted twice would file
         # the next speaker's voice under this speaker's callsign
-        self._marks = [(t, c) for (t, c) in self._marks if not lo <= t <= hi]
+        self._marks = [m for m in self._marks if not lo <= m[0] <= hi]
         vec = await asyncio.to_thread(self._spk.embed, pcm)
         if vec is None:
             return
-        if len(calls) == 1:
-            call = calls.pop()
-            self._seg_stat["enrol"] += 1
+        call, why = self._enrol_label(
+            win, t0, t1, speech, callsign_asr.normalize_call(settings.callsign),
+            self._calls)
+        self._seg_stat[why] = self._seg_stat.get(why, 0) + 1
+        if call:
             n = await asyncio.to_thread(self._spk.enrol, call, vec)
             # the panel shows the number of learned voices, so every change to
             # the profile set carries the new count with it
@@ -998,11 +1064,11 @@ class CallsignService:
                              "n": n, "dur": round(speech, 1),
                              "profiles": self._spk.stats()["profiles"]})
             return
-        if calls:
-            self._seg_stat["multi"] += 1
-            return          # two stations in one segment: labelling it would
-                            # poison both profiles, so this over is skipped
-        self._seg_stat["nocall"] += 1
+        if why in ("multi", "brief"):
+            return          # labelled well enough for the card, not for a profile
+        # "early" and "void" fall through on purpose: the callsign heard there
+        # is the one most likely to belong to someone else, so this is exactly
+        # the voice worth matching against what we already know
         # Hold on to it: the operator often corrects the attribution just AFTER
         # an over ends ("that was DL2YP"), and that is a label for exactly this
         # voiceprint — see mark_manual().
@@ -1056,8 +1122,8 @@ class CallsignService:
             # so its voiceprint can be filed under it. Recorded here rather than
             # after the de-dupe test, because a station repeating its call in a
             # later over is exactly the material a profile should grow on.
-            self._marks.append((now, call))
-            self._marks = [(t, c) for (t, c) in self._marks if now - t <= 60.0]
+            self._marks.append((now, call, False))
+            self._marks = [m for m in self._marks if now - m[0] <= 60.0]
         # Repetition voting: OMs send their call 2-3x. A list-valid call is trusted
         # at once; an unlisted (VOID) hit must be heard >=VOID_MIN_VOTES times in
         # the window before it is shown, which suppresses one-off mishears (e.g. a
