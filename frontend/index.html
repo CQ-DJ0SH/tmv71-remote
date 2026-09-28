@@ -812,11 +812,12 @@
       </div>
       <div class="mixer-field">
         <span class="logo-label">Mic boost (this browser)</span>
-        <div class="acg-row">
-          <label class="acg">BOOST
-            <input type="range" id="mic-boost" min="1" max="16" step="1" value="1">
-            <span class="gv" id="mic-boost-val">1×</span>
-          </label>
+        <div class="mixer-list">
+          <div class="mixer-row mic-boost-row">
+            <span class="mx-name">Boost</span>
+            <input type="range" class="mx-slider" id="mic-boost" min="1" max="16" step="1" value="1">
+            <span class="mx-val" id="mic-boost-val">1×</span>
+          </div>
         </div>
         <p class="pane-hint">Digital gain applied in the browser, before the audio is encoded and sent. It belongs here and not on the Pi when the microphone itself is quiet: iOS hands out a low-level signal once its own voice processing is switched off (which this app does on phones and tablets, so a Bluetooth headset stays on A2DP and speech is not mangled), and lifting a very quiet signal only after it has been through Opus lifts the codec's noise with it. Raise it until the mic meter in the audio panel reads like a desktop browser does, then use TX GAIN or AGC for the rest. A limiter after the boost keeps peaks from clipping. Stored per browser, and it takes effect immediately.</p>
       </div>
