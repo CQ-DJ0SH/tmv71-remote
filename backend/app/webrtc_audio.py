@@ -880,11 +880,7 @@ class RadioAudio:
             # run away. Overrides the manual tx_gain while enabled.
             x = pcm.astype(np.float32)
             rms = float(np.sqrt(np.mean(x * x))) if x.size else 0.0
-            # The ceiling is 24, not 12: a phone with its own voice processing
-            # switched off hands over a signal quiet enough that 12 does not
-            # reach the target. Raising it here is the coarse remedy — the
-            # browser-side boost, applied before the encoder, is the better one.
-            TARGET, NOISE, MAXG, MING = 5000.0, 180.0, 24.0, 0.3
+            TARGET, NOISE, MAXG, MING = 5000.0, 180.0, 12.0, 0.3
             if rms > NOISE:
                 desired = min(MAXG, max(MING, TARGET / rms))
                 a = 0.5 if desired < self._agc_gain else 0.04   # fast down, slow up

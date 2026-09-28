@@ -1012,10 +1012,6 @@ function bindEditor() {
 // NON-Bluetooth input — the phone's built-in mic — which never triggers SCO. The
 // headset then stays on A2DP the whole time; the radio mic comes from the phone.
 let audioPc = null, audioMic = null;
-// The stream as the microphone handed it over, kept apart from the one that is
-// actually sent: with a boost in between they are two different streams, and
-// the raw one still has to be stopped or the mic stays hot.
-let audioMicRaw = null, micCtx = null, micGainNode = null;
 let audioWant = false;          // user wants audio on → auto-reconnect on drops
 let audioReconnectT = null;     // pending reconnect timer
 let audioReconnectDelay = 400;  // reconnect backoff (ms), reset on a good connect
@@ -1043,21 +1039,39 @@ async function pickNonBtMicId() {
 //    input device and drop the level very low (across all browsers), so we leave
 //    them at the browser default.
 const isPwaMode = () => !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
-// An iPad running Safari calls itself a Mac. Since iPadOS 13 ("desktop-class
-// browsing") its user agent says Macintosh and carries no iPad, so the test
-// below missed it and the iPad was treated as a desktop — Apple's voice
-// processing stayed on the microphone and chewed up the transmitted audio.
-// Firefox for iOS keeps iPad in its user agent, was detected, and therefore
-// sounded markedly better on the same device. A Mac with a touch screen does
-// not exist, so touch points are what tells the two apart.
+// An iPad running Safari calls itself a Mac: since iPadOS 13 ("desktop-class
+// browsing") its user agent says Macintosh and carries no iPad, while Firefox
+// for iOS keeps iPad in its own. A Mac has no touch screen, so touch points
+// are what tells the two apart.
 const isTouchMac = () => /Mac/i.test(navigator.platform || navigator.userAgent || "")
                          && (navigator.maxTouchPoints || 0) > 1;
+const isIos = () => /iPhone|iPad|iPod/i.test(navigator.userAgent || "") || isTouchMac();
+const isMobile = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "")
+                       || isTouchMac() || isPwaMode();
+// Which path the microphone takes. The two are a real trade, not a right and a
+// wrong answer, so the choice is the operator's and is remembered per browser:
+//   "auto" — the browser's own processing, as on a desktop. On iOS that is
+//            Apple's voice unit: loud and levelled, but it pulls a Bluetooth
+//            headset onto the mono HFP profile and shapes the speech.
+//   "off"  — echo cancellation, noise suppression and automatic gain forced
+//            off: the headset stays on A2DP and nothing is shaped, but the raw
+//            iOS microphone is quiet.
+// Android keeps "off" by default — that is where a headset dropping to HFP was
+// first seen — while iOS defaults to "auto", where the level is the complaint.
+const micModeKey = () => "tmv71.micMode." + (isPwaMode() ? "pwa" : "browser");
+function micMode() {
+  const v = localStorage.getItem(micModeKey());
+  if (v === "auto" || v === "off") return v;
+  return (isMobile() && !isIos()) ? "off" : "auto";
+}
 function micConstraintsBase() {
-  const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "")
-                 || isTouchMac();
-  return (isPwaMode() || mobile)
+  return micMode() === "off"
     ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
     : {};
+}
+function setMicMode(v) {
+  try { localStorage.setItem(micModeKey(), v); } catch {}
+  if (audioPc) audioDropped();      // constraints are chosen when the mic is taken
 }
 // TX AGC toggle position is remembered per app (browser vs installed PWA). They
 // share one localStorage (same origin), so key it by display mode to separate.
@@ -1078,56 +1092,6 @@ async function captureBuiltinMic() {
     }
   }
   return stream;
-}
-
-// Gain applied in the browser, ahead of the Opus encoder. It exists because
-// iOS hands out a quiet signal once its voice processing is off — which this
-// app switches off on phones and tablets so a Bluetooth headset stays on A2DP
-// — and because lifting a very quiet signal only on the Pi lifts everything
-// Opus added on the way as well. Stored per app (browser vs installed PWA),
-// like the TX AGC toggle.
-const micBoostKey = () => "tmv71.micBoost." + (isPwaMode() ? "pwa" : "browser");
-function micBoost() {
-  const v = Number(localStorage.getItem(micBoostKey()));
-  if (Number.isFinite(v) && v >= 1 && v <= 16) return v;
-  // Nothing chosen yet: a Mac or PC needs none — the browser's own gain control
-  // is doing the work there — while iOS, with its voice processing off, starts
-  // out far too quiet. Four is a starting point to tune from, not a truth.
-  const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent || "") || isTouchMac();
-  return ios ? 4 : 1;
-}
-// Build mic -> gain -> limiter -> track. The limiter is not for sound, it is
-// there so a boost chosen for quiet speech cannot clip on a loud one.
-function boostMic(stream) {
-  const g = micBoost();
-  const AC = window.AudioContext || window.webkitAudioContext;
-  if (g <= 1 || !AC) return stream;
-  try {
-    micCtx = new AC();
-    micCtx.resume?.().catch(() => {});
-    const src = micCtx.createMediaStreamSource(stream);
-    micGainNode = micCtx.createGain();
-    micGainNode.gain.value = g;
-    const lim = micCtx.createDynamicsCompressor();
-    lim.threshold.value = -6; lim.knee.value = 0; lim.ratio.value = 20;
-    lim.attack.value = 0.003; lim.release.value = 0.25;
-    const dst = micCtx.createMediaStreamDestination();
-    src.connect(micGainNode).connect(lim).connect(dst);
-    return dst.stream;
-  } catch (e) {
-    // an AudioContext can be refused (autoplay policy, no gesture yet): send
-    // the plain microphone rather than no microphone at all
-    micCtx = micGainNode = null;
-    return stream;
-  }
-}
-function setMicBoost(g) {
-  try { localStorage.setItem(micBoostKey(), String(g)); } catch {}
-  if (micGainNode) micGainNode.gain.value = g;   // live, no renegotiation
-  const el = $("#mic-boost-val"); if (el) el.textContent = g + "×";
-  // going from 1 to more (or back) needs the graph built or removed, which
-  // means a fresh capture — only worth doing while audio is actually running
-  if (audioPc && ((g > 1) !== !!micGainNode)) { audioDropped(); }
 }
 
 function audioConnected() {
@@ -1160,8 +1124,6 @@ function teardownAudio() {
   if (audioGraceT) { clearTimeout(audioGraceT); audioGraceT = null; }
   if (audioPc) { try { audioPc.close(); } catch {} audioPc = null; }
   if (audioMic) { audioMic.getTracks().forEach(tr => tr.stop()); audioMic = null; }
-  if (audioMicRaw) { audioMicRaw.getTracks().forEach(tr => tr.stop()); audioMicRaw = null; }
-  if (micCtx) { try { micCtx.close(); } catch {} micCtx = null; micGainNode = null; }
   const a = $("#rx-audio"); if (a) a.srcObject = null;
 }
 function scheduleAudioReconnect() {
@@ -1196,8 +1158,7 @@ async function audioConnect() {
     if (t) t.disabled = false; return;
   }
   try {
-    audioMicRaw = mic;
-    audioMic = boostMic(mic);        // browser-side gain, ahead of the encoder
+    audioMic = mic;
     audioPc = new RTCPeerConnection();
     audioMic.getTracks().forEach(tr => audioPc.addTrack(tr, audioMic));
     audioPc.addEventListener("track", e => { $("#rx-audio").srcObject = e.streams[0]; });
@@ -1444,17 +1405,14 @@ function bindAudio() {
     try { await api("POST", "/api/audio/device", { device: e.target.value }); toast("Audio device switched", "ok"); }
     catch (err) { toast("Audio device: " + err.message, "err"); loadAudioDevices(); }
   });
-  const mb = $("#mic-boost");
-  if (mb) {
-    mb.value = String(micBoost());
-    const paint = () => {
-      const el = $("#mic-boost-val"); if (el) el.textContent = mb.value + "×";
-      const pct = (mb.value - mb.min) / (mb.max - mb.min) * 100;
-      mb.style.setProperty("--gpct", pct + "%");
-    };
-    paint();
-    mb.addEventListener("input", paint);
-    mb.addEventListener("change", () => setMicBoost(Number(mb.value)));
+  const mm = $("#mic-mode");
+  if (mm) {
+    mm.value = micMode();
+    mm.addEventListener("change", () => {
+      setMicMode(mm.value);
+      toast(mm.value === "off" ? "Mic: processing off (Bluetooth-safe)"
+                               : "Mic: browser default", "ok");
+    });
   }
   ["rx", "tx"].forEach(k => {
     const sl = document.getElementById(k + "-gain");

@@ -1073,6 +1073,29 @@ EN = [
     ]),
     ("p", "Try either with MIC TEST: the replay runs through the same chain, so "
           "it is heard without transmitting."),
+    ("h3", "Microphone path — why a phone can transmit quietly"),
+    ("p", "The browser's own processing — echo cancellation, noise suppression "
+          "and automatic gain — is what makes a gain of 1 correct on a desktop: "
+          "it levels the microphone before the audio is ever encoded. On iOS "
+          "that same processing is Apple's voice unit, and it comes as one "
+          "piece: switching it off costs the levelling too, which is why a "
+          "phone can transmit far more quietly than its own recorder app, even "
+          "with TX GAIN at the top. Switching it on shapes the speech and pulls "
+          "a Bluetooth headset onto the mono HFP profile, taking the received "
+          "audio down with it."),
+    ("p", "Neither is right for every station, so it is a setting: Settings > "
+          "Audio > Microphone path. BROWSER DEFAULT leaves the processing to "
+          "the browser, OFF forces all three off. Android starts at OFF — that "
+          "is where a headset dropping to HFP was first seen — while iOS and "
+          "the desktop start at BROWSER DEFAULT. The choice is remembered per "
+          "browser, and changing it re-takes the microphone, so the audio link "
+          "reconnects for a moment."),
+    ("p", "With OFF on an iPhone or iPad the signal arrives quiet: use TX GAIN "
+          "or the AGC to make it up, and judge the result with MIC TEST, which "
+          "runs the replay through the same chain without transmitting. If a "
+          "Bluetooth headset is in use, listen for the receive audio going dull "
+          "after a switch to BROWSER DEFAULT — that is the headset falling back "
+          "to HFP."),
     ("p", "Bluetooth headsets: transmit audio is captured from the phone's "
           "built-in microphone (not the headset's), so the headset stays on the "
           "A2DP profile and receive audio keeps coming through in good quality. "
@@ -1844,6 +1867,31 @@ DE = [
     ]),
     ("p", "Ausprobieren lässt sich beides mit MIC TEST: Die Wiedergabe läuft "
           "durch dieselbe Kette, man hört es also, ohne zu senden."),
+    ("h3", "Mikrofonweg — warum ein Telefon leise senden kann"),
+    ("p", "Die Aufbereitung des Browsers — Echokompensation, "
+          "Rauschunterdrückung und automatische Verstärkung — ist der Grund, "
+          "warum am Rechner Gain 1 richtig ist: Sie nivelliert das Mikrofon, "
+          "bevor überhaupt kodiert wird. Auf iOS ist genau das Apples "
+          "Sprachbaugruppe, und die gibt es nur im Ganzen: Schaltet man sie ab, "
+          "ist auch die Nivellierung weg — deshalb kann ein Telefon deutlich "
+          "leiser senden als seine eigene Recorder-App, selbst mit TX GAIN am "
+          "Anschlag. Schaltet man sie ein, formt sie die Sprache und zieht ein "
+          "Bluetooth-Headset auf das Mono-Profil HFP, was den Empfang "
+          "mitnimmt."),
+    ("p", "Für jede Station ist etwas anderes richtig, deshalb ist es eine "
+          "Einstellung: Einstellungen > Audio > Microphone path. BROWSER "
+          "DEFAULT überlässt die Aufbereitung dem Browser, OFF schaltet alle "
+          "drei ab. Android startet mit OFF — dort trat das Abfallen des "
+          "Headsets auf HFP zuerst auf —, iOS und der Rechner starten mit "
+          "BROWSER DEFAULT. Die Wahl wird je Browser gespeichert, und beim "
+          "Umschalten wird das Mikrofon neu geholt, die Audioverbindung baut "
+          "sich also kurz neu auf."),
+    ("p", "Mit OFF kommt auf iPhone und iPad ein leises Signal an: Der Rest "
+          "läuft dann über TX GAIN oder die AGC, beurteilen lässt sich das mit "
+          "MIC TEST, dessen Wiedergabe durch dieselbe Kette läuft, ohne zu "
+          "senden. Wer ein Bluetooth-Headset benutzt, sollte nach einem Wechsel "
+          "auf BROWSER DEFAULT darauf achten, ob der Empfang dumpf wird — das "
+          "wäre der Rückfall auf HFP."),
     ("p", "Bluetooth-Headsets: Das Sende-Audio wird vom eingebauten Telefon-"
           "Mikrofon aufgenommen (nicht vom Headset-Mikro), damit das Headset im "
           "A2DP-Profil bleibt und der Empfang in guter Qualität durchkommt. Das "

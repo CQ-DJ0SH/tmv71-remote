@@ -2280,11 +2280,6 @@ body.theme-light .mixer-row .mx-slider{--track-empty:#c8d2d9; --mark:rgba(40,55,
 .mixer-row .mx-mute{flex:0 0 auto; display:flex; align-items:center; gap:5px;
   font-family:var(--font-mono); font-size:11px; color:var(--text-dim); letter-spacing:.06em}
 .mixer-row .mx-mute input{width:15px; height:15px; accent-color:var(--cyan); color-scheme:dark}
-/* The mic boost is a single control, not a bank of mixer channels: a slider
-   stretched across the pane puts its value a hand's width from the thumb, and
-   the range is short (1-16x) anyway. */
-.mixer-row.mic-boost-row .mx-name{flex:0 0 auto}
-.mixer-row.mic-boost-row .mx-slider{flex:0 1 180px}
 body.theme-light .mixer-row .mx-mute input{color-scheme:light}
 .modal-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:22px}
 .modal-actions button{
