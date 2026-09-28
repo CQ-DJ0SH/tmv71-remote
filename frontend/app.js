@@ -1039,8 +1039,18 @@ async function pickNonBtMicId() {
 //    input device and drop the level very low (across all browsers), so we leave
 //    them at the browser default.
 const isPwaMode = () => !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+// An iPad running Safari calls itself a Mac. Since iPadOS 13 ("desktop-class
+// browsing") its user agent says Macintosh and carries no iPad, so the test
+// below missed it and the iPad was treated as a desktop — Apple's voice
+// processing stayed on the microphone and chewed up the transmitted audio.
+// Firefox for iOS keeps iPad in its user agent, was detected, and therefore
+// sounded markedly better on the same device. A Mac with a touch screen does
+// not exist, so touch points are what tells the two apart.
+const isTouchMac = () => /Mac/i.test(navigator.platform || navigator.userAgent || "")
+                         && (navigator.maxTouchPoints || 0) > 1;
 function micConstraintsBase() {
-  const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+  const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "")
+                 || isTouchMac();
   return (isPwaMode() || mobile)
     ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
     : {};
