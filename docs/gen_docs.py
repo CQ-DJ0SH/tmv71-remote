@@ -4,6 +4,7 @@
 Pure-Python via fpdf2 (no LaTeX). Run:  .venv/bin/python docs/gen_docs.py
 """
 import os
+import re
 import time
 
 from fpdf import FPDF
@@ -18,7 +19,25 @@ ACCENT = (16, 110, 78)        # muted green
 DARK = (28, 39, 49)
 GREY = (110, 122, 132)
 CODEBG = (244, 246, 248)
-VERSION = "3.5"
+
+
+def _app_version() -> str:
+    """The version the running app reports, read from its one definition.
+
+    The manual used to carry a copy of the number and the two drifted apart —
+    the app said 3.4 while the PDFs still said 3.2. Parsed rather than
+    imported: importing the config module would load the settings, and reading
+    runtime.json has no business in a documentation build.
+    """
+    src = os.path.join(HERE, "..", "backend", "app", "config.py")
+    with open(src, encoding="utf-8") as f:
+        m = re.search(r'^APP_VERSION\s*=\s*"([^"]+)"', f.read(), re.M)
+    if not m:                       # fail loudly: a wrong version is worse
+        raise SystemExit(f"APP_VERSION not found in {src}")
+    return m.group(1)
+
+
+VERSION = _app_version()
 
 
 RULE = (206, 216, 222)        # hairlines for header/footer
