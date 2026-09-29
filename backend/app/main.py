@@ -1587,7 +1587,7 @@ async def scan_status() -> dict:
 @app.post("/api/scan/start")
 async def scan_start(req: ScanStartRequest) -> dict:
     try:
-        return await service.start_scan(req.band)
+        return await service.start_scan(req.band, req.overwrite)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, str(exc))
 

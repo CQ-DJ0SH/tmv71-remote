@@ -1298,11 +1298,13 @@ EN = [
           "there, nothing is written at all. The first version instead rewrote "
           "one scratch channel for every single step, which cost 760 flash "
           "writes on every sweep."),
-    ("p", "So: MEMORIES 100–859 BELONG TO THE AIR SCAN. Pressing Air "
-          "overwrites them without asking — there is nowhere to put 760 "
-          "channels in the meantime. Channels 0–99 (the quick keys and the "
-          "memory scan), the presets from 900 up and the reserved 997–999 are "
-          "untouched."),
+    ("p", "So: MEMORIES 100–859 BELONG TO THE AIR SCAN. Before the grid is "
+          "written the panel asks, naming the range and what it will replace — "
+          "there is nowhere to put 760 channels in the meantime, so this is the "
+          "operator's decision, taken once: afterwards the grid is there and "
+          "the question does not come back. Channels 0–99 (the quick keys and "
+          "the memory scan), the presets from 900 up and the reserved 997–999 "
+          "are untouched."),
     ("h2", "ASR contacts"),
     ("p", "A panel below the band scan that collects every recognised station as "
           "an index card, so the last overs are readable at a glance instead of "
@@ -2144,10 +2146,13 @@ DE = [
           "steht das Raster schon drin, wird gar nichts geschrieben. Die erste "
           "Fassung schrieb stattdessen für jeden einzelnen Schritt einen "
           "Scratch-Kanal neu — 760 Flash-Schreibvorgänge pro Durchlauf."),
-    ("p", "Also: DIE SPEICHER 100–859 GEHÖREN DEM AIRBAND-SCAN. Ein Druck auf "
-          "Air überschreibt sie ohne Rückfrage — 760 Kanäle lassen sich "
-          "zwischenzeitlich nirgends ablegen. Unberührt bleiben die Kanäle "
-          "0–99 (Schnelltasten und Speicherscan), die Presets ab 900 und die "
+    ("p", "Also: DIE SPEICHER 100–859 GEHÖREN DEM AIRBAND-SCAN. Bevor das "
+          "Raster geschrieben wird, fragt das Panel nach und nennt dabei den "
+          "Bereich und was verloren geht — 760 Kanäle lassen sich "
+          "zwischenzeitlich nirgends ablegen, das ist also eine Entscheidung "
+          "des Bedieners, einmalig: Danach steht das Raster, und die Frage "
+          "kommt nicht wieder. Unberührt bleiben die Kanäle 0–99 "
+          "(Schnelltasten und Speicherscan), die Presets ab 900 und die "
           "reservierten 997–999."),
     ("h2", "ASR-Kontakte"),
     ("p", "Ein Panel unter dem Bandscan, das jede erkannte Station als "

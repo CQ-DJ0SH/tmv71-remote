@@ -2125,10 +2125,27 @@ function onScanBand(b) {
   scanBand = b; startScan();
 }
 
-async function startScan() {
+async function startScan(overwrite = false) {
   if (!scanBand || scanRunning) return;
   try {
-    const s = await api("POST", "/api/scan/start", { band: scanBand });
+    const s = await api("POST", "/api/scan/start", { band: scanBand, overwrite });
+    // The air band is swept by recalling memories, so its grid has to be in
+    // them. When it is not, the backend reports back instead of starting: 760
+    // stored channels are about to be replaced, and that is the operator's
+    // call, not ours. Asked once — afterwards the grid is there and the
+    // question does not come back.
+    if (s.needs_overwrite) {
+      const ok = await confirmDialog(
+        `The air-band scan is tuned by recalling memory channels, so it needs its `
+        + `own grid in memories ${s.mem_start}–${s.mem_end}. Writing it replaces `
+        + `whatever those ${s.total} channels hold now. Channels 0–99, the presets `
+        + `from 900 up and 997–999 stay as they are. Writing takes a minute or two; `
+        + `later scans reuse the grid and write nothing.`,
+        { title: "Overwrite memories " + s.mem_start + "–" + s.mem_end + "?",
+          okText: "OVERWRITE", danger: true });
+      if (!ok) { $("#scan-prog").textContent = "ready"; return; }
+      return startScan(true);
+    }
     scanMeta = scanMetaFrom(s);
     scanPoints = []; scanSweeps.length = 0; lastWfSweep = -1; setScanAxis();
     scanRunning = true; updateScanUi();

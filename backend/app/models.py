@@ -153,6 +153,10 @@ class ScanStartRequest(BaseModel):
     The list has to match radio_service.SCAN_BANDS plus "mem".
     """
     band: str = Field(pattern="^(2m|70cm|air|mem)$")
+    # The air band is scanned from memories 100-859, which it writes once. That
+    # wipes whatever was in them, so the first attempt reports back instead of
+    # starting and the panel asks; the answer comes back as overwrite=True.
+    overwrite: bool = False
 
 
 class WebRTCOffer(BaseModel):

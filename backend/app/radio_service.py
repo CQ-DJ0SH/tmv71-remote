@@ -395,7 +395,20 @@ class RadioService:
     def scan_status(self) -> dict:
         return self._scan
 
-    async def start_scan(self, band_key: str) -> dict:
+    def _air_mem_ready(self, freqs: list[int], mode: int) -> bool:
+        """Is the air grid already in memories AIR_MEM_START..? Five probes.
+
+        Used twice: to ask before overwriting, and by the runner to skip the
+        write phase. It talks to the radio, so it runs in a worker thread.
+        """
+        n = len(freqs)
+        for i in (0, n // 4, n // 2, (3 * n) // 4, n - 1):
+            m = self.radio.get_memory(AIR_MEM_START + i)
+            if m is None or m.rx_freq != freqs[i] or m.mode != mode:
+                return False
+        return True
+
+    async def start_scan(self, band_key: str, overwrite: bool = False) -> dict:
         if self._scanning:
             raise RuntimeError("scan already running")
         self._scanning = True
@@ -415,6 +428,20 @@ class RadioService:
                 raise ValueError(f"unknown band {band_key!r}")
             start, end, step, fm_mode, scratch_ch, via_memory = SCAN_BANDS[band_key]
             freqs = list(range(start, end + 1, step))
+            if via_memory and not overwrite:
+                # writing the grid destroys 760 stored channels: ask first, and
+                # only ask when it would actually happen
+                try:
+                    ready = await asyncio.to_thread(self._air_mem_ready, freqs, fm_mode)
+                except Exception as exc:  # noqa: BLE001
+                    self._scanning = False
+                    raise RuntimeError(str(exc)) from exc
+                if not ready:
+                    self._scanning = False
+                    return {"running": False, "needs_overwrite": True,
+                            "band": band_key, "total": len(freqs),
+                            "mem_start": AIR_MEM_START,
+                            "mem_end": AIR_MEM_START + len(freqs) - 1}
             self._scan = {"running": True, "band": band_key, "kind": "freq",
                           "total": len(freqs), "index": 0, "points": [],
                           "done": False, "error": None, "sweep": 0,
@@ -551,25 +578,15 @@ class RadioService:
         selection, not a write, so the sweep itself repeats as harmlessly as
         the memory-bank scan does.
 
-        The block is overwritten without asking — that is what the panel's
-        tooltip and the manual say it does, and 760 channels cannot be kept
-        anywhere else in the meantime.
+        Overwriting the block is confirmed in the panel before the scan is
+        started (see start_scan): 760 stored channels cannot be kept anywhere
+        in the meantime, so the operator decides, once.
         """
         band = 0                       # air band is on band A (VHF receiver)
         n = len(freqs)
         chans = [AIR_MEM_START + i for i in range(n)]
         orig_control = orig_ptt = 0
         saved_mode = saved_mem = None
-
-        def mem_ok() -> bool:
-            """Does the block already hold this grid? Five probes, not 760: a
-            full verify costs a serial round trip per channel and would take
-            longer than the scan it saves."""
-            for i in (0, n // 4, n // 2, (3 * n) // 4, n - 1):
-                m = self.radio.get_memory(chans[i])
-                if m is None or m.rx_freq != freqs[i] or m.mode != mode:
-                    return False
-            return True
 
         try:
             orig_control, orig_ptt = await asyncio.to_thread(self.radio.get_band_status)
@@ -579,7 +596,7 @@ class RadioService:
             if orig_control != band:   # scan on its audio -> make it control
                 await asyncio.to_thread(self.radio.set_control_band, band, band)
                 await asyncio.sleep(0.2)
-            if not await asyncio.to_thread(mem_ok):
+            if not await asyncio.to_thread(self._air_mem_ready, freqs, mode):
                 self._scan["phase"] = "preload"
                 for i, (ch, f) in enumerate(zip(chans, freqs)):
                     if self._scan_cancel or self._stop.is_set():
