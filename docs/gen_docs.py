@@ -961,7 +961,9 @@ EN = [
           "while transmitting the button shows a count-up timer (MM:SS). "
           "The 1750 Hz button "
           "arms a tone-call. Memory quick keys recall channels 0–16 (M0–M9 in the "
-          "left column, M10–M16 in the right; the loaded channel's key glows); "
+          "left column, M10–M16 in the right; the loaded channel's key glows). "
+          "With band A in the air band they switch to 50–66, a bank of their "
+          "own, so air-band presets and the ordinary ones do not share slots; "
           "below them the right column sends three DTMF memories (0–2). A status "
           "line shows per-band BUSY, the ASR state and the live RX/TX gain (in the "
           "PWA; the desktop shows the transmit hint). On mobile, mini RX/TX VU "
@@ -1289,7 +1291,7 @@ EN = [
     ("p", "Sweep a VHF/UHF range or the memory bank and see an occupancy "
           "spectrum + waterfall. Double-click a channel to tune the control VFO "
           "to it. 2 m and 70 cm are swept on the VFO; the memory bank scan "
-          "recalls channels 0–99 and skips the empty ones."),
+          "recalls channels 0–199 and skips the empty ones."),
     ("p", "The air band cannot be swept that way: the VFO refuses to be tuned "
           "into 118–137 MHz over CAT, so the scan has to recall memory "
           "channels. It therefore writes its grid — 760 channels at 25 kHz — "
@@ -1303,8 +1305,8 @@ EN = [
           "there is nowhere to put 760 channels in the meantime, so this is the "
           "operator's decision, taken once: afterwards the grid is there and "
           "the question does not come back. It starts at 200 to leave the whole "
-          "low bank alone: 0–9 and 50–59 are the quick keys, 0–99 is what the "
-          "memory-bank scan sweeps, and 100–199 is room for your own channels. "
+          "low bank alone: the quick keys are 0–16, or 50–66 while band A is "
+          "in the air band, and 0–199 is what the memory-bank scan sweeps. "
           "Above it, 960–996 is free and 997–999 are the reserved scratch "
           "entries (997 for air-band tuning, 998 and 999 for the 2 m and 70 cm "
           "scans)."),
@@ -1786,7 +1788,9 @@ DE = [
           "einen aufwärts laufenden Timer (MM:SS). Die 1750-Hz-Taste schärft einen "
           "Tonruf. Die Speicher-Schnelltasten rufen die Kanäle 0–16 ab (M0–M9 in "
           "der linken, M10–M16 in der rechten Spalte; die Taste des geladenen "
-          "Kanals leuchtet); darunter sendet die rechte Spalte drei DTMF-Speicher "
+          "Kanals leuchtet). Steht Band A im Airband, schalten sie auf 50–66 um "
+          "— eine eigene Bank, damit Airband-Presets und gewöhnliche Speicher "
+          "sich keine Plätze teilen; darunter sendet die rechte Spalte drei DTMF-Speicher "
           "(0–2). Eine Statuszeile zeigt BUSY je Band, den ASR-Zustand und den "
           "Live-RX/TX-Gain (in der PWA; am Desktop steht dort der Sende-Hinweis). "
           "Auf dem Handy flankieren Mini-RX/TX-VU-Bars mit Peak-Hold den Knopf."),
@@ -2139,7 +2143,7 @@ DE = [
     ("p", "Einen VHF/UHF-Bereich oder die Speicherbank absuchen und ein "
           "Belegungs-Spektrum + Wasserfall sehen. Ein Doppelklick auf einen Kanal "
           "stimmt den Steuer-VFO darauf ab. 2 m und 70 cm laufen über den VFO; "
-          "der Speicherbank-Scan ruft die Kanäle 0–99 auf und überspringt die "
+          "der Speicherbank-Scan ruft die Kanäle 0–199 auf und überspringt die "
           "leeren."),
     ("p", "Das Airband lässt sich so nicht absuchen: Der VFO nimmt über CAT "
           "keine Frequenz zwischen 118 und 137 MHz an, der Scan muss also "
@@ -2155,8 +2159,8 @@ DE = [
           "zwischenzeitlich nirgends ablegen, das ist also eine Entscheidung "
           "des Bedieners, einmalig: Danach steht das Raster, und die Frage "
           "kommt nicht wieder. Es beginnt bei 200, damit die ganze untere Bank "
-          "frei bleibt: 0–9 und 50–59 sind die Schnelltasten, 0–99 durchsucht "
-          "der Speicherscan, und 100–199 bleibt Platz für eigene Kanäle. "
+          "frei bleibt: Die Schnelltasten liegen auf 0–16, im Airband auf "
+          "50–66, und 0–199 durchsucht der Speicherscan. "
           "Darüber sind 960–996 frei, und 997–999 sind die reservierten "
           "Scratch-Kanäle (997 für die Airband-Abstimmung, 998 und 999 für die "
           "2-m- und 70-cm-Scans)."),

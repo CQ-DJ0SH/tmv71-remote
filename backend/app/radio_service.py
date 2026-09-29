@@ -39,8 +39,9 @@ log = logging.getLogger("tmv71")
 # for every step instead — 760 flash writes on every sweep.
 #
 # 760 channels at 25 kHz occupy 200..959. Starting at 200 keeps the whole low
-# bank free: 0-9 and 50-59 are the quick keys, 0-99 is what the memory-bank
-# scan sweeps, and 100-199 stays as room for the operator's own channels.
+# bank free: the quick keys are 0-16, or 50-66 while band A is in the air band
+# (17 of them, see QMEM_COUNT in the UI), and 0-199 is what the memory-bank
+# scan sweeps.
 # Above the grid, 960-996 is free and 997-999 are the reserved scratch entries
 # (997 air-band tuning, 998/999 the 2 m and 70 cm scans).
 AIR_MEM_START = 200
@@ -421,7 +422,10 @@ class RadioService:
         if band_key == "mem":
             # memory-bank scan: channels 0..99, empty ones skipped, repeats until
             # stopped. Pure recalls/reads (no flash writes), so looping is safe.
-            channels = list(range(0, 100))
+            # 0-199: the whole bank below the air grid. Empty channels cost
+            # one read and are skipped, so the range is as wide as the space
+            # that is actually the operator's.
+            channels = list(range(0, 200))
             self._scan = {"running": True, "band": band_key, "kind": "mem",
                           "total": 0, "index": 0, "points": [], "done": False,
                           "error": None, "sweep": 0,
@@ -683,7 +687,7 @@ class RadioService:
                 self._scan["points"] = []
                 self._scan["index"] = 0
                 if not occupied:
-                    self._scan["error"] = "No occupied channels in 0–99."
+                    self._scan["error"] = "No occupied channels in 0–199."
                     break
                 for i, (ch, f) in enumerate(occupied):
                     if self._scan_cancel or self._stop.is_set():

@@ -1932,7 +1932,7 @@ function tickClock() {
 }
 
 // When Band A sits in the air band, the quick-memory keys switch from M0–M9 to
-// M50–M59 (a dedicated bank of air-band presets). Re-label only when the base
+// M50–M66 (a dedicated bank of air-band presets). Re-label only when the base
 // actually changes, so the live status stream doesn't trigger constant fetches.
 function updateMemBase(st) {
   const b0 = (st.bands || [])[0];
@@ -1947,7 +1947,7 @@ function updateMemBase(st) {
   loadQuickMemNames();
 }
 
-// ---- quick keys: memory recall (M0-M9 / M50-M59 in air band) + DTMF (D0-D9) -
+// ---- quick keys: memory recall (M0-M16 / M50-M66 in air band) + DTMF --------
 const QMEM_COUNT = 17;   // M0–M16 (10 in the left column, 7 in the right)
 const QMEM_LEFT = 10;
 const QDTMF_COUNT = 3;   // DTMF 0–2
@@ -2139,8 +2139,8 @@ async function startScan(overwrite = false) {
         `The air-band scan is tuned by recalling memory channels, so it needs its `
         + `own grid in memories ${s.mem_start}–${s.mem_end}. Writing it replaces `
         + `whatever those ${s.total} channels hold now. Everything below it stays `
-        + `as it is — the quick keys, the 0–99 the memory scan sweeps, and 100–199 `
-        + `— as do 960–996 and the reserved 997–999. Writing takes a minute or two; `
+        + `as it is — the quick keys and the 0–199 the memory scan sweeps — as do `
+        + `960–996 and the reserved 997–999. Writing takes a minute or two; `
         + `later scans reuse the grid and write nothing.`,
         { title: "Overwrite memories " + s.mem_start + "–" + s.mem_end + "?",
           okText: "OVERWRITE", danger: true });

@@ -1800,7 +1800,7 @@ body.ctrl-b .qbtn.qmem:hover{color:var(--cyan)}} /* …or cyan when control band
 .qbtn.qmem.active{color:var(--amber); text-shadow:0 0 9px var(--amber-glow); opacity:1}
 body.ctrl-b .qbtn.qmem.active{color:var(--cyan); text-shadow:0 0 9px var(--cyan-glow)}
 .qbtn.qdtmf.sending{color:#fff; background:var(--tx); border-color:var(--tx); box-shadow:0 0 12px -3px var(--tx-glow)}
-/* --- air band = receive-only: M-keys (M50–M59) use the Band A amber border as a
+/* --- air band = receive-only: M-keys (M50–M66) use the Band A amber border as a
    bank cue, but (like normal mode) only the loaded memory's text glows; every TX
    control (PTT, lock/roger/1750, DTMF column) is disabled. --- */
 body.airband .qbtn.qmem{border-color:var(--amber)}
