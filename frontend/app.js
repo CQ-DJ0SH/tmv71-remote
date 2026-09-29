@@ -77,13 +77,29 @@ function wsUrl(path) {
 }
 
 // ---- helpers --------------------------------------------------------------
+// FastAPI answers a rejected body with a LIST of error objects, not a string.
+// Concatenated into a message that became "[object Object]" on screen — which
+// says nothing at all, where the objects themselves say exactly which field
+// was wrong. Flatten them into something a person can act on.
+function errText(detail) {
+  if (!detail) return "";
+  if (typeof detail === "string") return detail;
+  const one = e => {
+    if (typeof e === "string") return e;
+    const where = Array.isArray(e?.loc) ? e.loc.filter(x => x !== "body").join(".") : "";
+    const msg = e?.msg || e?.detail || JSON.stringify(e);
+    return where ? `${where}: ${msg}` : msg;
+  };
+  return (Array.isArray(detail) ? detail.map(one) : [one(detail)]).join("; ");
+}
+
 async function api(method, path, body) {
   const opt = { method, headers: {} };
   if (body !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
   const r = await fetch(apiUrl(path), opt);
   if (!r.ok) {
     let detail = "";
-    try { detail = (await r.json()).detail || ""; } catch {}
+    try { detail = errText((await r.json()).detail); } catch {}
     throw new Error(detail || `An error occurred: ${r.status}`);
   }
   return r.headers.get("content-type")?.includes("json") ? r.json() : r.text();
@@ -2138,7 +2154,11 @@ async function pollScan() {
   drawScan();
   const lp = scanPoints.length ? scanPoints[scanPoints.length - 1] : null;
   const lastTxt = lp ? (lp.ch != null ? `M${lp.ch} · ${fmtMHz(lp.f)} MHz` : `${fmtMHz(lp.f)} MHz`) : "";
-  $("#scan-prog").textContent = s.running
+  // the air band writes its grid into memory on the very first run; without
+  // saying so the panel just sits at 0/760 for a minute and looks stuck
+  const pre = s.running && s.phase === "preload"
+    ? `preparing memories ${s.mem_start}–${s.mem_end} · ${s.index}/${s.total}` : "";
+  $("#scan-prog").textContent = pre ? pre : s.running
     ? `running · ${s.index}/${s.total} · ${lastTxt}`
     : s.error ? "Error: " + s.error
     : s.done ? `done · ${s.total} channels` : "ready";

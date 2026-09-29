@@ -1288,7 +1288,21 @@ EN = [
     ("h2", "Band scan"),
     ("p", "Sweep a VHF/UHF range or the memory bank and see an occupancy "
           "spectrum + waterfall. Double-click a channel to tune the control VFO "
-          "to it."),
+          "to it. 2 m and 70 cm are swept on the VFO; the memory bank scan "
+          "recalls channels 0–99 and skips the empty ones."),
+    ("p", "The air band cannot be swept that way: the VFO refuses to be tuned "
+          "into 118–137 MHz over CAT, so the scan has to recall memory "
+          "channels. It therefore writes its grid — 760 channels at 25 kHz — "
+          "into memories 100–859 once and only recalls them afterwards. "
+          "Before each run five of them are read back; if the grid is already "
+          "there, nothing is written at all. The first version instead rewrote "
+          "one scratch channel for every single step, which cost 760 flash "
+          "writes on every sweep."),
+    ("p", "So: MEMORIES 100–859 BELONG TO THE AIR SCAN. Pressing Air "
+          "overwrites them without asking — there is nowhere to put 760 "
+          "channels in the meantime. Channels 0–99 (the quick keys and the "
+          "memory scan), the presets from 900 up and the reserved 997–999 are "
+          "untouched."),
     ("h2", "ASR contacts"),
     ("p", "A panel below the band scan that collects every recognised station as "
           "an index card, so the last overs are readable at a glance instead of "
@@ -2119,7 +2133,22 @@ DE = [
     ("h2", "Bandscan"),
     ("p", "Einen VHF/UHF-Bereich oder die Speicherbank absuchen und ein "
           "Belegungs-Spektrum + Wasserfall sehen. Ein Doppelklick auf einen Kanal "
-          "stimmt den Steuer-VFO darauf ab."),
+          "stimmt den Steuer-VFO darauf ab. 2 m und 70 cm laufen über den VFO; "
+          "der Speicherbank-Scan ruft die Kanäle 0–99 auf und überspringt die "
+          "leeren."),
+    ("p", "Das Airband lässt sich so nicht absuchen: Der VFO nimmt über CAT "
+          "keine Frequenz zwischen 118 und 137 MHz an, der Scan muss also "
+          "Speicherkanäle aufrufen. Er schreibt sein Raster — 760 Kanäle im "
+          "25-kHz-Abstand — deshalb einmal in die Speicher 100–859 und ruft sie "
+          "danach nur noch auf. Vor jedem Lauf werden fünf davon zurückgelesen; "
+          "steht das Raster schon drin, wird gar nichts geschrieben. Die erste "
+          "Fassung schrieb stattdessen für jeden einzelnen Schritt einen "
+          "Scratch-Kanal neu — 760 Flash-Schreibvorgänge pro Durchlauf."),
+    ("p", "Also: DIE SPEICHER 100–859 GEHÖREN DEM AIRBAND-SCAN. Ein Druck auf "
+          "Air überschreibt sie ohne Rückfrage — 760 Kanäle lassen sich "
+          "zwischenzeitlich nirgends ablegen. Unberührt bleiben die Kanäle "
+          "0–99 (Schnelltasten und Speicherscan), die Presets ab 900 und die "
+          "reservierten 997–999."),
     ("h2", "ASR-Kontakte"),
     ("p", "Ein Panel unter dem Bandscan, das jede erkannte Station als "
           "Karteikarte sammelt — die letzten Durchgänge sind so auf einen Blick "

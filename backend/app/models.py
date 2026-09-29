@@ -146,8 +146,13 @@ class ThemeRequest(BaseModel):
 
 
 class ScanStartRequest(BaseModel):
-    """Start a graphical sweep: a band (2m/70cm) or the memory bank (mem)."""
-    band: str = Field(pattern="^(2m|70cm|mem)$")
+    """Start a graphical sweep: a band (2m/70cm/air) or the memory bank (mem).
+
+    The air band was missing here while the panel offered it and the service
+    could run it, so pressing Air got a validation error instead of a scan.
+    The list has to match radio_service.SCAN_BANDS plus "mem".
+    """
+    band: str = Field(pattern="^(2m|70cm|air|mem)$")
 
 
 class WebRTCOffer(BaseModel):

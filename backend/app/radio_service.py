@@ -33,10 +33,18 @@ log = logging.getLogger("tmv71")
 #  - via_memory True: sweep by rewriting + recalling scratch_ch for every step.
 #    This is the only way to scan the air band (an RX-only AM segment the VFO
 #    can't be moved into over CAT), at the cost of one ME flash write per step.
+# The air band is scanned from memory channels, because the VFO cannot be
+# tuned into 118-137 MHz over CAT. The grid is written ONCE into this block and
+# only recalled afterwards: 760 channels at 25 kHz occupy 100..859, and the
+# radio has a thousand of them. The first version rewrote a single scratch
+# channel for every step instead — 760 flash writes on every sweep.
+AIR_MEM_START = 100
+
 SCAN_BANDS = {
     "2m":   (144_000_000, 145_995_000, 12_500, 0, 998, False),
     "70cm": (430_000_000, 439_975_000, 25_000, 0, 999, False),
-    "air":  (118_000_000, 136_975_000, 25_000, 2, 997, True),
+    # air: no scratch channel — it scans the preloaded block (see AIR_MEM_START)
+    "air":  (118_000_000, 136_975_000, 25_000, 2, 0, True),
 }
 
 
@@ -410,8 +418,13 @@ class RadioService:
             self._scan = {"running": True, "band": band_key, "kind": "freq",
                           "total": len(freqs), "index": 0, "points": [],
                           "done": False, "error": None, "sweep": 0,
+                          # the air band writes its grid into memory first; the
+                          # panel says so instead of looking stalled
+                          "phase": "sweep" if not via_memory else "check",
+                          "mem_start": AIR_MEM_START if via_memory else None,
+                          "mem_end": (AIR_MEM_START + len(freqs) - 1) if via_memory else None,
                           "start_hz": start, "end_hz": end, "step_hz": step}
-            runner = (self._run_scan_memory(freqs, fm_mode, scratch_ch) if via_memory
+            runner = (self._run_scan_air(freqs, fm_mode) if via_memory
                       else self._run_scan(freqs, fm_mode, scratch_ch))
         self._scan_task = asyncio.create_task(runner)
         return self._scan
@@ -528,18 +541,36 @@ class RadioService:
             await self.refresh()
             await self.manager.broadcast(self._status.model_dump())
 
-    async def _run_scan_memory(self, freqs: list[int], mode: int,
-                               scratch_ch: int) -> None:
-        """Sweep a band the VFO can't reach (the air band) by rewriting and
-        recalling ``scratch_ch`` for each frequency, measuring the RX AF level.
+    async def _run_scan_air(self, freqs: list[int], mode: int) -> None:
+        """Sweep the air band from memories written once, then only recalled.
 
-        The air band lives on band A (the VHF receiver), so the scan runs there.
-        One ME flash write happens per step — that's inherent to memory-recall
-        scanning; keep the range/step modest. The scratch channel is left in
-        place (used by the air-band toggle too)."""
+        Channels AIR_MEM_START.. hold the grid. They are spot-checked first
+        (first, middle, last and two in between): if they already carry the
+        expected frequencies the write phase is skipped, so only the very first
+        air scan on a radio costs flash writes. Recalling a channel is a
+        selection, not a write, so the sweep itself repeats as harmlessly as
+        the memory-bank scan does.
+
+        The block is overwritten without asking — that is what the panel's
+        tooltip and the manual say it does, and 760 channels cannot be kept
+        anywhere else in the meantime.
+        """
         band = 0                       # air band is on band A (VHF receiver)
+        n = len(freqs)
+        chans = [AIR_MEM_START + i for i in range(n)]
         orig_control = orig_ptt = 0
         saved_mode = saved_mem = None
+
+        def mem_ok() -> bool:
+            """Does the block already hold this grid? Five probes, not 760: a
+            full verify costs a serial round trip per channel and would take
+            longer than the scan it saves."""
+            for i in (0, n // 4, n // 2, (3 * n) // 4, n - 1):
+                m = self.radio.get_memory(chans[i])
+                if m is None or m.rx_freq != freqs[i] or m.mode != mode:
+                    return False
+            return True
+
         try:
             orig_control, orig_ptt = await asyncio.to_thread(self.radio.get_band_status)
             saved_mode = await asyncio.to_thread(self.radio.get_band_mode, band)
@@ -548,35 +579,48 @@ class RadioService:
             if orig_control != band:   # scan on its audio -> make it control
                 await asyncio.to_thread(self.radio.set_control_band, band, band)
                 await asyncio.sleep(0.2)
-            for i, f in enumerate(freqs):
-                if self._scan_cancel or self._stop.is_set():
-                    break
-                scratch = ChannelData(index=scratch_ch, rx_freq=f, step=7, shift=0,
-                                      reverse=0, tone_on=0, ctcss_on=0, dcs_on=0,
-                                      tone_idx=1, ctcss_idx=1, dcs_idx=0, offset=0,
-                                      mode=mode, tx_freq=0, lockout=0)
-                try:
-                    await asyncio.to_thread(self.radio.set_memory, scratch)
-                    await asyncio.to_thread(self.radio.recall_memory, band, scratch_ch)
-                except TMV71Error:
-                    self._scan["points"].append({"f": f, "db": -90.0})
+            if not await asyncio.to_thread(mem_ok):
+                self._scan["phase"] = "preload"
+                for i, (ch, f) in enumerate(zip(chans, freqs)):
+                    if self._scan_cancel or self._stop.is_set():
+                        return
+                    entry = ChannelData(index=ch, rx_freq=f, step=7, shift=0,
+                                        reverse=0, tone_on=0, ctcss_on=0, dcs_on=0,
+                                        tone_idx=1, ctcss_idx=1, dcs_idx=0, offset=0,
+                                        mode=mode, tx_freq=0, lockout=0)
+                    await asyncio.to_thread(self.radio.set_memory, entry)
                     self._scan["index"] = i + 1
-                    continue
-                await asyncio.sleep(0.17)            # retune + audio settle
-                db = float(self.level_provider()) if self.level_provider else -90.0
-                self._scan["points"].append({"f": f, "db": round(db, 1)})
-                self._scan["index"] = i + 1
+            self._scan["phase"] = "sweep"
+            sweep = 0
+            while not (self._scan_cancel or self._stop.is_set()):
+                self._scan["points"] = []
+                self._scan["index"] = 0
+                for i, (ch, f) in enumerate(zip(chans, freqs)):
+                    if self._scan_cancel or self._stop.is_set():
+                        break
+                    try:
+                        await asyncio.to_thread(self.radio.recall_memory, band, ch)
+                    except TMV71Error:
+                        self._scan["points"].append({"f": f, "db": -90.0})
+                        self._scan["index"] = i + 1
+                        continue
+                    await asyncio.sleep(0.17)        # retune + audio settle
+                    db = float(self.level_provider()) if self.level_provider else -90.0
+                    self._scan["points"].append({"f": f, "db": round(db, 1)})
+                    self._scan["index"] = i + 1
+                sweep += 1
+                self._scan["sweep"] = sweep
         except Exception as exc:  # noqa: BLE001
             self._scan["error"] = str(exc)
             log.error("air-band scan failed: %s", exc)
         finally:
             try:
-                # restore band A's mode/channel and the original control band
                 if saved_mode == MR_MODE and saved_mem is not None:
                     await asyncio.to_thread(self.radio.recall_memory, band, saved_mem)
                 elif saved_mode is not None and saved_mode != MR_MODE:
                     await asyncio.to_thread(self.radio.set_band_mode, band, saved_mode)
-                await asyncio.to_thread(self.radio.set_control_band, orig_control, orig_ptt)
+                await asyncio.to_thread(self.radio.set_control_band,
+                                        orig_control, orig_ptt)
             except Exception as exc:  # noqa: BLE001
                 log.error("air scan restore failed: %s", exc)
             self._scan["running"] = False
