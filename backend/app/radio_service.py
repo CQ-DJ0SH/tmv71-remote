@@ -35,10 +35,15 @@ log = logging.getLogger("tmv71")
 #    can't be moved into over CAT), at the cost of one ME flash write per step.
 # The air band is scanned from memory channels, because the VFO cannot be
 # tuned into 118-137 MHz over CAT. The grid is written ONCE into this block and
-# only recalled afterwards: 760 channels at 25 kHz occupy 100..859, and the
-# radio has a thousand of them. The first version rewrote a single scratch
-# channel for every step instead — 760 flash writes on every sweep.
-AIR_MEM_START = 100
+# only recalled afterwards; the first version rewrote a single scratch channel
+# for every step instead — 760 flash writes on every sweep.
+#
+# 760 channels at 25 kHz occupy 200..959. Starting at 200 keeps the whole low
+# bank free: 0-9 and 50-59 are the quick keys, 0-99 is what the memory-bank
+# scan sweeps, and 100-199 stays as room for the operator's own channels.
+# Above the grid, 960-996 is free and 997-999 are the reserved scratch entries
+# (997 air-band tuning, 998/999 the 2 m and 70 cm scans).
+AIR_MEM_START = 200
 
 SCAN_BANDS = {
     "2m":   (144_000_000, 145_995_000, 12_500, 0, 998, False),

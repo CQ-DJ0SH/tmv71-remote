@@ -2138,8 +2138,9 @@ async function startScan(overwrite = false) {
       const ok = await confirmDialog(
         `The air-band scan is tuned by recalling memory channels, so it needs its `
         + `own grid in memories ${s.mem_start}–${s.mem_end}. Writing it replaces `
-        + `whatever those ${s.total} channels hold now. Channels 0–99, the presets `
-        + `from 900 up and 997–999 stay as they are. Writing takes a minute or two; `
+        + `whatever those ${s.total} channels hold now. Everything below it stays `
+        + `as it is — the quick keys, the 0–99 the memory scan sweeps, and 100–199 `
+        + `— as do 960–996 and the reserved 997–999. Writing takes a minute or two; `
         + `later scans reuse the grid and write nothing.`,
         { title: "Overwrite memories " + s.mem_start + "–" + s.mem_end + "?",
           okText: "OVERWRITE", danger: true });
