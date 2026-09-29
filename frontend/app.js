@@ -2034,10 +2034,14 @@ const SCAN_FLOOR = -45, SCAN_TOP = -10;
 const scanNorm = db => Math.max(0, Math.min(1, (db - SCAN_FLOOR) / (SCAN_TOP - SCAN_FLOOR)));
 const scanLevel = p => scanNorm(p.db);
 
-// heat ramp low→high. Dark theme fades from near-black; the light theme starts
-// light (so low/empty channels blend with the bright panel) → cyan → amber → red.
-const SCAN_PAL_DARK  = [[12,18,24],[16,72,76],[63,224,208],[255,178,62],[255,70,58]];
-const SCAN_PAL_LIGHT = [[226,231,234],[120,200,205],[34,165,170],[240,158,48],[222,52,42]];
+// Heat ramp low→high → cyan → amber → red. The bottom of the ramp used to be
+// rgb(12,18,24) against a graph background of rgb(10,16,21): three units apart,
+// which made a swept but quiet band indistinguishable from a waterfall that was
+// never drawn — the panel looked broken when it was merely reporting silence.
+// Both floors now sit clear of their background, so "scanned, nothing heard"
+// reads as a dim band and only an empty history stays blank.
+const SCAN_PAL_DARK  = [[26,38,48],[16,72,76],[63,224,208],[255,178,62],[255,70,58]];
+const SCAN_PAL_LIGHT = [[206,214,221],[120,200,205],[34,165,170],[240,158,48],[222,52,42]];
 function scanHeat(t) {
   t = Math.max(0, Math.min(1, t));
   const s = document.body.classList.contains("theme-light") ? SCAN_PAL_LIGHT : SCAN_PAL_DARK;
@@ -2056,8 +2060,16 @@ function sizeScanCanvas() {
 
 function drawScan() {
   const cv = $("#scan-canvas"); if (!cv) return;
-  const ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
   const dpr = window.devicePixelRatio || 1;
+  // Match the bitmap to the box before every draw. A canvas measured while its
+  // panel was collapsed comes out 1x1, and nothing then re-measured it: the
+  // scan ran, the data arrived, and the graph stayed empty because everything
+  // was being painted into a single pixel. Cheap to check, impossible to get
+  // wrong again — whatever made the panel visible, the next frame fits.
+  const r = cv.getBoundingClientRect();
+  const w = Math.max(1, Math.round(r.width * dpr)), h = Math.max(1, Math.round(r.height * dpr));
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  const ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
   ctx.clearRect(0, 0, W, H);
   // give the waterfall more room so several history rows are visible
   const specH = Math.round(H * 0.6), wfH = H - specH;

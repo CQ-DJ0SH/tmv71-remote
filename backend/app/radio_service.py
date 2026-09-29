@@ -634,8 +634,16 @@ class RadioService:
                     db = float(self.level_provider()) if self.level_provider else -90.0
                     self._scan["points"].append({"f": f, "db": round(db, 1)})
                     self._scan["index"] = i + 1
+                if self._scan_cancel or self._stop.is_set():
+                    break
                 sweep += 1
-                self._scan["sweep"] = sweep
+                # A waterfall row is added when a client sees a finished sweep:
+                # points complete, index at total, the counter moved. Without
+                # this pause the next pass cleared all three within the same
+                # instant, so a poll every 400 ms never caught one — the air
+                # band scanned but drew no waterfall.
+                self._scan["sweep"] = sweep          # hold the finished sweep briefly
+                await asyncio.sleep(0.6)             # so clients can grab it + throttle
         except Exception as exc:  # noqa: BLE001
             self._scan["error"] = str(exc)
             log.error("air-band scan failed: %s", exc)
