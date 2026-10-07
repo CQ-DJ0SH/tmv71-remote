@@ -60,6 +60,7 @@ class HackRFSpectrum:
         # config / state
         self.available = shutil.which("hackrf_transfer") is not None
         self.running = False
+        self.dropped = 0                   # frames a subscriber could not take
         self.mode = "pan"                  # 'pan' | 'sweep'
         self.follow = True                 # panadapter centre tracks the radio
         self.center = 145_000_000          # panadapter centre (Hz)
@@ -88,6 +89,11 @@ class HackRFSpectrum:
         # runs on the event loop thread
         for q in list(self._subs):
             if q.full():
+                # A client that cannot keep up loses its oldest frame rather
+                # than holding everyone else back. Counted, because from the
+                # outside a slow link and a slow browser look the same — a
+                # graph that jumps — and this number tells them apart.
+                self.dropped += 1
                 try: q.get_nowait()        # drop oldest, keep the waterfall live
                 except asyncio.QueueEmpty: pass
             try: q.put_nowait(frame)
@@ -110,6 +116,7 @@ class HackRFSpectrum:
             "sweep_start": self.sweep_start, "sweep_stop": self.sweep_stop,
             "lna": self.lna, "vga": self.vga, "amp": self.amp,
             "bins": OUT_BINS, "fps": round(self._fps, 1), "error": self.error,
+            "dropped": self.dropped, "clients": len(self._subs),
         }
 
     def _probe_device_sync(self) -> bool:

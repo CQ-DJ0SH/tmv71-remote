@@ -485,7 +485,14 @@ body.theme-light #asr-mod.on{color:#1b2731; border-color:#7d8f9c; background:#00
    the panel head (only the collapse arrow follows it). Lit while it listens;
    the filled state means it is actually moving the mark (stage 2) rather than
    only reporting what it would do — the same neutral family as MOD. */
-#asr-voice{display:inline-flex; align-items:center; gap:6px; margin-left:auto}
+/* the pair sits at the right end of the head, ASSIGN first so VOICE MATCH
+   stays the last thing in the row */
+#asr-assign{margin-left:auto}
+#asr-voice{display:inline-flex; align-items:center; gap:6px}
+/* Same language as the VOICE MATCH button one step further: outline = the
+   stage is available, filled = it is intervening. */
+#asr-assign.act{color:#0d151b; background:#9fb4c2; border-color:#9fb4c2}
+body.theme-light #asr-assign.act{color:#eef4f7; background:#435b69; border-color:#435b69}
 /* the LED is always in the layout, only its state changes: a dot that appears
    and disappears would resize the button */
 #asr-voice::before{
@@ -1104,7 +1111,7 @@ body.theme-light .asr-tip{background:#ffffffF2; border-color:#c5cfd8; box-shadow
   .debug-zone .asr-total, .debug-zone #asr-stats,
   .debug-zone #asr-profiles{display:none}
   .debug-zone .panel-head{gap:8px; flex-wrap:wrap}
-  .debug-zone #asr-voice{margin-left:0}
+  .debug-zone #asr-voice, .debug-zone #asr-assign{margin-left:0}
   .debug-zone .asr-manual{width:96px; margin-left:0}
   /* the panel title may shrink and clip — the controls next to it must not */
   .debug-zone .panel-head h2{flex:0 1 auto; min-width:0; overflow:hidden;
@@ -2134,10 +2141,11 @@ body.theme-light #audio-toggle.connected:hover{
 #tx-buffer-val, #ptt-tail-val, #rx-buffer-val,
 #deemph-us-val, #roger-level-val{color:#5cc3cf}
 .audio-ctl .gv{font-family:var(--font-mono); font-size:11px; color:var(--cyan); width:40px; text-align:right}
-/* RX value: audio-panel violet; shrink to content + left-align so the short
-   whole-number value sits snug to the slider instead of a wide right-aligned box */
-#rx-gain-val{color:#8b7ad6; width:auto; text-align:left}
-#tx-gain-val{color:#cf6159}   /* MIC value: muted red */
+/* Both values shrink to content and sit left, snug to their slider: the 40 px
+   right-aligned box was sized for "10.5×" and left the short whole numbers
+   these sliders now show stranded well to the right of the thumb. */
+#rx-gain-val{color:#8b7ad6; width:auto; text-align:left}   /* audio-panel violet */
+#tx-gain-val{color:#cf6159; width:auto; text-align:left}   /* MIC value: muted red */
 
 /* scrolling RX/MIC level history graph (newest on the right) */
 .audio-graph{

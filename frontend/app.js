@@ -2291,12 +2291,30 @@ const HRF_GREEN = "#6fd89a";   // HackRF spectrum trace above the separator (sof
 // strong signals — deep navy → blue → cyan → yellow → red.
 const HRF_PAL_DARK  = [[10,14,30],[26,60,150],[40,130,225],[70,205,225],[245,225,70],[220,55,40]];
 const HRF_PAL_LIGHT = [[223,230,239],[120,165,222],[40,120,212],[40,178,205],[232,195,55],[208,48,38]];
+// The ramp, baked once into 256 steps. The waterfall asks for a colour per
+// FFT bin — 512 bins, 15 frames a second — and returning a fresh array each
+// time meant some 8,000 short-lived objects a second. That is not slow in
+// itself; it is what the garbage collector then has to clear away, once or
+// twice a second, which is exactly how often the graph was seen to stutter.
+const HRF_LUT = {light: null, dark: null};
+function hrfLut() {
+  const light = document.body.classList.contains("theme-light");
+  const key = light ? "light" : "dark";
+  if (HRF_LUT[key]) return HRF_LUT[key];
+  const s = light ? HRF_PAL_LIGHT : HRF_PAL_DARK, lut = new Uint8Array(256 * 3);
+  for (let k = 0; k < 256; k++) {
+    const x = (k / 255) * (s.length - 1), i = Math.floor(x), f = x - i;
+    const a = s[i], b = s[Math.min(i + 1, s.length - 1)];
+    lut[k * 3] = a[0] + (b[0] - a[0]) * f;
+    lut[k * 3 + 1] = a[1] + (b[1] - a[1]) * f;
+    lut[k * 3 + 2] = a[2] + (b[2] - a[2]) * f;
+  }
+  HRF_LUT[key] = lut;
+  return lut;
+}
 function hrfHeatRGB(t) {
-  t = Math.max(0, Math.min(1, t));
-  const s = document.body.classList.contains("theme-light") ? HRF_PAL_LIGHT : HRF_PAL_DARK;
-  const x = t * (s.length - 1), i = Math.floor(x), f = x - i;
-  const a = s[i], b = s[Math.min(i + 1, s.length - 1)];
-  return [Math.round(a[0]+(b[0]-a[0])*f), Math.round(a[1]+(b[1]-a[1])*f), Math.round(a[2]+(b[2]-a[2])*f)];
+  const lut = hrfLut(), k = Math.max(0, Math.min(255, Math.round(t * 255))) * 3;
+  return [lut[k], lut[k + 1], lut[k + 2]];
 }
 function hrfHeat(t) { const c = hrfHeatRGB(t); return `rgb(${c[0]},${c[1]},${c[2]})`; }
 
@@ -2354,13 +2372,27 @@ function openHrfWs() {
 }
 function closeHrfWs() { if (hrf.ws) { try { hrf.ws.close(); } catch {} hrf.ws = null; } }
 
+// Frames arrive about 15 times a second, the display refreshes 60: drawing
+// straight out of the socket means that whenever the main thread was busy for a
+// moment, the frames that piled up behind it are all drawn back to back, none
+// of them seen. Keep the newest and paint it on the next animation frame, which
+// is the only moment painting is worth anything.
+let hrfPending = null, hrfRaf = 0;
+function hrfPaint() {
+  hrfRaf = 0;
+  const m = hrfPending; hrfPending = null;
+  if (!m) return;
+  hrfUpdateFloor(m.db);
+  drawHrfWaterfall(m.db);
+  drawHrfSpectrum(m.db);
+}
+
 function hrfFrame(m) {
   if (m.t === "status") { applyHrfStatus(m); return; }
   if (m.t !== "pan" && m.t !== "sweep") return;       // idle/ping
   hrf.meta = m;
-  hrfUpdateFloor(m.db);
-  drawHrfWaterfall(m.db);
-  drawHrfSpectrum(m.db);
+  hrfPending = m;
+  if (!hrfRaf) hrfRaf = requestAnimationFrame(hrfPaint);
   setHrfAxis(m);
   updateHrfCenterline(m);
   hrfStat(`${m.t === "pan" ? "PAN" : "SWEEP"} · ${hrfMhz(m.center)} MHz`);
@@ -2379,10 +2411,29 @@ function applyHrfStatus(s) {
 // Track the noise floor (slow EMA of a low percentile) so it sits at the bottom
 // of the waterfall in any RF/gain condition.
 function hrfUpdateFloor(db) {
-  const s = [...db].sort((a, b) => a - b);
-  const p = s[Math.floor(s.length * 0.10)];
+  // A 10th percentile, without copying and sorting 512 values every frame: a
+  // 1 dB histogram over the range these values live in. The floor is a slow
+  // average anyway, so a 1 dB grid is finer than it needs.
+  const n = db.length;
+  let lo = Infinity, hi = -Infinity;
+  for (let i = 0; i < n; i++) { const v = db[i]; if (v < lo) lo = v; if (v > hi) hi = v; }
+  if (!isFinite(lo)) return;
+  const bins = Math.max(1, Math.min(512, Math.ceil(hi - lo) + 1));
+  if (!hrfHist || hrfHist.length !== bins) hrfHist = new Uint16Array(bins);
+  else hrfHist.fill(0);
+  const scale = bins / Math.max(1e-6, hi - lo + 1e-6);
+  for (let i = 0; i < n; i++) {
+    let k = Math.floor((db[i] - lo) * scale);
+    if (k < 0) k = 0; else if (k >= bins) k = bins - 1;
+    hrfHist[k]++;
+  }
+  const target = Math.floor(n * 0.10);
+  let acc = 0, k = 0;
+  for (; k < bins; k++) { acc += hrfHist[k]; if (acc > target) break; }
+  const p = lo + (k + 0.5) / scale;
   hrf.floorEMA = hrf.floorEMA == null ? p : hrf.floorEMA * 0.93 + p * 0.07;
 }
+let hrfHist = null;         // reused histogram for the floor estimate
 // dB→0..1 with the auto floor at the bottom; the LEVEL slider sets the dB span
 // above it (= peak height / contrast): more level → smaller span → taller peaks.
 function hrfNorm() {
@@ -2407,6 +2458,7 @@ function sizeHrfCanvases() {
 }
 
 let hrfRowCv = null;        // offscreen 1-row buffer (bin resolution)
+let hrfRowImg = null;       // its pixel buffer, reused frame to frame
 function drawHrfWaterfall(db) {
   const cv = $("#hrf-wf"); if (!cv) return;
   const ctx = cv.getContext("2d"), W = cv.width;
@@ -2422,12 +2474,14 @@ function drawHrfWaterfall(db) {
   if (!hrfRowCv || hrfRowCv.width !== n) {
     hrfRowCv = document.createElement("canvas"); hrfRowCv.width = n; hrfRowCv.height = 1;
   }
-  const rctx = hrfRowCv.getContext("2d"), img = rctx.createImageData(n, 1), d = img.data;
+  const rctx = hrfRowCv.getContext("2d");
+  if (!hrfRowImg || hrfRowImg.width !== n) hrfRowImg = rctx.createImageData(n, 1);
+  const d = hrfRowImg.data, lut = hrfLut();       // one buffer, one table, no garbage
   for (let i = 0; i < n; i++) {
-    const c = hrfHeatRGB(norm(db[i])), o = i * 4;
-    d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255;
+    const k = Math.max(0, Math.min(255, Math.round(norm(db[i]) * 255))) * 3, o = i * 4;
+    d[o] = lut[k]; d[o + 1] = lut[k + 1]; d[o + 2] = lut[k + 2]; d[o + 3] = 255;
   }
-  rctx.putImageData(img, 0, 0);
+  rctx.putImageData(hrfRowImg, 0, 0);
   // …then stretch it across the canvas with interpolation → smooth, not blocky
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(hrfRowCv, 0, 0, n, 1, 0, 0, W, rowH);
@@ -3507,7 +3561,7 @@ function overPaint() {
   const ms = overElapsed();
   durSet(overCard, ms);
   el.classList.add("live");
-  asrRailSync();
+  asrRailSync(overCard);            // one card moved, not the whole log
   // The RUNNING value has to be persisted too. It used to be painted only as
   // text while data-dur-ms and the store kept the last BANKED figure — so a
   // card whose clock was still going showed minutes and came back from a reload
@@ -3745,9 +3799,19 @@ function reflectSpk(k) {
       : k.act ? `Voice ID is assigning (${k.profiles} profiles) — switch off`
               : `Voice ID is observing only (${k.profiles} profiles) — switch off`;
   }
+  const ab = $("#asr-assign");
+  if (ab) {
+    ab.disabled = !k.available;
+    ab.classList.toggle("act", !!(k.enabled && k.act));
+    ab.setAttribute("aria-pressed", k.enabled && k.act ? "true" : "false");
+    ab.title = !k.available ? "Voice ID: speaker model missing on the Pi"
+      : k.act ? "Assigning: a recognised voice moves the mark and the talk timer — switch off"
+              : "Observing only: switch on to let a recognised voice move the mark and the talk timer";
+  }
   spkOn = !!k.enabled;
+  spkAct = !!k.act;
 }
-let spkOn = false;
+let spkOn = false, spkAct = false;
 // PROFILES sits next to STATS: same panel, same kind of dialog. It is opened
 // rarely, so it fetches the current state each time rather than relying on
 // whatever the last status push happened to carry.
@@ -3771,6 +3835,18 @@ $("#asr-profiles")?.addEventListener("click", spkDlgOpen);
 $("#asr-spk-close")?.addEventListener("click", spkDlgClose);
 $("#asr-spk-dlg")?.addEventListener("mousedown", ev => {
   if (ev.target.id === "asr-spk-dlg") spkDlgClose();
+});
+
+// The second stage, next to the switch that enables recognition at all.
+// Turning it on also turns recognition on: a stage that acts on nothing would
+// be a dead switch, and the settings selector reads the same way.
+$("#asr-assign")?.addEventListener("click", async () => {
+  const want = !spkAct;
+  try {
+    reflectAsr(await api("POST", "/api/asr/speaker",
+                         want ? { enabled: true, act: true } : { act: false }));
+    toast(want ? "Voice ID: assigning" : "Voice ID: observing only", want ? "ok" : "");
+  } catch (err) { toast("Voice ID: " + err.message, "err"); }
 });
 
 $("#asr-voice")?.addEventListener("click", async () => {
@@ -4230,18 +4306,38 @@ function asrRailBuild() {
   asrRailSync();
 }
 // the parts that change without the card set changing: talk time and state
-function asrRailSync() {
-  const cards = [...document.querySelectorAll("#asr-log .asr-card")];
-  const copies = [...document.querySelectorAll(".rail-body .asr-card")];
-  copies.forEach((c, i) => {
-    const src = cards[i];
-    if (!src || c.querySelector(".ac-edit")) return;   // leave an open editor be
-    if (c.className !== src.className) c.className = src.className.replace(" flash", "");
-    const a = c.querySelector(".ac-dv"), b = src.querySelector(".ac-dv");
-    if (a && b && a.textContent !== b.textContent) a.textContent = b.textContent;
-    const ca = c.querySelector(".ac-count"), cb = src.querySelector(".ac-count");
-    if (ca && cb && ca.textContent !== cb.textContent) ca.textContent = cb.textContent;
-  });
+// `one` = the single card that changed (the running clock, twice a second).
+// Without it this walked every card and every copy in the document on each
+// tick — work that grows with the log and competes with whatever else wants
+// the main thread, the HackRF graph included. A full pass still happens when
+// the rails are rebuilt or a card is added, where it is actually needed.
+function asrRailSync(one) {
+  if (one) {
+    const copy = asrRailCopy(one);
+    if (copy) asrRailCopyOne(one, copy);
+    return;
+  }
+  const cards = document.querySelectorAll("#asr-log .asr-card");
+  const copies = document.querySelectorAll(".rail-body .asr-card");
+  for (let i = 0; i < copies.length; i++) {
+    if (cards[i]) asrRailCopyOne(cards[i], copies[i]);
+  }
+}
+
+// the copy of one card, found by its callsign rather than by counting nodes
+function asrRailCopy(src) {
+  const call = src.dataset.call;
+  if (!call) return null;
+  return document.querySelector(`.rail-body .asr-card[data-call="${CSS.escape(call)}"]`);
+}
+
+function asrRailCopyOne(src, c) {
+  if (!c || c.querySelector(".ac-edit")) return;      // leave an open editor be
+  if (c.className !== src.className) c.className = src.className.replace(" flash", "");
+  const a = c.querySelector(".ac-dv"), b = src.querySelector(".ac-dv");
+  if (a && b && a.textContent !== b.textContent) a.textContent = b.textContent;
+  const ca = c.querySelector(".ac-count"), cb = src.querySelector(".ac-count");
+  if (ca && cb && ca.textContent !== cb.textContent) ca.textContent = cb.textContent;
 }
 // Fold both rails together: they are one display split over two columns, and
 // leaving one open while the other is shut looks like a fault, not a choice.
@@ -4895,6 +4991,38 @@ document.addEventListener("visibilitychange", () => {
   if (!document.hidden) refreshAudio();            // refresh at once on return
 });
 tickClock(); setInterval(tickClock, 1000);
+
+// ---- opt-in main-thread diagnostics ----------------------------------------
+// A graph that jumps a couple of times a second is the main thread being busy
+// somewhere else. Guessing which handler it is wastes more time than measuring
+// it, so this measures: in the browser console run
+//   localStorage.setItem("tmv71.perf", "1")
+// and reload. Two logs follow: every task that blocks longer than 50 ms (where
+// the browser supports it — Chromium does, Safari does not), and every gap
+// between animation frames longer than 100 ms, which is the stutter as the eye
+// sees it. Turn it off again with removeItem. Nothing runs unless asked.
+try {
+  if (localStorage.getItem("tmv71.perf") === "1") {
+    if (window.PerformanceObserver) {
+      try {
+        new PerformanceObserver(l => l.getEntries().forEach(e =>
+          console.log(`[perf] long task ${Math.round(e.duration)} ms`,
+                      e.attribution?.[0]?.containerName || e.name || ""))
+        ).observe({ entryTypes: ["longtask"] });
+      } catch { /* longtask unsupported (Safari/Firefox) — the frame gaps below still tell */ }
+    }
+    let perfPrev = performance.now(), perfWorst = 0, perfN = 0;
+    const perfTick = () => {
+      const now = performance.now(), gap = now - perfPrev;
+      perfPrev = now;
+      if (gap > 100) { perfN++; if (gap > perfWorst) perfWorst = gap; console.log(`[perf] frame gap ${Math.round(gap)} ms`); }
+      requestAnimationFrame(perfTick);
+    };
+    requestAnimationFrame(perfTick);
+    setInterval(() => { if (perfN) { console.log(`[perf] ${perfN} gaps > 100 ms in the last 10 s, worst ${Math.round(perfWorst)} ms`); perfN = 0; perfWorst = 0; } }, 10000);
+    console.log("[perf] main-thread logging on — localStorage.removeItem('tmv71.perf') to stop");
+  }
+} catch { /* private mode: no storage, no diagnostics, no harm */ }
 
 // Persistent audio: auto-reconnect if it was on last session. RX playback may
 // need a user gesture (autoplay policy) — resume it on the first tap.

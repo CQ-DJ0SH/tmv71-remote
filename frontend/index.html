@@ -365,7 +365,7 @@
       </label>
       <label class="acg">TX GAIN
         <input type="range" id="tx-gain" min="1" max="12" step="1" value="1">
-        <span class="gv" id="tx-gain-val">1.0×</span>
+        <span class="gv" id="tx-gain-val">1×</span>
       </label>
     </div>
     <div class="audio-graph">
@@ -627,6 +627,8 @@
       <button class="scan-clear" id="asr-profiles" type="button" title="Show the learned voice profiles, and discard them one by one">PROFILES</button>
       <span class="asr-total" id="asr-total" title="Sum of the talk timers in this panel — stations marked as moderator (M) excluded">Σ 00:00:00</span>
       <button class="scan-clear" id="asr-log-clear" type="button" title="Remove every contact card">CLEAR ALL</button>
+      <button class="scan-clear" id="asr-assign" type="button" aria-pressed="false"
+              title="Assign stage">ASSIGN</button>
       <button class="scan-clear" id="asr-voice" type="button" aria-pressed="false"
               title="Voice recognition">VOICE MATCH<span class="vn" id="asr-spk-n"></span></button>
       <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="debug-body" title="Show / hide the recognised contacts">▲</button>
