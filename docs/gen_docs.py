@@ -987,8 +987,17 @@ EN = [
         "un-muting again on the next status update.",
         "DROP also lifts after three seconds without speech, even while BUSY "
         "is still up — the permanent carrier of a repeater would otherwise "
-        "keep the audio muted indefinitely. The threshold is on the AF level, "
-        "so a quiet carrier counts as silence while an over does not.",
+        "keep the audio muted indefinitely. What counts as silence is measured "
+        "against the noise floor, not against a fixed level, because on a flat "
+        "data feed a pause is not silence at all: it is the quieted noise of a "
+        "carrier that is still standing. Measured here, speech sat at -20 dBFS "
+        "and a three-second speaker change at -37.5, while the quietest frame "
+        "of a whole 36-second recording never reached -39 — a fixed threshold "
+        "of -55 dBFS could not fire once. The floor is therefore tracked (5th "
+        "percentile of the last half minute) and anything within 8 dB of it is "
+        "a pause; a receiver that does fall properly silent still releases on "
+        "the absolute rule. The three seconds are what keeps a breath between "
+        "words from counting as a pause.",
         "Muting is done in the browser, on the audio element. The S-meter, the "
         "raw RX recorder and the callsign recognition keep receiving the signal — "
         "only what you hear is silenced.",
@@ -1438,7 +1447,12 @@ EN = [
         "Assign additionally moves the mark and the talk timer onto the "
         "recognised station; such a card is drawn with a dashed border so it is "
         "never confused with the solid red of \u201cjust heard saying its call\u201d. "
-        "The stage is chosen in Settings > Audio > Voice ID.",
+        "The stage is chosen either in the panel — ASSIGN sits beside VOICE "
+        "MATCH in the head, filled while it is intervening, outlined while it "
+        "only reports — or in Settings > Audio > Voice ID. Switching ASSIGN on "
+        "switches the recognition on with it: a stage that can act on nothing "
+        "would be a dead switch. Switching it off leaves the recognition "
+        "running and falls back to observing.",
         "A card picked BY HAND always wins: while a manual selection holds, the "
         "voice moves neither the mark nor the timer. It is released when the "
         "next over begins, so the correction applies to the over it was made in. "
@@ -1826,8 +1840,18 @@ DE = [
         "statt beim nächsten Statuswechsel sofort wieder aufzugehen.",
         "DROP gibt außerdem nach drei Sekunden ohne Sprache frei, auch wenn "
         "BUSY noch ansteht — der Dauerträger eines Relais hielte den Ton sonst "
-        "unbegrenzt stumm. Die Schwelle liegt auf dem NF-Pegel: Ein stiller "
-        "Träger gilt als Stille, eine Aussendung nicht.",
+        "unbegrenzt stumm. Was als Stille gilt, misst sich am Rauschboden und "
+        "nicht an einem festen Pegel, denn am flachen Datenausgang ist eine "
+        "Pause gar keine Stille, sondern das heruntergeregelte Rauschen eines "
+        "weiter stehenden Trägers. Hier gemessen: Sprache bei −20 dBFS, ein "
+        "dreisekündiger Sprecherwechsel bei −37,5, und der leiseste Rahmen "
+        "einer ganzen 36-Sekunden-Aufnahme erreichte nie −39 — eine feste "
+        "Schwelle von −55 dBFS konnte kein einziges Mal auslösen. Der Boden "
+        "wird deshalb mitgeschätzt (5. Perzentil der letzten halben Minute), "
+        "und als Pause gilt alles bis 8 dB darüber; ein Empfänger, der wirklich "
+        "verstummt, löst weiterhin über die absolute Regel aus. Die drei "
+        "Sekunden sind es, die eine Atempause zwischen Wörtern nicht als Pause "
+        "zählen lassen.",
         "Stummgeschaltet wird im Browser, am Audio-Element. S-Meter, "
         "Roh-Rekorder und Rufzeichenerkennung bekommen das Signal weiterhin — "
         "still ist nur, was man hört.",
@@ -2317,8 +2341,13 @@ DE = [
         "nichts. „Assign“ verschiebt zusätzlich Marke und Redezeit auf die "
         "erkannte Station; eine solche Karte wird gestrichelt umrandet und ist "
         "damit nie mit dem durchgezogenen Rot von „hat gerade sein Rufzeichen "
-        "genannt“ zu verwechseln. Die Stufe wird unter Einstellungen > Audio > "
-        "Voice ID gewählt.",
+        "genannt“ zu verwechseln. Die Stufe wird entweder im Panel gewählt — "
+        "ASSIGN steht im Kopf neben VOICE MATCH, ausgefüllt solange es "
+        "eingreift, umrandet solange es nur meldet — oder unter Einstellungen "
+        "> Audio > Voice ID. ASSIGN einzuschalten schaltet die Erkennung mit "
+        "ein: Eine Stufe, die auf nichts wirken kann, wäre ein toter Schalter. "
+        "Ausschalten lässt die Erkennung laufen und fällt auf Beobachten "
+        "zurück.",
         "Eine VON HAND gewählte Kachel hat immer Vorrang: Solange sie gilt, "
         "verschiebt die Stimme weder Marke noch Timer. Sie wird mit dem Beginn "
         "des nächsten Durchgangs frei, die Korrektur gilt also für den "
