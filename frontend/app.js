@@ -3287,13 +3287,38 @@ function sqSetMute(on) {
 // leave the audio muted long after anyone stopped talking. Watch the AF level
 // instead — measured on the Pi, so muting the browser side does not blind it —
 // and release once it has stayed at the noise floor for SQ_QUIET_MS.
-const SQ_SPEECH_DB = -55;            // above this counts as "someone is talking"
+// "Quiet" cannot be a fixed number of dBFS. On a flat, un-squelched data feed
+// the gap between two overs is not silence but the quieted noise of a carrier
+// that is still up: measured on this station, a three-second speaker change
+// sat at -37 dBFS while the old threshold waited for -55, so DROP never
+// released by itself. What separates speech from a pause is not the absolute
+// level but the distance to the floor the signal keeps returning to — about
+// 18 dB on that recording. So the floor is tracked (a low percentile of the
+// last half minute) and a pause is anything close to it. The absolute rule
+// stays as well, for a feed that really does fall silent.
+const SQ_SPEECH_DB = -55;            // below this is silence on any feed
+const SQ_FLOOR_MARGIN_DB = 8;        // within this of the floor = a pause
 const SQ_QUIET_MS = 3000;
-let sqQuietSince = 0;
+const SQ_FLOOR_N = 150;              // ~30 s of history at the 200 ms poll
+let sqQuietSince = 0, sqLev = [], sqFloor = null;
+function sqFloorTrack(db) {
+  if (db == null || !isFinite(db)) return;
+  sqLev.push(db);
+  if (sqLev.length > SQ_FLOOR_N) sqLev.shift();
+  if (sqLev.length < 10) return;                  // too early to judge
+  const s = [...sqLev].sort((a, b) => a - b);
+  // the 5th percentile, not the 10th: nearer the true floor, which keeps the
+  // margin honest if the window happens to hold little but speech
+  sqFloor = s[Math.floor(s.length * 0.05)];
+}
 function sqQuietCheck(db) {
+  sqFloorTrack(db);                               // keep tracking while un-muted
   if (!sqMuted) return;
   const now = Date.now();
-  if (db == null || db > SQ_SPEECH_DB) { sqQuietSince = now; return; }
+  const quiet = db != null
+    && (db <= SQ_SPEECH_DB
+        || (sqFloor != null && db <= sqFloor + SQ_FLOOR_MARGIN_DB));
+  if (!quiet) { sqQuietSince = now; return; }
   if (now - sqQuietSince >= SQ_QUIET_MS) { sqSetMute(false); threeToneChime(); }
 }
 // MUTE: plain, permanent — stays until it is pressed again
