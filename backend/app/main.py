@@ -74,7 +74,7 @@ from . import mixer
 from . import speaker_id
 from . import system_info
 from . import updater
-from .power_switch import PowerSwitch
+from .power_switch import MIN_OFF_S, PowerSwitch
 from .webrtc_audio import (RadioAudio, RadioRxTrack, consume_mic, SAMPLE_RATE,
                            ROGER_BEEP_S)
 from . import digimodes
@@ -1423,11 +1423,24 @@ def _restore_power_switch() -> None:
         return
     if power_switch.state:                 # already on (pin survived somehow)
         return
-    try:
-        power_switch.set(True)
-        logging.getLogger("tmv71").info("power switch restored to on")
-    except Exception as exc:  # noqa: BLE001
-        logging.getLogger("tmv71").warning("power switch restore failed: %s", exc)
+
+    async def _go() -> None:
+        # The line dropped moments ago, when the old process exited. Powering
+        # straight back up is the one thing that leaves the rig hung, so wait
+        # out the same minimum off time a click in the UI gets, then bring the
+        # radio back exactly as the power-on endpoint does.
+        await asyncio.sleep(MIN_OFF_S)
+        try:
+            power_switch.set(True)
+            logging.getLogger("tmv71").info("power switch restored to on")
+        except Exception as exc:  # noqa: BLE001
+            logging.getLogger("tmv71").warning(
+                "power switch restore failed: %s", exc)
+            return
+        await _restore_mem_after_boot()    # it reboots on M001 otherwise
+        await callsign_svc.resume()
+
+    asyncio.create_task(_go())
 
 
 async def _reclaim_loop() -> None:
