@@ -1250,14 +1250,42 @@ class RadioRxTrack(MediaStreamTrack):
         super().stop()
 
 
+def _mic_pcm(frame) -> Optional[np.ndarray]:
+    """One decoded mic frame -> mono int16, or None if it needs a real resample.
+
+    The Opus decoder hands over s16 at 48 kHz — stereo even when the browser
+    sends mono, because aiortc configures the decoder that way — so the only
+    conversion this path ever needs is a channel downmix. PyAV's resampler did
+    that until now, and it leaks: measured on this Pi, 0.22 MB a minute, which
+    is 13 MB/h for every connected listener whether or not anyone transmits
+    (confirmed live — one listener +13.9 MB/h, two +26.5, back to one +11.9).
+    A downmix in numpy costs nothing and leaks nothing. Anything that is not
+    48 kHz s16 still goes through the resampler, which is then built on demand.
+    """
+    if frame.format.name != "s16" or frame.sample_rate != SAMPLE_RATE:
+        return None
+    a = frame.to_ndarray()
+    ch = a.size // max(1, frame.samples)          # layout-API-independent
+    if ch <= 1:
+        return a.reshape(-1).astype(np.int16, copy=False)
+    x = a.reshape(-1, ch) if a.shape[0] == 1 else a.T    # packed or planar
+    return np.clip(x.mean(axis=1), -32768, 32767).astype(np.int16)
+
+
 async def consume_mic(track: MediaStreamTrack, radio: RadioAudio) -> None:
-    """Incoming track: browser mic -> radio mic (resampled to 48 kHz mono)."""
-    resampler = AudioResampler(format="s16", layout="mono", rate=SAMPLE_RATE)
+    """Incoming track: browser mic -> radio mic (48 kHz mono)."""
+    resampler = None                 # built only if a frame ever needs one
     try:
         while True:
             frame = await track.recv()
-            for f in resampler.resample(frame):
-                pcm = f.to_ndarray().reshape(-1).astype(np.int16)
+            pcm = _mic_pcm(frame)
+            if pcm is not None:
                 radio.push_tx(pcm)
+                continue
+            if resampler is None:
+                resampler = AudioResampler(format="s16", layout="mono",
+                                           rate=SAMPLE_RATE)
+            for f in resampler.resample(frame):
+                radio.push_tx(f.to_ndarray().reshape(-1).astype(np.int16))
     except Exception:  # noqa: BLE001
         pass

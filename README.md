@@ -248,10 +248,28 @@ resample, for a second channel nobody asked for.
 
 So [`opus_mono.py`](backend/app/opus_mono.py) encodes mono straight against
 `libopus.so`, bypassing both. Measured end to end through a real peer
-connection, with a receiver decoding every frame: **+0.42 → +0.02 MB/min**, and
-after a collection the process sits *below* where it started. About 1 MB an hour
-per listener instead of 45. Without `libopus.so` it falls back to the PyAV
-encoder, still mono, which is half.
+connection, with a receiver decoding every frame: **+0.42 → +0.02 MB/min**.
+Without `libopus.so` it falls back to the PyAV encoder, still mono, which is
+half.
+
+That left a third of it, and only watching the live curve overnight found it:
+the **same resampler on the way back**. `consume_mic` built one per listener to
+turn the decoder's stereo output into the radio's mono, and ran it fifty times a
+second whether or not anyone was transmitting — 13 MB/h for every connected
+browser, sitting there even while the station was idle. The conversion it was
+doing is a channel downmix at an unchanged rate and format, which is three lines
+of numpy. The slope scaling with the number of listeners is what gave it away:
+
+| | |
+|---|---|
+| before, one listener | +19.2 MB/h |
+| before, two listeners | +26.5 MB/h |
+| **after, two listeners** | **−3.9 MB/h** (±0.4 over 22 min) |
+
+Negative, with two listeners: the five-minute reclaim now wins. So the leak had
+three sites — ffmpeg's Opus wrapper, aiortc's needless mono→stereo resample on
+the way out, and that same resample on the way in — and together they are what
+filled a 1 GB Pi overnight.
 
 Two things keep the rest bounded. Housekeeping hands freed memory back every
 five minutes (`gc.collect()` plus `malloc_trim(0)`, about 7 ms a run). And the
