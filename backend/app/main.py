@@ -72,6 +72,7 @@ from .models import (AsrManualRequest, AudioDeviceRequest, AudioGainRequest,
 from . import aprs
 from . import mixer
 from . import speaker_id
+from . import sys_history
 from . import system_info
 from . import updater
 from .power_switch import MIN_OFF_S, PowerSwitch
@@ -1443,6 +1444,18 @@ def _restore_power_switch() -> None:
     asyncio.create_task(_go())
 
 
+async def _sys_history_loop() -> None:
+    """Sample the host metrics once a minute for the 24 h graph."""
+    sys_history.load()
+    while True:
+        try:
+            m = await asyncio.to_thread(system_info.collect)
+            sys_history.add(m)
+        except Exception as exc:  # noqa: BLE001
+            logging.getLogger("tmv71").debug("system history sample failed: %s", exc)
+        await asyncio.sleep(sys_history.STEP_S)
+
+
 async def _reclaim_loop() -> None:
     """Give freed memory back to the system, every few minutes.
 
@@ -1534,6 +1547,7 @@ async def lifespan(app: FastAPI):
     ptt_wd = asyncio.create_task(_ptt_safety_loop())
     sq_task = asyncio.create_task(_rx_squelch_loop())
     mem_task = asyncio.create_task(_reclaim_loop())
+    hist_task = asyncio.create_task(_sys_history_loop())
     yield
     if audio_wd:
         audio_wd.cancel()
@@ -1544,6 +1558,7 @@ async def lifespan(app: FastAPI):
     ptt_wd.cancel()
     sq_task.cancel()
     mem_task.cancel()
+    hist_task.cancel()
     await sdr.stop()
     for pc in list(pcs):
         await pc.close()
@@ -2409,6 +2424,13 @@ async def ws_callsign(ws: WebSocket) -> None:
 async def get_system() -> dict:
     """Raspberry Pi host metrics for the settings ▸ Hardware tab."""
     return await asyncio.to_thread(system_info.collect)
+
+
+@app.get("/api/system/history")
+async def get_system_history(hours: float = 24.0) -> dict:
+    """The same metrics over time — "has it been climbing all night?" is not a
+    question the live figures can answer."""
+    return sys_history.series(min(max(hours, 0.0), 24.0))
 
 
 @app.get("/api/update")

@@ -1682,11 +1682,16 @@ function switchTab(name) {
   $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
   $$(".tab-pane").forEach(p => p.classList.toggle("active", p.dataset.pane === name));
   if (sysTimer) { clearInterval(sysTimer); sysTimer = null; }   // leaving hardware
+  if (sysHistTimer) { clearInterval(sysHistTimer); sysHistTimer = null; }
   if (name === "info") loadInfo();
   if (name === "dtmf") loadDtmf();
   if (name === "audio") { loadAudioDevices(); loadMixer(); loadTones(); }
   if (name === "logging") loadLogConfig();
-  if (name === "hardware") { loadSystem(); sysTimer = setInterval(loadSystem, 2000); }
+  if (name === "hardware") {
+    loadSystem(); sysTimer = setInterval(loadSystem, 2000);
+    loadSysHistory();                       // one sample a minute — poll to match
+    sysHistTimer = setInterval(loadSysHistory, 60000);
+  }
 }
 
 async function loadSerialConfig() {
@@ -1719,6 +1724,10 @@ async function loadInfo() {
 
 // ---- hardware tab (Raspberry Pi metrics, auto-refresh while open) ----
 let sysTimer = null;
+let sysHistTimer = null;
+let sysHist = null;          // {ts, temp_c, load1, mem_used_mb, app_rss_mb}
+let sysRangeH = 24;          // selected window in hours
+let sysHover = -1;           // hovered sample index, -1 = none
 const fmtBytes = n => {
   if (!n) return "0 B";
   const u = ["B", "KB", "MB", "GB", "TB"]; let i = 0;
@@ -1747,6 +1756,242 @@ async function loadSystem() {
   // is a question host memory cannot answer
   set("sys-app", s.app_rss ? `${fmtBytes(s.app_rss)} · ${s.app_threads} threads` : "—");
   set("sys-uptime", fmtUptime(s.uptime_sec));
+}
+
+// ---- 24 h graph: temperature, load, memory ----
+// Three panels rather than three lines in one frame: °C, load and MB share no
+// scale, and a second y-axis is how a chart starts lying. One series each (the
+// memory panel pairs host and service, which are both MB), a shared time axis.
+async function loadSysHistory() {
+  try { sysHist = await api("GET", "/api/system/history?hours=24"); }
+  catch (e) { sysHist = null; }
+  drawSysGraph();
+}
+
+const SYS_PANELS = [
+  { key: "temp_c", title: "TEMPERATURE", slot: 1,
+    fmt: v => `${v.toFixed(1)} °C`, min0: false },
+  { key: "load1", title: "LOAD (1 MIN)", slot: 2,
+    fmt: v => v.toFixed(2), min0: true },
+  { key: "app_rss_mb", title: "MEMORY", slot: 0,
+    fmt: v => `${v} MB`, min0: true, with: "mem_used_mb" },
+];
+
+// Validated categorical slots (dataviz palette, both modes checked against this
+// panel's surface): 1 = blue, 2 = orange, 3 = aqua.
+const SYS_HUES = {
+  dark:  ["#3987e5", "#d95926", "#199e70"],
+  light: ["#2a78d6", "#eb6834", "#1baf7a"],
+};
+
+function sysVar(name, fallback) {
+  const v = getComputedStyle(document.body).getPropertyValue(name).trim();
+  return v || fallback;
+}
+
+function sysNiceMax(v) {
+  if (!(v > 0)) return 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(v)));
+  for (const step of [1, 1.5, 2, 2.5, 3, 4, 5, 7.5, 10]) {
+    if (v <= step * mag) return step * mag;
+  }
+  return 10 * mag;
+}
+
+function sysWindow() {
+  // client-side slice: the whole day arrives in one request, so changing the
+  // range must not cost another round trip
+  if (!sysHist || !sysHist.n) return null;
+  const cut = (sysHist.ts[sysHist.n - 1] || 0) - sysRangeH * 3600;
+  let from = 0;
+  while (from < sysHist.n && sysHist.ts[from] < cut) from++;
+  return { from, n: sysHist.n - from };
+}
+
+function drawSysGraph() {
+  const cv = $("#sys-canvas"); if (!cv) return;
+  const dpr = window.devicePixelRatio || 1;
+  // measure before every draw: a canvas sized while its pane was hidden comes
+  // out 1x1 and nothing re-measures it (see drawScan)
+  const r = cv.getBoundingClientRect();
+  const w = Math.max(1, Math.round(r.width * dpr)), h = Math.max(1, Math.round(r.height * dpr));
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  const ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+  const light = document.body.classList.contains("theme-light");
+  const hues = light ? SYS_HUES.light : SYS_HUES.dark;
+  const ink = sysVar("--text", "#c9d6df"), dim = sysVar("--text-dim", "#93a6b4");
+  ctx.clearRect(0, 0, W, H);
+
+  const win = sysWindow();
+  if (!win || win.n < 2) {
+    ctx.fillStyle = dim;
+    ctx.font = `${11 * dpr}px ${sysVar("--font-ui", "sans-serif")}`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(sysHist ? "collecting — one sample a minute" : "no history yet",
+                 W / 2, H / 2);
+    return;
+  }
+
+  const padL = 44 * dpr, padR = 10 * dpr, padT = 8 * dpr, padB = 18 * dpr;
+  const gap = 10 * dpr;
+  const plotW = W - padL - padR;
+  const panelH = (H - padT - padB - gap * (SYS_PANELS.length - 1)) / SYS_PANELS.length;
+  const t0 = sysHist.ts[win.from], t1 = sysHist.ts[sysHist.n - 1];
+  const span = Math.max(1, t1 - t0);
+  const xOf = t => padL + (t - t0) / span * plotW;
+
+  SYS_PANELS.forEach((p, pi) => {
+    const top = padT + pi * (panelH + gap), bot = top + panelH;
+    const cols = [sysHist[p.key]].concat(p.with ? [sysHist[p.with]] : []);
+    let hi = -Infinity, lo = Infinity;
+    cols.forEach(col => {
+      for (let i = win.from; i < sysHist.n; i++) {
+        const v = col[i]; if (v == null) continue;
+        if (v > hi) hi = v; if (v < lo) lo = v;
+      }
+    });
+    if (!isFinite(hi)) { hi = 1; lo = 0; }
+    let yMax, yMin;
+    if (p.min0) { yMin = 0; yMax = sysNiceMax(hi) || 1; }
+    else {        // temperature: a padded band reads better than 0-based
+      const pad = Math.max(2, (hi - lo) * 0.25);
+      yMin = Math.floor((lo - pad) / 5) * 5; yMax = Math.ceil((hi + pad) / 5) * 5;
+    }
+    const yOf = v => bot - (v - yMin) / Math.max(1e-9, yMax - yMin) * panelH;
+
+    // recessive frame + grid
+    ctx.strokeStyle = "rgba(127,140,150,0.12)"; ctx.lineWidth = 1 * dpr;
+    for (let g = 0; g <= 2; g++) {
+      const y = Math.round(top + panelH * g / 2) + 0.5;
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+    }
+    // y labels: just the two ends, in text ink — never the series colour
+    ctx.fillStyle = dim; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    ctx.font = `${9 * dpr}px ${sysVar("--font-mono", "monospace")}`;
+    const lab = v => (p.key === "load1" ? v.toFixed(1) : String(Math.round(v)));
+    ctx.fillText(lab(yMax), padL - 6 * dpr, top + 5 * dpr);
+    ctx.fillText(lab(yMin), padL - 6 * dpr, bot - 5 * dpr);
+
+    // the paired host series first, as a recessive area behind the line
+    if (p.with) {
+      ctx.beginPath(); ctx.moveTo(xOf(sysHist.ts[win.from]), bot);
+      for (let i = win.from; i < sysHist.n; i++) {
+        const v = sysHist[p.with][i]; if (v == null) continue;
+        ctx.lineTo(xOf(sysHist.ts[i]), yOf(v));
+      }
+      ctx.lineTo(xOf(t1), bot); ctx.closePath();
+      ctx.fillStyle = light ? "rgba(90,105,118,0.16)" : "rgba(147,166,180,0.18)";
+      ctx.fill();
+    }
+    // the series itself: 2px line, no markers at this density
+    ctx.strokeStyle = hues[p.slot]; ctx.lineWidth = 2 * dpr;
+    ctx.lineJoin = "round"; ctx.beginPath();
+    let pen = false;
+    for (let i = win.from; i < sysHist.n; i++) {
+      const v = sysHist[p.key][i];
+      if (v == null) { pen = false; continue; }      // gap, not a jump to zero
+      const x = xOf(sysHist.ts[i]), y = yOf(v);
+      pen ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      pen = true;
+    }
+    ctx.stroke();
+
+    // header: swatch + title, and the figures as text (the light-mode aqua sits
+    // under 3:1 on this surface, so the values must be readable without it)
+    const sw = 7 * dpr, hx = padL + 2 * dpr, hy = top + 9 * dpr;
+    ctx.fillStyle = hues[p.slot];
+    ctx.fillRect(hx, hy - sw / 2, sw, sw);
+    ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.font = `${9 * dpr}px ${sysVar("--font-ui", "sans-serif")}`;
+    ctx.fillStyle = dim;
+    ctx.fillText(p.title, hx + sw + 5 * dpr, hy);
+    const last = (col) => {
+      for (let i = sysHist.n - 1; i >= win.from; i--) if (col[i] != null) return col[i];
+      return null;
+    };
+    const now = last(sysHist[p.key]);
+    let txt = now == null ? "—" : `${p.fmt(now)}   min ${p.fmt(lo)}   max ${p.fmt(hi)}`;
+    if (p.with) {
+      const hv = last(sysHist[p.with]);
+      txt = `service ${now == null ? "—" : p.fmt(now)}   host ${hv == null ? "—" : p.fmt(hv)}`;
+    }
+    ctx.textAlign = "right"; ctx.fillStyle = ink;
+    ctx.font = `${10 * dpr}px ${sysVar("--font-mono", "monospace")}`;
+    ctx.fillText(txt, W - padR - 2 * dpr, hy);
+  });
+
+  // shared time axis, labelled under the bottom panel
+  ctx.fillStyle = dim; ctx.textBaseline = "top"; ctx.textAlign = "center";
+  ctx.font = `${9 * dpr}px ${sysVar("--font-mono", "monospace")}`;
+  const ticks = Math.min(6, Math.max(2, Math.round(plotW / (70 * dpr))));
+  for (let i = 0; i <= ticks; i++) {
+    const t = t0 + span * i / ticks, x = xOf(t);
+    const d = new Date(t * 1000);
+    const s2 = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    ctx.textAlign = i === 0 ? "left" : (i === ticks ? "right" : "center");
+    ctx.fillText(s2, x, H - padB + 4 * dpr);
+  }
+
+  // crosshair for the hovered sample
+  if (sysHover >= win.from && sysHover < sysHist.n) {
+    const x = Math.round(xOf(sysHist.ts[sysHover])) + 0.5;
+    ctx.strokeStyle = light ? "rgba(27,39,49,0.35)" : "rgba(201,214,223,0.35)";
+    ctx.lineWidth = 1 * dpr;
+    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, H - padB); ctx.stroke();
+    SYS_PANELS.forEach((p, pi) => {
+      const top = padT + pi * (panelH + gap), bot = top + panelH;
+      const v = sysHist[p.key][sysHover]; if (v == null) return;
+      let yMax, yMin, hi = -Infinity, lo = Infinity;
+      const cols = [sysHist[p.key]].concat(p.with ? [sysHist[p.with]] : []);
+      cols.forEach(col => { for (let i = win.from; i < sysHist.n; i++) {
+        const q = col[i]; if (q == null) continue; if (q > hi) hi = q; if (q < lo) lo = q; } });
+      if (p.min0) { yMin = 0; yMax = sysNiceMax(hi) || 1; }
+      else { const pad = Math.max(2, (hi - lo) * 0.25);
+             yMin = Math.floor((lo - pad) / 5) * 5; yMax = Math.ceil((hi + pad) / 5) * 5; }
+      const y = bot - (v - yMin) / Math.max(1e-9, yMax - yMin) * panelH;
+      ctx.beginPath(); ctx.arc(x, y, 3.2 * dpr, 0, Math.PI * 2);
+      ctx.fillStyle = hues[p.slot]; ctx.fill();
+      ctx.strokeStyle = sysVar("--panel-2", "#161e25"); ctx.lineWidth = 2 * dpr; ctx.stroke();
+    });
+  }
+}
+
+function sysGraphHover(ev) {
+  const cv = $("#sys-canvas"), tip = $("#sys-tip");
+  if (!cv || !tip) return;
+  const win = sysWindow();
+  if (!win || win.n < 2) return;
+  const r = cv.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const padL = 44, padR = 10;
+  const plotW = Math.max(1, r.width - padL - padR);
+  const f = Math.min(1, Math.max(0, (ev.clientX - r.left - padL) / plotW));
+  const t0 = sysHist.ts[win.from], t1 = sysHist.ts[sysHist.n - 1];
+  const t = t0 + (t1 - t0) * f;
+  let best = win.from, bd = Infinity;
+  for (let i = win.from; i < sysHist.n; i++) {
+    const d = Math.abs(sysHist.ts[i] - t);
+    if (d < bd) { bd = d; best = i; }
+  }
+  sysHover = best;
+  const d = new Date(sysHist.ts[best] * 1000);
+  const hhmm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  const tc = sysHist.temp_c[best], ld = sysHist.load1[best];
+  tip.innerHTML = `<b>${hhmm}</b><br>`
+    + `${tc == null ? "—" : tc.toFixed(1) + " °C"} &middot; load ${ld == null ? "—" : ld.toFixed(2)}<br>`
+    + `service ${sysHist.app_rss_mb[best]} MB &middot; host ${sysHist.mem_used_mb[best]} MB`;
+  tip.hidden = false;
+  const x = padL + f * plotW;
+  tip.style.left = `${Math.min(r.width - 10, Math.max(60, x))}px`;
+  tip.style.top = `${Math.max(0, ev.clientY - r.top - 54)}px`;
+  drawSysGraph();
+}
+
+function sysGraphLeave() {
+  const tip = $("#sys-tip");
+  if (tip) tip.hidden = true;
+  sysHover = -1;
+  drawSysGraph();
 }
 
 // ---- software update (git pull from GitHub) ----
@@ -1856,6 +2101,7 @@ function bindSettings() {
   });
   const close = () => {
     if (sysTimer) { clearInterval(sysTimer); sysTimer = null; }
+    if (sysHistTimer) { clearInterval(sysHistTimer); sysHistTimer = null; }
     $("#settings").classList.remove("open");
   };
   $("#set-cancel").addEventListener("click", close);
@@ -1864,7 +2110,20 @@ function bindSettings() {
   $("#settings").addEventListener("click", e => { if (e.target.id === "settings") close(); });
   $$(".tab").forEach(t => t.addEventListener("click", () => switchTab(t.dataset.tab)));
   $("#info-refresh").addEventListener("click", loadInfo);
-  $("#sys-refresh")?.addEventListener("click", loadSystem);
+  $("#sys-refresh")?.addEventListener("click", () => { loadSystem(); loadSysHistory(); });
+  $$(".sys-range-btn").forEach(b => b.addEventListener("click", () => {
+    sysRangeH = Number(b.dataset.hours) || 24;
+    $$(".sys-range-btn").forEach(o => o.classList.toggle("is-on", o === b));
+    const cap = $("#sys-graph-cap");
+    if (cap) cap.textContent = sysRangeH === 1 ? "Last hour" : `Last ${sysRangeH} hours`;
+    sysHover = -1; drawSysGraph();
+  }));
+  const sysCv = $("#sys-canvas");
+  if (sysCv) {
+    sysCv.addEventListener("pointermove", sysGraphHover);
+    sysCv.addEventListener("pointerleave", sysGraphLeave);
+  }
+  window.addEventListener("resize", () => { if (sysHist) drawSysGraph(); });
   $("#update-check")?.addEventListener("click", loadUpdate);
   $("#update-apply")?.addEventListener("click", applyUpdate);
   window.addEventListener("keydown", e => { if (e.key === "Escape") close(); });

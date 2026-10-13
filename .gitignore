@@ -31,3 +31,5 @@ frontend/tm-v71-ca.crt
 
 # Vollständiger Quellcode-Snapshot (lokales Backup, nie committen)
 PROJECT-SNAPSHOT.md
+# 24 h host-metric history for the Hardware tab (local measurements)
+backend/app/sys_history.csv

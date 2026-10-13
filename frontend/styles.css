@@ -2492,6 +2492,40 @@ body.theme-light .stats-tab tbody tr:first-child td.st-bar i{
 body.theme-light .info-grid dt{background:#e4eaef; color:#46545f}
 @media (max-width:520px){.info-grid{grid-template-columns:1fr}}
 
+/* ---- 24 h host-metric graph (Hardware tab) ----
+   Three stacked panels on one canvas, one metric each: °C, load and MB are
+   three different scales, and two y-axes in one frame is the one chart mistake
+   worth never making. Shared time axis, labelled on the bottom panel only. */
+.sys-graph{margin:16px 0 14px; padding:0}
+.sys-graph-head{
+  display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;
+}
+.sys-graph figcaption{
+  font-family:var(--font-ui); font-size:10px; letter-spacing:.12em; color:var(--text-dim);
+}
+.sys-range{display:flex; gap:4px}
+.sys-range-btn{
+  font-family:var(--font-ui); font-size:10px; letter-spacing:.08em; padding:3px 8px;
+  color:var(--text-dim); background:var(--ctrl-bg); border:1px solid var(--edge);
+  border-radius:6px; cursor:pointer;
+}
+.sys-range-btn:hover{color:var(--text); border-color:var(--edge-hi)}
+.sys-range-btn.is-on{color:var(--text); border-color:var(--edge-hi); background:var(--panel-2)}
+.sys-graph canvas{
+  display:block; width:100%; height:320px;
+  background:var(--panel-2); border:1px solid var(--edge); border-radius:10px;
+}
+.sys-graph{position:relative}
+.sys-tip{
+  position:absolute; pointer-events:none; z-index:4; transform:translate(-50%, 0);
+  padding:6px 8px; border-radius:8px; border:1px solid var(--edge-hi);
+  background:var(--panel); color:var(--text);
+  font-family:var(--font-mono); font-size:11px; line-height:1.5; white-space:nowrap;
+  box-shadow:0 6px 18px rgba(0,0,0,.45);
+}
+.sys-tip b{color:var(--text-dim); font-weight:400}
+@media (max-width:520px){.sys-graph canvas{height:260px}}
+
 /* DTMF memory list */
 .dtmf-list{display:flex; flex-direction:column; gap:8px}
 .dtmf-row{display:flex; align-items:center; gap:10px}

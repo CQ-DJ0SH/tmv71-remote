@@ -960,7 +960,21 @@
         <dt title="Resident memory of the backend itself. It settles within a few minutes of a restart and should stay there: freed memory is handed back to the system every five minutes.">This service</dt><dd id="sys-app">—</dd>
         <dt>Uptime</dt><dd id="sys-uptime">—</dd>
       </dl>
-      <p class="pane-hint">Live Raspberry Pi metrics — auto-refreshing while this tab is open.</p>
+      <figure class="sys-graph">
+        <div class="sys-graph-head">
+          <figcaption id="sys-graph-cap">Last 24 hours</figcaption>
+          <div class="sys-range" role="group" aria-label="Graph time range">
+            <button type="button" class="sys-range-btn" data-hours="1">1h</button>
+            <button type="button" class="sys-range-btn" data-hours="6">6h</button>
+            <button type="button" class="sys-range-btn is-on" data-hours="24">24h</button>
+          </div>
+        </div>
+        <canvas id="sys-canvas" aria-label="Temperature, load and memory over time"></canvas>
+        <div id="sys-tip" class="sys-tip" hidden></div>
+      </figure>
+      <p class="pane-hint">Live Raspberry Pi metrics — auto-refreshing while this tab is open.
+        The graph samples once a minute and survives a restart, so the hour before
+        a reboot or a memory ceiling is still there to look at.</p>
       <div class="modal-actions">
         <button id="sys-refresh" class="btn-ghost">REFRESH</button>
       </div>
