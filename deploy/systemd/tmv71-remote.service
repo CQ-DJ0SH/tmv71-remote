@@ -11,8 +11,20 @@ WorkingDirectory=/root/tmv71-remote/backend
 # HTTPS (browser microphone access needs a secure context). certs/ are created
 # by deploy/install.sh. Drop the two --ssl-* flags to serve plain HTTP instead.
 ExecStart=/root/tmv71-remote/backend/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8443 --ssl-keyfile certs/key.pem --ssl-certfile certs/cert.pem
-Restart=on-failure
+# "always", not "on-failure": a service killed for memory (see MemoryMax below)
+# exits on a signal, and a radio that answers nothing because its backend is
+# gone is the one state this must not stay in.
+Restart=always
 RestartSec=3
+# A ceiling, so a runaway can never take the Pi down with it. Reported from a
+# 1 GB Pi: memory filled, the machine locked up, and only a power cycle helped.
+# MemoryHigh puts the service under reclaim pressure first; MemoryMax is the
+# last resort, where it is killed and restarted instead of the board freezing.
+# The backend settles around 300 MB with the German callsign list and both
+# Vosk models, and some 150 MB more with the 823k-entry FCC list — raise both
+# on a larger board, or comment them out if you would rather not have a cap.
+MemoryHigh=600M
+MemoryMax=800M
 # Give the radio + audio device time to come up on boot
 TimeoutStartSec=30
 

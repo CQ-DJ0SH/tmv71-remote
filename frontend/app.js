@@ -1743,6 +1743,9 @@ async function loadSystem() {
   set("sys-mem", `${fmtBytes(s.mem_used)} / ${fmtBytes(s.mem_total)}${pct(s.mem_used, s.mem_total)}`);
   set("sys-swap", s.swap_total ? `${fmtBytes(s.swap_used)} / ${fmtBytes(s.swap_total)}${pct(s.swap_used, s.swap_total)}` : "none");
   set("sys-disk", `${fmtBytes(s.disk_used)} / ${fmtBytes(s.disk_total)}${pct(s.disk_used, s.disk_total)}`);
+  // the backend's own footprint, next to the host's: "is the service growing?"
+  // is a question host memory cannot answer
+  set("sys-app", s.app_rss ? `${fmtBytes(s.app_rss)} · ${s.app_threads} threads` : "—");
   set("sys-uptime", fmtUptime(s.uptime_sec));
 }
 

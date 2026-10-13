@@ -214,6 +214,22 @@ signalling — no extra services. For a reboot-proof setup see [`deploy/`](deplo
 > with your own root CA and trust that CA on the phone — see
 > [Mobile app (PWA)](#mobile-app-pwa).
 
+**Memory.** The backend settles at roughly **300 MB** on this build — most of it
+the callsign list and, when callsign recognition is on, the two Vosk models — and
+it should stay there. *Settings ▸ Hardware* shows the service's own resident size
+next to the host's, which is the figure to quote in a bug report.
+
+It used to creep instead. The audio path allocates and frees numpy blocks fifty
+times a second, and glibc keeps the freed arenas rather than returning them, so
+RSS only ever rose: on a 1 GB Pi that ends in a locked-up board, which is what a
+nightly restart was papering over. Measured over twenty audio
+connect/disconnect cycles the process grew 6.5 MB, and `gc.collect()` plus
+`malloc_trim(0)` gave 7.4 MB back — below where it started. Nothing was leaking;
+the memory was simply never handed back. A housekeeping task now does that every
+five minutes (about 7 ms a run). The systemd unit in [`deploy/`](deploy/) adds a
+`MemoryHigh`/`MemoryMax` ceiling and `Restart=always`, so even a future runaway
+gets the service killed and restarted rather than freezing the Pi.
+
 ## Audio
 
 Two-way audio is **direct WebRTC** between the browser and the backend (via

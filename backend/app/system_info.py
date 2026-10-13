@@ -65,6 +65,24 @@ def _freq_mhz() -> int | None:
         return None
 
 
+def _self_mem() -> tuple[int, int]:
+    """The backend's own resident size (bytes) and thread count.
+
+    Host memory alone cannot answer "is the service growing?", which is the
+    question a slow leak raises — and the one a bug report needs an answer to.
+    """
+    rss = 0
+    for line in _read("/proc/self/status").splitlines():
+        if line.startswith("VmRSS:"):
+            rss = int(line.split()[1]) * 1024
+            break
+    try:
+        threads = len(os.listdir("/proc/self/task"))
+    except OSError:
+        threads = 0
+    return rss, threads
+
+
 def collect() -> dict:
     mem = _meminfo()
     total = mem.get("MemTotal", 0)
@@ -80,6 +98,7 @@ def collect() -> dict:
         load = [round(x, 2) for x in os.getloadavg()]
     except OSError:
         load = [0, 0, 0]
+    app_rss, app_threads = _self_mem()
     up = _read("/proc/uptime").split()
     return {
         "model": _model(),
@@ -96,4 +115,6 @@ def collect() -> dict:
         "disk_total": disk_total,
         "disk_used": disk_used,
         "uptime_sec": float(up[0]) if up else 0.0,
+        "app_rss": app_rss,
+        "app_threads": app_threads,
     }

@@ -1538,7 +1538,23 @@ EN = [
           "auto power-off, logo, GitHub self-update, Root-CA download), Audio "
           "(device, USB mixer, voice filters, test tone, audio timing), Rig-Info, "
           "Rig-Memory, Rig-DTMF, Logging (Wavelog + QRZ.com), and Pi-Hardware "
-          "(host metrics)."),
+          "(host metrics, and the backend's own resident size beside them)."),
+    ("h3", "Memory"),
+    ("p", "The backend settles at roughly 300 MB — mostly the callsign list and, "
+          "with recognition on, the two Vosk models — and should stay there. "
+          "Settings > Hardware shows its resident size next to the host's, which "
+          "is the figure to quote if it does not."),
+    ("p", "It used to creep instead, reported from a 1 GB Pi that filled up and "
+          "locked the board until the power was pulled; a nightly restart was "
+          "the workaround. The cause was not a leak. The audio path allocates "
+          "and frees numpy blocks fifty times a second, and the C library keeps "
+          "the freed arenas rather than handing them back, so the resident size "
+          "only ever rose. Measured over twenty audio connect/disconnect cycles "
+          "the process grew 6.5 MB, and a collection plus a trim gave 7.4 MB "
+          "back — it ended below where it started. That housekeeping now runs "
+          "every five minutes and costs about 7 ms. The systemd unit adds a "
+          "memory ceiling and restarts the service if it is ever hit, so a "
+          "future runaway costs a restart instead of the whole Pi."),
     ("h1", "8  Mobile App (PWA)"),
     ("p", "The UI installs as a Progressive Web App: full-screen, with an "
           "app-shell service worker for instant launch. On phones the panels become "
@@ -2441,7 +2457,27 @@ DE = [
           "GPIO-Power, Auto-Abschaltung, Logo, GitHub-Update, Root-CA-Download), "
           "Audio (Gerät, USB-Mixer, Sprachfilter, Testton, Audio-Timing), Rig-Info, "
           "Rig-Speicher, Rig-DTMF, Logging (Wavelog + QRZ.com) und Pi-Hardware "
-          "(Host-Metriken)."),
+          "(Host-Metriken, daneben der Speicherbedarf des Dienstes selbst)."),
+    ("h3", "Speicher"),
+    ("p", "Der Dienst pendelt sich bei etwa 300 MB ein — überwiegend die "
+          "Rufzeichenliste und, bei eingeschalteter Erkennung, die beiden "
+          "Vosk-Modelle — und sollte dort bleiben. Einstellungen > Hardware "
+          "zeigt seinen Speicherbedarf neben dem des Rechners; das ist die "
+          "Zahl, die in eine Fehlermeldung gehört, falls er es nicht tut."),
+    ("p", "Früher wuchs er statt dessen. Gemeldet von einem Pi mit 1 GB: Der "
+          "Speicher lief voll, das Gerät blieb stehen und half sich erst nach "
+          "dem Ziehen der Stromversorgung; ein nächtlicher Neustart war der "
+          "Behelf. Die Ursache war kein Leck. Der Audiopfad belegt und gibt "
+          "fünfzigmal in der Sekunde numpy-Blöcke frei, und die C-Bibliothek "
+          "behält die freigewordenen Bereiche, statt sie zurückzugeben — der "
+          "belegte Speicher stieg deshalb nur. Über zwanzig Verbindungszyklen "
+          "gemessen wuchs der Prozess um 6,5 MB, und ein Aufräumen mit "
+          "anschließender Rückgabe holte 7,4 MB zurück: Er lag danach "
+          "niedriger als vorher. Genau das läuft jetzt alle fünf Minuten und "
+          "kostet rund 7 ms. Die systemd-Unit bekommt zusätzlich eine "
+          "Speichergrenze und startet den Dienst neu, falls sie je erreicht "
+          "wird — ein künftiger Ausreißer kostet dann einen Neustart und nicht "
+          "den ganzen Pi."),
     ("h1", "8  Mobile App (PWA)"),
     ("p", "Die Oberfläche installiert sich als Progressive Web App: Vollbild, mit "
           "App-Shell-Service-Worker für sofortigen Start. Auf dem Handy werden die "

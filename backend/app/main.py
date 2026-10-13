@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import glob
+import gc
 import logging
 import math
 import mimetypes
@@ -1379,6 +1380,40 @@ async def _audio_watchdog() -> None:
         last = radio_audio.rx_frames
 
 
+RECLAIM_EVERY_S = 300        # how often freed memory is handed back (5 min)
+
+
+async def _reclaim_loop() -> None:
+    """Give freed memory back to the system, every few minutes.
+
+    Reported from a 1 GB Pi: the service grows until the machine locks up, and
+    a nightly restart was the workaround. Measured here over twenty audio
+    connect/disconnect cycles, the process grew by 6.5 MB and gc.collect() plus
+    malloc_trim(0) handed 7.4 MB back — it ended BELOW where it started. So
+    nothing is leaking in the sense of objects nobody can reach: the audio path
+    allocates and frees numpy blocks fifty times a second, and glibc keeps the
+    freed arenas rather than returning them. RSS then only ever rises, which is
+    what a long-running process on a small Pi cannot afford.
+
+    The whole thing costs about 7 ms (measured on this Pi, most of it the
+    collection), so it runs on a plain timer rather than hunting for an idle
+    moment.
+    """
+    import ctypes
+    try:
+        trim = ctypes.CDLL("libc.so.6").malloc_trim
+    except Exception:  # noqa: BLE001
+        trim = None                      # not glibc: the collection still helps
+    while True:
+        await asyncio.sleep(RECLAIM_EVERY_S)
+        try:
+            gc.collect()
+            if trim is not None:
+                trim(0)
+        except Exception as exc:  # noqa: BLE001
+            logging.getLogger("tmv71").debug("reclaim failed: %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await service.start()
@@ -1429,6 +1464,7 @@ async def lifespan(app: FastAPI):
     apo_task = asyncio.create_task(_auto_power_off_loop())
     ptt_wd = asyncio.create_task(_ptt_safety_loop())
     sq_task = asyncio.create_task(_rx_squelch_loop())
+    mem_task = asyncio.create_task(_reclaim_loop())
     yield
     if audio_wd:
         audio_wd.cancel()
@@ -1438,6 +1474,7 @@ async def lifespan(app: FastAPI):
     apo_task.cancel()
     ptt_wd.cancel()
     sq_task.cancel()
+    mem_task.cancel()
     await sdr.stop()
     for pc in list(pcs):
         await pc.close()
