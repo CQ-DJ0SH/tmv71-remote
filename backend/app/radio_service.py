@@ -186,6 +186,16 @@ class RadioService:
         # radio just came (back) online — re-apply the persisted squelch, which
         # the rig loses on a power cycle (GPIO/manual power-on, serial recovery)
         if self._status.connected and not prev:
+            if not self.model:
+                # The backend started while the rig was dark, so start() never
+                # got the model name. Read it now, or it stays blank until the
+                # next service restart.
+                try:
+                    self.model = await asyncio.to_thread(self.radio.get_model)
+                    self._status.model = self.model
+                    log.info("Connected to radio: %s", self.model)
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("model read after reconnect failed: %s", exc)
             await self._restore_squelch()
         return self._status
 
