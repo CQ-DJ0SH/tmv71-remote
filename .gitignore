@@ -33,3 +33,5 @@ frontend/tm-v71-ca.crt
 PROJECT-SNAPSHOT.md
 # 24 h host-metric history for the Hardware tab (local measurements)
 backend/app/sys_history.csv
+# Arbeitsstand-Notizen (lokal, nicht veröffentlicht)
+STATUS.md
