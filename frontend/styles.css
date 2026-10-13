@@ -2556,7 +2556,11 @@ body.theme-light .info-grid dt{background:#e4eaef; color:#46545f}
   box-shadow:0 12px 30px -12px #000; transition:transform .35s cubic-bezier(.2,.9,.3,1.2);
   max-width:80vw;
 }
-.toast.show{transform:translate(-50%,0)}
+.toast.show{transform:translate(-50%,0); pointer-events:auto}
+/* only the visible plate takes taps — and a tap dismisses it, so a toast over
+   the PTT LOCK key costs one tap instead of waiting out the timer */
+.toast{pointer-events:none; cursor:pointer; -webkit-tap-highlight-color:transparent}
+.toast:active{filter:brightness(1.15)}
 .toast.err{border-color:var(--tx); color:#ffd9d5}
 .toast.ok{border-color:var(--ok)}
 /* light theme: a light toast plate with dark/red text instead of the dark box */

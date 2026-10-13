@@ -106,10 +106,22 @@ async function api(method, path, body) {
 }
 
 let toastTimer;
+function hideToast() {
+  const t = $("#toast");
+  if (!t) return;
+  clearTimeout(toastTimer);
+  t.className = "toast";
+}
+
 function toast(msg, kind = "", ms = 2600) {
   const t = $("#toast");
   t.textContent = msg;
   t.className = `toast show ${kind}`;
+  // Tap to dismiss: on a phone the plate sits over the PTT LOCK key, and
+  // waiting out the timer to reach a transmit control is the wrong order of
+  // things. Assigning the handler (rather than adding a listener) keeps it at
+  // one, however often a toast is shown.
+  t.onpointerdown = hideToast;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (t.className = "toast"), ms);
 }
