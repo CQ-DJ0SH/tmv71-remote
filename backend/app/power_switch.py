@@ -11,8 +11,14 @@ crashing.
 from __future__ import annotations
 
 import logging
+import time
 
 log = logging.getLogger("tmv71")
+
+# The radio needs its DC line to drop properly before it comes back up: power
+# re-applied a fraction of a second after it was cut leaves the rig's MCU hung
+# (lit but deaf on CAT), and only another, slower cycle recovers it.
+MIN_OFF_S = 3.0
 
 
 class PowerSwitch:
@@ -21,6 +27,7 @@ class PowerSwitch:
         self.pin: int | None = None
         self.error: str | None = None
         self._dev = None
+        self._off_at: float | None = None
         self.configure(pin)
 
     def configure(self, pin: int | None) -> None:
@@ -55,10 +62,21 @@ class PowerSwitch:
         except Exception:  # noqa: BLE001
             return None
 
+    def off_remaining(self) -> float:
+        """Seconds the radio still has to stay dark before powering it back on."""
+        if self._off_at is None:
+            return 0.0
+        return max(0.0, MIN_OFF_S - (time.monotonic() - self._off_at))
+
     def set(self, on: bool) -> None:
         if not self._dev:
             raise RuntimeError(self.error or "GPIO power switch not configured")
-        self._dev.on() if on else self._dev.off()
+        if on:
+            self._off_at = None
+            self._dev.on()
+        else:
+            self._off_at = time.monotonic()
+            self._dev.off()
 
     def close(self) -> None:
         if self._dev is not None:

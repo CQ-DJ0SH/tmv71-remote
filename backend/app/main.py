@@ -1699,6 +1699,12 @@ async def get_power_switch() -> dict:
 async def set_power_switch(req: PowerSwitchRequest) -> dict:
     if not req.on:
         _remember_mem_for_boot()         # capture channel while the radio still answers
+    else:
+        # Don't re-apply power before the DC line has actually dropped: a fast
+        # off/on leaves the rig hung (no CAT reply until the next slow cycle).
+        wait = power_switch.off_remaining()
+        if wait > 0:
+            await asyncio.sleep(wait)
     try:
         power_switch.set(req.on)
     except Exception as exc:  # noqa: BLE001
