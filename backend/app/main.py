@@ -71,6 +71,7 @@ from .models import (AsrManualRequest, AudioDeviceRequest, AudioGainRequest,
                      LogDeleteRequest, AsrRenameRequest, AsrSpeakerRequest)
 from . import aprs
 from . import mixer
+from . import opus_mono
 from . import speaker_id
 from . import sys_history
 from . import system_info
@@ -1497,6 +1498,7 @@ async def _reclaim_loop() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    opus_mono.install()          # before the first peer builds an encoder
     _restore_power_switch()
     await service.start()
     audio_wd = None

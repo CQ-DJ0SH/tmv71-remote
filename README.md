@@ -219,40 +219,49 @@ signalling — no extra services. For a reboot-proof setup see [`deploy/`](deplo
 
 **Memory.** The backend starts at roughly **320 MB** on this build — most of it
 the callsign list and, when callsign recognition is on, the two Vosk models.
-With nobody listening it stays there: measured here over ten hours with the
-sound card running the whole time, 361 MB start to finish, ±1 MB. *Settings ▸
-Hardware* shows the service's own resident size next to the host's, which is the
-figure to quote in a bug report.
+With nobody listening it stays there: measured over ten hours with the sound
+card running the whole time, 361 MB start to finish, ±1 MB. *Settings ▸
+Hardware* shows the service's own resident size next to the host's, and the
+**24 h graph** below it answers the question a single reading cannot — whether
+it has been climbing all night.
 
-**A connected listener costs about 45 MB an hour**, and that is the figure
-behind the reports of a 1 GB Pi filling up overnight. It is not a leak in this
-code. Measured: a bare `aiortc` loopback in an empty process — no radio, no
-audio device, no recognition — grows 0.43 MB a minute while it streams, and in
-five minutes of that the Python heap gains **two objects**. Nothing here is
-holding anything; the WebRTC stack allocates and frees per packet in C, fifty
-packets a second, and glibc never hands the pages back. Callsign recognition
-was measured separately and is *not* involved: with it switched off the slope
-was unchanged (41 MB/h over 13 samples).
+A connected listener used to cost about **45 MB an hour**, which is what filled
+up the 1 GB Pi behind the original bug report. That is fixed, and the chase is
+worth recording because almost every intuition about it was wrong:
 
-Three things keep that bounded:
+| | |
+|---|---|
+| Callsign recognition off | unchanged, 41 MB/h — not the ASR |
+| Bare `aiortc` loopback, empty process | +0.43 MB/min, **+2 Python objects in 5 min** |
+| glibc tuned / jemalloc / default | identical slopes — not fragmentation |
+| Rebuilding the codec context every minute | reclaims nothing, and costs the listener a 105 ms burst |
+| Mono instead of stereo, same resampler | no change at all |
+| `pcm_s16le` instead of libopus | **flat to the byte** |
+| libopus called directly, via `ctypes` | +0.03 MB/min |
 
-- A housekeeping task hands freed memory back every five minutes (`gc.collect()`
-  plus `malloc_trim(0)`, about 7 ms a run). It recovers what a *departed* peer
-  left behind — after twenty connect/disconnect cycles the process ended below
-  where it started — but it cannot reclaim pages a live stream is still churning.
-- The allocator is capped to two arenas at startup. glibc otherwise gives each
-  thread its own 64 MB arena: this process had grown **thirty** of them, 3 GB of
-  address space, each fragmenting on its own. Capping them cut the resident size
-  from 611 MB to 318 MB and the virtual footprint from 3.0 GB to 0.67 GB.
-  `MALLOC_ARENA_MAX` overrides it if you would rather trade memory back for
-  allocator parallelism.
-- The systemd unit in [`deploy/`](deploy/) adds a `MemoryHigh`/`MemoryMax`
-  ceiling and `Restart=always`, so a day-long listening session costs a service
-  restart rather than a frozen board.
+Same frames, same PyAV machinery, same packet objects — only the codec swapped,
+and the growth disappears. The leak is in **libavcodec's libopus wrapper** (PyAV
+16.1.0, bundled libavcodec 62.11.100); libopus itself is clean. On top of that,
+aiortc's encoder hard-codes `layout="stereo"` and resamples our mono there,
+although the offer already pins Opus to one channel — half the growth was that
+resample, for a second channel nobody asked for.
 
-So: closing the browser tab stops the growth, and *Settings ▸ Audio ▸ auto power
-off* does it for you. If you leave a tab streaming for a day on a 1 GB Pi, expect
-the ceiling to do its job.
+So [`opus_mono.py`](backend/app/opus_mono.py) encodes mono straight against
+`libopus.so`, bypassing both. Measured end to end through a real peer
+connection, with a receiver decoding every frame: **+0.42 → +0.02 MB/min**, and
+after a collection the process sits *below* where it started. About 1 MB an hour
+per listener instead of 45. Without `libopus.so` it falls back to the PyAV
+encoder, still mono, which is half.
+
+Two things keep the rest bounded. Housekeeping hands freed memory back every
+five minutes (`gc.collect()` plus `malloc_trim(0)`, about 7 ms a run). And the
+allocator is capped to two arenas at startup: glibc otherwise gives each thread
+its own 64 MB arena, and this process had grown **thirty** of them, 3 GB of
+address space, each fragmenting on its own — capping them cut the resident size
+from 611 MB to 318 MB and the virtual footprint from 3.0 GB to 0.67 GB.
+`MALLOC_ARENA_MAX` overrides it. The systemd unit in [`deploy/`](deploy/) still
+adds a `MemoryHigh`/`MemoryMax` ceiling and `Restart=always`, so a runaway costs
+a restart rather than a frozen board.
 
 ## Audio
 
