@@ -157,7 +157,10 @@ share ground through the audio and CAT cables, which would bridge a switch in
 the negative lead. Size it for the transmitter (~13 A at 50 W) and drive the
 relay coil from a logic-level MOSFET or an opto-isolated board with a flyback
 diode — a GPIO pin cannot drive a coil. Don't power the Pi from the switched
-side. TX needs about 40 dB of attenuation (line level → a few mV into 600 Ω); a 1:1
+side. The GPIO line is released when the backend process exits — the pin falls
+back to an input and the radio loses its supply — so the service remembers the
+switch state and restores it on startup; a restart no longer leaves the rig
+dark. TX needs about 40 dB of attenuation (line level → a few mV into 600 Ω); a 1:1
 transformer in that lead also breaks the ground loop between the Pi's supply and
 the radio. TX cannot use the data connector: PTT is keyed over CAT (serial), and
 the TM-V71 only routes **transmit** audio to the data connector when a
@@ -214,21 +217,42 @@ signalling — no extra services. For a reboot-proof setup see [`deploy/`](deplo
 > with your own root CA and trust that CA on the phone — see
 > [Mobile app (PWA)](#mobile-app-pwa).
 
-**Memory.** The backend settles at roughly **300 MB** on this build — most of it
-the callsign list and, when callsign recognition is on, the two Vosk models — and
-it should stay there. *Settings ▸ Hardware* shows the service's own resident size
-next to the host's, which is the figure to quote in a bug report.
+**Memory.** The backend starts at roughly **320 MB** on this build — most of it
+the callsign list and, when callsign recognition is on, the two Vosk models.
+With nobody listening it stays there: measured here over ten hours with the
+sound card running the whole time, 361 MB start to finish, ±1 MB. *Settings ▸
+Hardware* shows the service's own resident size next to the host's, which is the
+figure to quote in a bug report.
 
-It used to creep instead. The audio path allocates and frees numpy blocks fifty
-times a second, and glibc keeps the freed arenas rather than returning them, so
-RSS only ever rose: on a 1 GB Pi that ends in a locked-up board, which is what a
-nightly restart was papering over. Measured over twenty audio
-connect/disconnect cycles the process grew 6.5 MB, and `gc.collect()` plus
-`malloc_trim(0)` gave 7.4 MB back — below where it started. Nothing was leaking;
-the memory was simply never handed back. A housekeeping task now does that every
-five minutes (about 7 ms a run). The systemd unit in [`deploy/`](deploy/) adds a
-`MemoryHigh`/`MemoryMax` ceiling and `Restart=always`, so even a future runaway
-gets the service killed and restarted rather than freezing the Pi.
+**A connected listener costs about 45 MB an hour**, and that is the figure
+behind the reports of a 1 GB Pi filling up overnight. It is not a leak in this
+code. Measured: a bare `aiortc` loopback in an empty process — no radio, no
+audio device, no recognition — grows 0.43 MB a minute while it streams, and in
+five minutes of that the Python heap gains **two objects**. Nothing here is
+holding anything; the WebRTC stack allocates and frees per packet in C, fifty
+packets a second, and glibc never hands the pages back. Callsign recognition
+was measured separately and is *not* involved: with it switched off the slope
+was unchanged (41 MB/h over 13 samples).
+
+Three things keep that bounded:
+
+- A housekeeping task hands freed memory back every five minutes (`gc.collect()`
+  plus `malloc_trim(0)`, about 7 ms a run). It recovers what a *departed* peer
+  left behind — after twenty connect/disconnect cycles the process ended below
+  where it started — but it cannot reclaim pages a live stream is still churning.
+- The allocator is capped to two arenas at startup. glibc otherwise gives each
+  thread its own 64 MB arena: this process had grown **thirty** of them, 3 GB of
+  address space, each fragmenting on its own. Capping them cut the resident size
+  from 611 MB to 318 MB and the virtual footprint from 3.0 GB to 0.67 GB.
+  `MALLOC_ARENA_MAX` overrides it if you would rather trade memory back for
+  allocator parallelism.
+- The systemd unit in [`deploy/`](deploy/) adds a `MemoryHigh`/`MemoryMax`
+  ceiling and `Restart=always`, so a day-long listening session costs a service
+  restart rather than a frozen board.
+
+So: closing the browser tab stops the growth, and *Settings ▸ Audio ▸ auto power
+off* does it for you. If you leave a tab streaming for a day on a 1 GB Pi, expect
+the ceiling to do its job.
 
 ## Audio
 

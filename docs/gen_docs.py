@@ -898,10 +898,13 @@ EN = [
         "Never power the Pi from the switched side. It would cut its own "
         "supply the moment it switched the radio off, and nothing would switch "
         "it back on.",
-        "The pin is claimed without being driven at startup, so restarting the "
-        "backend — or reconfiguring the pin — never toggles the radio. Auto "
-        "power-off runs on the Pi itself and therefore keeps working with every "
-        "browser closed.",
+        "Reconfiguring the pin never toggles the radio: it is claimed without "
+        "being driven. A restart is different, and it was measured here — the "
+        "GPIO line is released when the process exits, the pin falls back to an "
+        "input, and the radio loses its supply. The hardware cannot be asked "
+        "afterwards what it was, so the service remembers the switch state and "
+        "puts it back on startup. Auto power-off runs on the Pi itself and "
+        "therefore keeps working with every browser closed.",
     ]),
     ("h1", "5  Installation"),
     ("code", INSTALL),
@@ -1540,21 +1543,33 @@ EN = [
           "Rig-Memory, Rig-DTMF, Logging (Wavelog + QRZ.com), and Pi-Hardware "
           "(host metrics, and the backend's own resident size beside them)."),
     ("h3", "Memory"),
-    ("p", "The backend settles at roughly 300 MB — mostly the callsign list and, "
-          "with recognition on, the two Vosk models — and should stay there. "
+    ("p", "The backend starts at roughly 320 MB — mostly the callsign list and, "
+          "with recognition on, the two Vosk models. With nobody listening it "
+          "stays there: measured over ten hours with the sound card running the "
+          "whole time, 361 MB start to finish, give or take a megabyte. "
           "Settings > Hardware shows its resident size next to the host's, which "
-          "is the figure to quote if it does not."),
-    ("p", "It used to creep instead, reported from a 1 GB Pi that filled up and "
-          "locked the board until the power was pulled; a nightly restart was "
-          "the workaround. The cause was not a leak. The audio path allocates "
-          "and frees numpy blocks fifty times a second, and the C library keeps "
-          "the freed arenas rather than handing them back, so the resident size "
-          "only ever rose. Measured over twenty audio connect/disconnect cycles "
-          "the process grew 6.5 MB, and a collection plus a trim gave 7.4 MB "
-          "back — it ended below where it started. That housekeeping now runs "
-          "every five minutes and costs about 7 ms. The systemd unit adds a "
-          "memory ceiling and restarts the service if it is ever hit, so a "
-          "future runaway costs a restart instead of the whole Pi."),
+          "is the figure to quote in a bug report."),
+    ("p", "A connected listener costs about 45 MB an hour, and that is what "
+          "filled up the 1 GB Pi behind the original report. It is not a leak in "
+          "this code: a bare WebRTC loopback in an empty process — no radio, no "
+          "sound card, no recognition — grows 0.43 MB a minute while it streams, "
+          "and gains two Python objects in five minutes of it. Nothing is being "
+          "held; the WebRTC stack allocates and frees per packet in C, fifty "
+          "packets a second, and the C library never hands the pages back. "
+          "Callsign recognition was measured separately and is not involved: "
+          "with it switched off the slope was unchanged."),
+    ("p", "Three things keep that bounded. Housekeeping hands freed memory back "
+          "every five minutes (about 7 ms a run); it recovers what a departed "
+          "listener left behind — after twenty connect/disconnect cycles the "
+          "process ended below where it started — but it cannot reclaim pages a "
+          "live stream is still churning. The allocator is capped to two arenas "
+          "at startup: the C library otherwise hands each thread its own 64 MB "
+          "arena, and this process had grown thirty of them, which cut the "
+          "resident size from 611 MB to 318 MB once capped. And the systemd unit "
+          "adds a memory ceiling with an automatic restart, so a day-long "
+          "listening session costs a service restart instead of a frozen board. "
+          "In short: closing the browser tab stops the growth, and the auto "
+          "power off does it for you."),
     ("h1", "8  Mobile App (PWA)"),
     ("p", "The UI installs as a Progressive Web App: full-screen, with an "
           "app-shell service worker for instant launch. On phones the panels become "
@@ -1760,10 +1775,14 @@ DE = [
         "Den Pi niemals von der geschalteten Seite versorgen. Er schnitte sich "
         "beim Abschalten des Funkgeräts die eigene Versorgung ab, und niemand "
         "schaltete ihn wieder ein.",
-        "Der Pin wird beim Start belegt, aber nicht angesteuert — ein Neustart "
-        "des Backends oder ein Umkonfigurieren des Pins schaltet das Funkgerät "
-        "also nie um. Die Auto-Abschaltung läuft auf dem Pi selbst und "
-        "funktioniert deshalb auch bei geschlossenem Browser.",
+        "Ein Umkonfigurieren des Pins schaltet das Funkgerät nie um: Er wird "
+        "belegt, aber nicht angesteuert. Bei einem Neustart ist es anders, hier "
+        "nachgemessen — mit dem Prozessende wird die GPIO-Leitung freigegeben, "
+        "der Pin fällt auf Eingang zurück, und das Funkgerät verliert die "
+        "Versorgung. Hinterher lässt sich die Hardware nicht fragen, wie sie "
+        "stand; der Dienst merkt sich den Schalterzustand deshalb und stellt "
+        "ihn beim Start wieder her. Die Auto-Abschaltung läuft auf dem Pi "
+        "selbst und funktioniert deshalb auch bei geschlossenem Browser.",
     ]),
     ("h1", "5  Installation"),
     ("code", INSTALL),
@@ -2459,25 +2478,36 @@ DE = [
           "Rig-Speicher, Rig-DTMF, Logging (Wavelog + QRZ.com) und Pi-Hardware "
           "(Host-Metriken, daneben der Speicherbedarf des Dienstes selbst)."),
     ("h3", "Speicher"),
-    ("p", "Der Dienst pendelt sich bei etwa 300 MB ein — überwiegend die "
+    ("p", "Der Dienst startet bei etwa 320 MB — überwiegend die "
           "Rufzeichenliste und, bei eingeschalteter Erkennung, die beiden "
-          "Vosk-Modelle — und sollte dort bleiben. Einstellungen > Hardware "
-          "zeigt seinen Speicherbedarf neben dem des Rechners; das ist die "
-          "Zahl, die in eine Fehlermeldung gehört, falls er es nicht tut."),
-    ("p", "Früher wuchs er statt dessen. Gemeldet von einem Pi mit 1 GB: Der "
-          "Speicher lief voll, das Gerät blieb stehen und half sich erst nach "
-          "dem Ziehen der Stromversorgung; ein nächtlicher Neustart war der "
-          "Behelf. Die Ursache war kein Leck. Der Audiopfad belegt und gibt "
-          "fünfzigmal in der Sekunde numpy-Blöcke frei, und die C-Bibliothek "
-          "behält die freigewordenen Bereiche, statt sie zurückzugeben — der "
-          "belegte Speicher stieg deshalb nur. Über zwanzig Verbindungszyklen "
-          "gemessen wuchs der Prozess um 6,5 MB, und ein Aufräumen mit "
-          "anschließender Rückgabe holte 7,4 MB zurück: Er lag danach "
-          "niedriger als vorher. Genau das läuft jetzt alle fünf Minuten und "
-          "kostet rund 7 ms. Die systemd-Unit bekommt zusätzlich eine "
-          "Speichergrenze und startet den Dienst neu, falls sie je erreicht "
-          "wird — ein künftiger Ausreißer kostet dann einen Neustart und nicht "
-          "den ganzen Pi."),
+          "Vosk-Modelle. Hört niemand zu, bleibt er dort: über zehn Stunden "
+          "gemessen, mit durchlaufender Soundkarte, 361 MB am Anfang und am "
+          "Ende, auf ein Megabyte genau. Einstellungen > Hardware zeigt seinen "
+          "Speicherbedarf neben dem des Rechners; das ist die Zahl, die in eine "
+          "Fehlermeldung gehört."),
+    ("p", "Ein verbundener Zuhörer kostet etwa 45 MB pro Stunde — das ist, was "
+          "den Pi mit 1 GB aus der ursprünglichen Meldung volllaufen ließ. Es "
+          "ist kein Leck in diesem Code: Eine nackte WebRTC-Schleife in einem "
+          "leeren Prozess — ohne Funkgerät, ohne Soundkarte, ohne Erkennung — "
+          "wächst im Betrieb um 0,43 MB pro Minute und gewinnt in fünf Minuten "
+          "zwei Python-Objekte. Festgehalten wird also nichts; die "
+          "WebRTC-Schicht belegt und gibt in C pro Paket frei, fünfzig Pakete "
+          "je Sekunde, und die C-Bibliothek gibt die Seiten nie zurück. Die "
+          "Rufzeichenerkennung wurde getrennt gemessen und ist unbeteiligt: "
+          "ausgeschaltet blieb der Anstieg gleich."),
+    ("p", "Drei Dinge halten das in Grenzen. Eine Aufräumschleife gibt alle "
+          "fünf Minuten frei gewordenen Speicher zurück (rund 7 ms pro Lauf); "
+          "sie holt, was ein gegangener Zuhörer hinterlässt — nach zwanzig "
+          "Verbindungszyklen lag der Prozess niedriger als vorher — kann aber "
+          "nicht einsammeln, was ein laufender Strom gerade umwälzt. Der "
+          "Speicherverwalter wird beim Start auf zwei Bereiche begrenzt: Die "
+          "C-Bibliothek gibt sonst jedem Thread einen eigenen von 64 MB, und "
+          "dieser Prozess hatte dreißig davon angesammelt; begrenzt sank der "
+          "Bedarf von 611 MB auf 318 MB. Und die systemd-Unit setzt eine "
+          "Speichergrenze mit automatischem Neustart, damit eine "
+          "tagelange Mithörsitzung einen Neustart kostet und nicht den ganzen "
+          "Pi. Kurz: Den Browser-Tab zu schließen stoppt das Wachstum, und die "
+          "Abschaltautomatik tut es von selbst."),
     ("h1", "8  Mobile App (PWA)"),
     ("p", "Die Oberfläche installiert sich als Progressive Web App: Vollbild, mit "
           "App-Shell-Service-Worker für sofortigen Start. Auf dem Handy werden die "

@@ -58,6 +58,12 @@ class Settings(BaseSettings):
     auto_power_off_enabled: bool = False
     auto_power_off_seconds: int = 60
 
+    # Last commanded state of that switch. The GPIO line is released when the
+    # process exits — the pin falls back to input and the radio loses its DC —
+    # so the hardware cannot be asked "were you on?" after a restart. Remember
+    # it here instead and re-apply it on startup.
+    gpio_power_on: bool = False
+
     # Operator callsign shown in the title bar. Persisted server-side so it
     # survives across browsers/devices (not just in one browser's localStorage).
     callsign: str = ""
@@ -167,6 +173,7 @@ _RUNTIME_KEYS = ("serial_port", "serial_baud", "gpio_power_pin",
                  "squelch_a", "squelch_b",
                  "tx_buffer_ms", "ptt_tail_ms",
                  "auto_power_off_enabled", "auto_power_off_seconds",
+                 "gpio_power_on",
                  "callsign", "locator", "roger_beep_enabled", "roger_beep_level", "theme",
                  "tx_lowpass_enabled", "rx_lowpass_enabled", "rx_deemph_enabled",
                  "tx_preemph_enabled", "tx_comp_enabled",

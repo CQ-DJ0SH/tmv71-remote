@@ -16,7 +16,32 @@ import time
 import urllib.request
 from contextlib import asynccontextmanager
 
-import numpy as np
+
+def _cap_malloc_arenas(n: int = 2) -> None:
+    """Keep glibc from spreading the heap over a per-thread arena each.
+
+    Measured on this Pi: 34 threads had grown 30 anonymous 64 MB arenas (3 GB
+    of address space). Every arena fragments on its own and malloc_trim() can
+    only hand back what sits at an arena's top, so RSS crept roughly 40 MB/h
+    for each connected listener even with the reclaim loop running. Capping the
+    arenas makes the audio path reuse the same few heaps instead.
+
+    Called before numpy/sounddevice bring up their thread pools, since the cap
+    only applies to arenas created after it. MALLOC_ARENA_MAX wins if set, so
+    the trade (memory vs. allocator parallelism) stays overridable.
+    """
+    if os.environ.get("MALLOC_ARENA_MAX"):
+        return
+    import ctypes
+    try:
+        ctypes.CDLL("libc.so.6").mallopt(-8, n)        # -8 = M_ARENA_MAX
+    except Exception:  # noqa: BLE001
+        pass                                           # not glibc: nothing to cap
+
+
+_cap_malloc_arenas()
+
+import numpy as np                                     # noqa: E402
 
 from fastapi import (FastAPI, HTTPException, Response, UploadFile, WebSocket,
                      WebSocketDisconnect)
@@ -1308,6 +1333,8 @@ async def _auto_power_off_loop() -> None:
             try:
                 _remember_mem_for_boot()       # capture channel before cutting power
                 power_switch.set(False)
+                settings.gpio_power_on = False
+                save_runtime(gpio_power_on=False)
                 await _shut_down_peripherals()
                 logging.getLogger("tmv71").info(
                     "auto power off after %ds inactivity",
@@ -1383,6 +1410,26 @@ async def _audio_watchdog() -> None:
 RECLAIM_EVERY_S = 300        # how often freed memory is handed back (5 min)
 
 
+def _restore_power_switch() -> None:
+    """Put the radio's DC line back the way it was before the restart.
+
+    gpiozero releases the line when the process exits: the pin reverts to an
+    input, the gate falls and the radio loses power -- so after a backend
+    restart the rig was dark and answered nothing, which reads as "radio
+    offline" and cost a manual power-on every time. The pin cannot be asked
+    what it was, so the last commanded state is remembered in runtime.json.
+    """
+    if not power_switch.available or not settings.gpio_power_on:
+        return
+    if power_switch.state:                 # already on (pin survived somehow)
+        return
+    try:
+        power_switch.set(True)
+        logging.getLogger("tmv71").info("power switch restored to on")
+    except Exception as exc:  # noqa: BLE001
+        logging.getLogger("tmv71").warning("power switch restore failed: %s", exc)
+
+
 async def _reclaim_loop() -> None:
     """Give freed memory back to the system, every few minutes.
 
@@ -1390,10 +1437,18 @@ async def _reclaim_loop() -> None:
     a nightly restart was the workaround. Measured here over twenty audio
     connect/disconnect cycles, the process grew by 6.5 MB and gc.collect() plus
     malloc_trim(0) handed 7.4 MB back — it ended BELOW where it started. So
-    nothing is leaking in the sense of objects nobody can reach: the audio path
-    allocates and frees numpy blocks fifty times a second, and glibc keeps the
-    freed arenas rather than returning them. RSS then only ever rises, which is
-    what a long-running process on a small Pi cannot afford.
+    nothing leaks in the sense of objects nobody can reach; the memory is
+    simply never handed back, and RSS then only ever rises, which a long-
+    running process on a small Pi cannot afford.
+
+    What this does NOT fix, measured later: while a listener streams, RSS still
+    climbs about 45 MB/h and this loop reclaims none of it. That is the WebRTC
+    stack allocating and freeing per packet in C (a bare aiortc loopback in an
+    empty process does it too, +0.43 MB/min while gaining two Python objects in
+    five minutes), and malloc_trim can only return pages nothing is using. The
+    arena cap at the top of this module keeps that footprint from being
+    multiplied across a heap per thread; the systemd ceiling bounds the rest.
+    A peer that goes away is what this loop cleans up after.
 
     The whole thing costs about 7 ms (measured on this Pi, most of it the
     collection), so it runs on a plain timer rather than hunting for an idle
@@ -1416,6 +1471,7 @@ async def _reclaim_loop() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _restore_power_switch()
     await service.start()
     audio_wd = None
     if settings.audio_enabled:
@@ -1709,6 +1765,9 @@ async def set_power_switch(req: PowerSwitchRequest) -> dict:
         power_switch.set(req.on)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, str(exc))
+    if settings.gpio_power_on != req.on:
+        settings.gpio_power_on = req.on
+        save_runtime(gpio_power_on=req.on)
     if not req.on:
         await _shut_down_peripherals()   # radio off -> stop HackRF + audio peers
     else:
