@@ -154,7 +154,4 @@ for i in range(60000):                        # 20 min Material
 1. Die Nachtkurve gegenprüfen: mit dem Fix sollte eine Mithörsitzung die
    Steigung nicht mehr tragen.
 2. Fehlermeldung an PyAV/FFmpeg mit dem Reproduzierer oben.
-4. Service-Worker-Cache steht auf `tmv71-shell-v16` — für den neuen Graph auf
-   allen Geräten muss er auf `v17` (wird nicht automatisch hochgezählt).
-5. Zweite Mail an John ist geschrieben, aber nicht abgeschickt.
-6. Kein GitHub-Issue zum Speicherthema angelegt.
+3. Kein GitHub-Issue zum Speicherthema angelegt.
