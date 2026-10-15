@@ -3793,14 +3793,20 @@ function sqFloorTrack(db) {
   // margin honest if the window happens to hold little but speech
   sqFloor = s[Math.floor(s.length * 0.05)];
 }
+// One definition of "a pause in speech", for everything that has to let go at
+// one: DROP below, and the talk timer with the voice-match mark further down.
+// Two rules for it would mean two different silences, and the mark would still
+// be standing on a card long after the silence that lifted DROP.
+function sqIsQuiet(db) {
+  if (db == null || !isFinite(db)) return false;
+  return db <= SQ_SPEECH_DB
+      || (sqFloor != null && db <= sqFloor + SQ_FLOOR_MARGIN_DB);
+}
 function sqQuietCheck(db) {
   sqFloorTrack(db);                               // keep tracking while un-muted
   if (!sqMuted) return;
   const now = Date.now();
-  const quiet = db != null
-    && (db <= SQ_SPEECH_DB
-        || (sqFloor != null && db <= sqFloor + SQ_FLOOR_MARGIN_DB));
-  if (!quiet) { sqQuietSince = now; return; }
+  if (!sqIsQuiet(db)) { sqQuietSince = now; return; }
   if (now - sqQuietSince >= SQ_QUIET_MS) { sqSetMute(false); threeToneChime(); }
 }
 // MUTE: plain, permanent — stays until it is pressed again
@@ -3993,6 +3999,7 @@ function overSetPin(card) {
 function overRelease(card) {
   overUnpin();
   card.classList.remove("marked", "byvoice");
+  asrRailSync(card);               // same for a card let go by hand
   if (overCard === card) {
     overStop();                  // fold the running stretch into the card
     overCard = null;
@@ -4017,13 +4024,24 @@ function overFocus(card, byVoice = false) {
 // Through a repeater BUSY stays up for the whole round, so the falling edge that
 // would end an over never comes: the clock keeps counting the dead carrier onto
 // whichever card was marked, and the next station's over is credited to the
-// previous one. Three seconds without speech — the same silence that releases
-// DROP — end it instead.
-const OVER_QUIET_MS = 3000;
+// previous one. Three seconds without speech — literally the same silence that
+// releases DROP, by the same rule — end it instead.
+//
+// It used to be its own rule, and that rule was the absolute one: anything
+// above -55 dBFS counted as speech. On this station's flat, un-squelched feed
+// that is never reached — the gap between two overs is not silence but the
+// quieted noise of a carrier that is still up, measured at -37 dBFS — so the
+// mark and the clock stayed on the previous station for the whole round, even
+// though DROP (which tracks the floor the signal returns to) had long let go.
+// Both now ask sqIsQuiet(), so they end at the same moment, on the same pause.
+const OVER_QUIET_MS = SQ_QUIET_MS;
 let overQuietSince = 0;
 function overQuietCheck(db) {
-  if (db == null || db > SQ_SPEECH_DB) { overQuietSince = 0; return; }
   const now = Date.now();
+  // Timed from the last sample that still had speech in it, exactly as DROP
+  // times its own release — so the two let go on the same poll, and the three
+  // seconds are not counted from a moment that was already silent.
+  if (!sqIsQuiet(db)) { overQuietSince = now; return; }
   if (!overQuietSince) { overQuietSince = now; return; }
   if (now - overQuietSince < OVER_QUIET_MS) return;
   const began = overQuietSince;
@@ -4041,6 +4059,11 @@ function overIdle(quietStart) {
   overSave();
   overUnpin();
   overCard.classList.remove("marked", "byvoice");
+  // The copy in the margin has to let go with it. Nothing syncs a card again
+  // once it is no longer the focused one (overPaint only writes while the clock
+  // runs), so without this the rail would keep showing the ring and the voice
+  // mark on a station that has finished.
+  asrRailSync(overCard);
   overCard = null;
   overAcc = 0;
   asrModSync();

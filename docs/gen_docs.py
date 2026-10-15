@@ -1015,6 +1015,16 @@ EN = [
         "a pause; a receiver that does fall properly silent still releases on "
         "the absolute rule. The three seconds are what keeps a breath between "
         "words from counting as a pause.",
+        "The same pause lets go of the contact card: the talk timer stops and "
+        "the mark — including one the voice recognition put there — is "
+        "released, by the same rule and on the same poll as DROP. Through a "
+        "repeater BUSY stands for the whole round, so without it the clock "
+        "would credit the next station's over to the previous one, and the "
+        "voice mark would sit on a station that had finished. The timer stops "
+        "as of the START of the pause: three seconds of silence are nobody's "
+        "talk time. This used to be a rule of its own, the absolute one, which "
+        "on a flat feed never fired — so it let go only when the carrier "
+        "dropped.",
         "Muting is done in the browser, on the audio element. The S-meter, the "
         "raw RX recorder and the callsign recognition keep receiving the signal — "
         "only what you hear is silenced.",
@@ -1952,6 +1962,16 @@ DE = [
         "verstummt, löst weiterhin über die absolute Regel aus. Die drei "
         "Sekunden sind es, die eine Atempause zwischen Wörtern nicht als Pause "
         "zählen lassen.",
+        "Dieselbe Pause löst auch die Kontaktkarte: Die Sprechzeituhr hält "
+        "an, und die Markierung — auch eine von der Stimmerkennung gesetzte — "
+        "wird freigegeben, nach derselben Regel und im selben Abfragetakt wie "
+        "DROP. Über ein Relais steht BUSY den ganzen Durchgang; ohne das "
+        "schriebe die Uhr den Durchgang der nächsten Station der vorigen zu, "
+        "und die Stimm-Markierung bliebe auf einer Station stehen, die fertig "
+        "ist. Gezählt wird bis zum BEGINN der Pause — drei Sekunden Stille "
+        "sind niemandes Sprechzeit. Früher war das eine eigene Regel, die "
+        "absolute, die am flachen Ausgang nie auslöste: Gelöst wurde deshalb "
+        "erst, wenn der Träger fiel.",
         "Stummgeschaltet wird im Browser, am Audio-Element. S-Meter, "
         "Roh-Rekorder und Rufzeichenerkennung bekommen das Signal weiterhin — "
         "still ist nur, was man hört.",
