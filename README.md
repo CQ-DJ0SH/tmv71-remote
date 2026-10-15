@@ -69,6 +69,12 @@ the theme toggle in the header (light is the default).*
     dump (823,264 active licences). A call that is not in the register is still
     shown, flagged **·VOID**. Switching reloads model and register in about
     three seconds; the voice profiles are language-independent and survive it.
+- **Band lock (CTRL / PTT)** — the padlock in the title bar freezes the control
+  and transmit band where they stand, so a stray tap on CTRL or PTT can no
+  longer put you on the band you were not watching. The four buttons then carry
+  a padlock and say what is going on instead of acting; a press held for ~0.7 s
+  still switches. Per browser, so the phone can run locked while the shack PC
+  does not.
 - **A console you can trim** — *Settings ▸ Panels* switches off whatever the
   station does not use (HackRF, digimodes, selcall, logbook, scan, contact
   cards, down to a whole VFO). The panel leaves the desktop console, and in the

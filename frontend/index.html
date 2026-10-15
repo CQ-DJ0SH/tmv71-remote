@@ -65,6 +65,14 @@
     <div class="audio-status"><span class="led" id="audio-led"></span><span id="audio-text">USB Audio</span></div>
     <div class="clock" id="clock">--:--:--</div>
     <button class="gear rail-x" type="button" title="Hide the contact columns" aria-label="ASR contact columns">▶</button>
+    <button class="gear band-lock" id="band-lock" type="button" aria-pressed="false"
+            title="Lock the CTRL/PTT band choice against a stray tap" aria-label="Lock the band choice">
+      <svg class="lock-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="5" y="11" width="14" height="10" rx="2.2"></rect>
+        <path class="lk-shut" d="M8.5 11V7.5a3.5 3.5 0 0 1 7 0V11"></path>
+        <path class="lk-open" d="M8.5 11V7.5a3.5 3.5 0 0 1 6.6-1.3"></path>
+      </svg>
+    </button>
     <button class="gear theme-toggle" id="theme-toggle" title="Toggle light/dark" aria-label="Toggle theme">☾</button>
     <button class="gear hdr-hide" id="hdr-hide" title="Hide title bar" aria-label="Hide title bar">▴</button>
     <button class="gear" id="open-settings" title="Settings" aria-label="Settings">⚙</button>
@@ -113,8 +121,8 @@
         <button class="band-power" data-band="0" title="Band active · toggle single-band" aria-label="Band on/off"><svg class="pwr-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="3" x2="12" y2="12"></line><path d="M7.1 6.4a8 8 0 1 0 9.8 0"></path></svg></button>
         <span class="band-tag">BAND A</span>
         <button class="air-btn" id="air-0" type="button" title="Tune Band A to the air band (memory 997); off → back to 2 m">AIR Band</button>
-        <button class="ctrl-band-btn" data-band="0">CTRL</button>
-        <button class="ptt-band-btn" data-band="0" title="Select transmit band (PTT)">PTT</button>
+        <button class="ctrl-band-btn" data-band="0" title="Make this VFO the control band (spinner, frequency entry, memory recall)">CTRL<svg class="lock-mk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2.2"></rect><path d="M8.5 11V7.5a3.5 3.5 0 0 1 7 0V11"></path></svg></button>
+        <button class="ptt-band-btn" data-band="0" title="Select transmit band (PTT)">PTT<svg class="lock-mk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2.2"></rect><path d="M8.5 11V7.5a3.5 3.5 0 0 1 7 0V11"></path></svg></button>
         <span class="tx-lamp" title="Transmit indicator">TX</span>
         <div class="seg pwr-seg" title="Transmit power">
           <button class="sg" data-pwr="0">50W</button>
@@ -184,8 +192,8 @@
       <div class="band-head">
         <button class="band-power" data-band="1" title="Band active · toggle single-band" aria-label="Band on/off"><svg class="pwr-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="3" x2="12" y2="12"></line><path d="M7.1 6.4a8 8 0 1 0 9.8 0"></path></svg></button>
         <span class="band-tag">BAND B</span>
-        <button class="ctrl-band-btn" data-band="1">CTRL</button>
-        <button class="ptt-band-btn" data-band="1" title="Select transmit band (PTT)">PTT</button>
+        <button class="ctrl-band-btn" data-band="1" title="Make this VFO the control band (spinner, frequency entry, memory recall)">CTRL<svg class="lock-mk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2.2"></rect><path d="M8.5 11V7.5a3.5 3.5 0 0 1 7 0V11"></path></svg></button>
+        <button class="ptt-band-btn" data-band="1" title="Select transmit band (PTT)">PTT<svg class="lock-mk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2.2"></rect><path d="M8.5 11V7.5a3.5 3.5 0 0 1 7 0V11"></path></svg></button>
         <span class="tx-lamp" title="Transmit indicator">TX</span>
         <div class="seg pwr-seg" title="Transmit power">
           <button class="sg" data-pwr="0">50W</button>

@@ -297,6 +297,17 @@ body.theme-light .launch{background:radial-gradient(120% 90% at 50% 34%, #ffffff
 @media (hover:hover){
 .gear:hover{color:var(--amber); border-color:var(--amber); transform:rotate(45deg)}}
 .theme-toggle{font-size:16px}
+/* CTRL/PTT band lock. The shackle carries the state, not the colour: in the
+   PWA this button is 30 px wide in a vertical strip, where a tint reads as
+   "pressed" rather than as "closed". The amber ring is the second cue. */
+.band-lock{display:inline-flex; align-items:center; justify-content:center; padding:0}
+.band-lock .lock-svg{width:17px; height:17px}
+.band-lock .lk-shut{display:none}
+.band-lock[aria-pressed="true"] .lk-shut{display:inline}
+.band-lock[aria-pressed="true"] .lk-open{display:none}
+.band-lock[aria-pressed="true"]{color:var(--amber); border-color:var(--amber)}
+@media (hover:hover){
+.band-lock:hover{color:var(--amber); border-color:var(--amber); transform:none}}
 @media (hover:hover){
 .theme-toggle:hover{color:var(--cyan); border-color:var(--cyan); transform:none}}
 
@@ -1490,6 +1501,18 @@ body.radio-off .hackrf-zone{opacity:.32; filter:grayscale(.6) brightness(.78)}
   color:#06222a; background:var(--accent); border-color:var(--accent);
   box-shadow:0 0 14px var(--accent-glow); font-weight:600;
 }
+/* While the band lock is on, the padlock sits on the button itself: a tap that
+   does nothing has to say why, and a greyed-out control says only "no". The
+   dashed edge carries it for anyone who cannot make out a 9 px glyph. The
+   active button keeps its accent fill (higher specificity above), so which VFO
+   holds CTRL and PTT stays as readable as before. */
+.lock-mk{display:none}
+.ctrl-band-btn.is-locked .lock-mk, .ptt-band-btn.is-locked .lock-mk{
+  display:inline-block; width:9px; height:9px; margin-left:5px; vertical-align:-1px}
+.ctrl-band-btn.is-locked, .ptt-band-btn.is-locked{border-style:dashed; cursor:default}
+/* the flash that acknowledges a press held past the lock */
+.ctrl-band-btn.lock-passed, .ptt-band-btn.lock-passed{
+  box-shadow:0 0 0 2px var(--amber); border-style:solid}
 .tx-lamp{
   font-size:10px; letter-spacing:.2em; padding:3px 8px; border-radius:5px;
   border:1px solid var(--edge); color:#33404a; background:#0c1217; transition:.15s;

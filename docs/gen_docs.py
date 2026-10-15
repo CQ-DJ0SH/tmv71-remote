@@ -954,6 +954,20 @@ EN = [
           "a relative quieting estimate: a readable signal reads mid/upper scale, a "
           "strong local signal saturates at S9, and it snaps back to S0 the moment "
           "the carrier drops."),
+    ("h3", "Band lock (CTRL / PTT)"),
+    ("p", "CTRL moves the control band — what the spinner, the frequency entry "
+          "and a memory recall act on — and PTT moves the transmit band. Both "
+          "are a single tap and both reach the radio at once, so a stray tap "
+          "leaves you tuning the band you are not watching, or keying the one "
+          "you did not mean to. On a phone that is easy to do: the two buttons "
+          "sit in the band head, a thumb's width from the swipe you were aiming "
+          "for. The padlock in the title bar freezes the pair where they stand. "
+          "All four buttons then carry a small padlock, a tap on one says what "
+          "is going on instead of doing something, and a press held for about "
+          "0.7 s still switches the band — the lock is there to stop the "
+          "accident, not to make a band change something you have to unlock "
+          "first. It is remembered per browser, so the phone can run locked "
+          "while the PC in the shack does not."),
     ("h2", "PTT & memory quick keys"),
     ("p", "Hold the large PTT button (or the space bar) to transmit; PTT-LOCK "
           "latches transmit. PTT and PTT-LOCK require connected audio (there is no "
@@ -1870,6 +1884,21 @@ DE = [
           "BUSY-Status. Es ist eine relative Quieting-Schätzung: ein verständliches "
           "Signal steht im mittleren/oberen Bereich, ein starkes Ortssignal sättigt "
           "bei S9, und bei Trägerverlust springt es sofort auf S0 zurück."),
+    ("h3", "Bandsperre (CTRL / PTT)"),
+    ("p", "CTRL verlegt das Kontrollband — worauf der Drehspinner, die "
+          "Frequenzeingabe und ein Speicherabruf wirken —, PTT verlegt das "
+          "Sendeband. Beides ist ein einziger Tipper, und beides erreicht das "
+          "Funkgerät sofort. Ein Fehlgriff lässt einen also die Frequenz des "
+          "Bandes verstellen, das man gerade nicht beobachtet, oder auf dem "
+          "senden, das man nicht gemeint hat. Am Telefon passiert das leicht: "
+          "Die beiden Knöpfe sitzen im Band-Kopf, eine Daumenbreite neben dem "
+          "Wisch, den man eigentlich wollte. Das Schloss in der Titelzeile "
+          "nagelt die Zuordnung fest. Alle vier Knöpfe tragen dann ein kleines "
+          "Schloss, ein Tipper darauf sagt, was los ist, statt etwas zu tun, "
+          "und ein etwa 0,7 s gehaltener Druck schaltet trotzdem um — die "
+          "Sperre soll das Versehen verhindern, nicht den Bandwechsel zu etwas "
+          "machen, das man erst entsperren muss. Gespeichert wird sie je "
+          "Browser: Das Telefon darf gesperrt laufen, der PC im Shack nicht."),
     ("h2", "PTT & Speicher-Schnelltasten"),
     ("p", "Den großen PTT-Knopf (oder die Leertaste) halten zum Senden; PTT-LOCK "
           "rastet den Sendebetrieb ein. PTT und PTT-LOCK setzen verbundenes Audio "

@@ -716,6 +716,85 @@ async function applySpinner(band) {
   markDirty(band, false);
 }
 
+// ---- CTRL / PTT band lock --------------------------------------------------
+// CTRL moves the control band — what the spinner, the frequency entry and a
+// memory recall act on. PTT moves the transmit band. Both are a single tap and
+// both reach the radio at once (one BC command), so a stray tap leaves you
+// tuning the band you are not watching, or keying the one you did not mean to.
+// On a phone that is easy to do: the two buttons sit in the band head, a
+// thumb's width from the swipe you were aiming for.
+//
+// The lock freezes the pair where they stand. The four buttons stop reacting
+// and say why — a padlock on the button, not a grey-out, because a disabled
+// control explains nothing. A press held for BAND_LOCK_HOLD_MS still gets
+// through: the point is to stop the accident, not to make a band change
+// something you have to go and unlock first.
+const BAND_LOCK_KEY = "tmv71.bandLock";
+const BAND_LOCK_HOLD_MS = 700;
+let bandLocked = false;
+try { bandLocked = localStorage.getItem(BAND_LOCK_KEY) === "1"; } catch {}
+
+function paintBandLock() {
+  const b = $("#band-lock");
+  if (b) {
+    b.setAttribute("aria-pressed", String(bandLocked));
+    b.title = bandLocked
+      ? "CTRL/PTT band choice locked — hold a CTRL or PTT button to switch anyway"
+      : "Lock the CTRL/PTT band choice against a stray tap";
+  }
+  $$(".ctrl-band-btn, .ptt-band-btn").forEach(btn => {
+    btn.classList.toggle("is-locked", bandLocked);
+    // aria-disabled, not disabled: the button still takes a held press, and a
+    // disabled one would also drop out of the tab order for good.
+    btn.setAttribute("aria-disabled", String(bandLocked));
+  });
+}
+
+function setBandLock(on, say = true) {
+  bandLocked = !!on;
+  try { localStorage.setItem(BAND_LOCK_KEY, bandLocked ? "1" : "0"); } catch {}
+  paintBandLock();
+  if (say) toast(bandLocked
+    ? "CTRL/PTT band locked — hold a band button to switch anyway"
+    : "CTRL/PTT band unlocked", "ok");
+}
+
+// Both pickers work the same way, so they are bound the same way: a tap
+// switches, and while the lock is on only a held press does.
+function bindBandPicker(sel, kind) {
+  const label = kind === "ctrl" ? "CTRL" : "PTT";
+  const send = async btn => {
+    const band = Number(btn.dataset.band);
+    try {
+      if (kind === "ctrl") await api("POST", "/api/control-band", { control_band: band });
+      else await api("POST", "/api/ptt-band", { ptt_band: band });
+    } catch (e) { toast(`${label}: ${e.message}`, "err"); }
+  };
+  $$(sel).forEach(btn => {
+    let timer = 0, passed = false;
+    const stop = () => { if (timer) { clearTimeout(timer); timer = 0; } };
+    btn.addEventListener("pointerdown", () => {
+      if (!bandLocked) return;
+      passed = false;
+      timer = setTimeout(() => {
+        timer = 0;
+        passed = true;                 // the click that follows must not repeat it
+        btn.classList.add("lock-passed");
+        setTimeout(() => btn.classList.remove("lock-passed"), 320);
+        toast(`${label} → Band ${Number(btn.dataset.band) ? "B" : "A"} (held past the lock)`, "ok");
+        send(btn);
+      }, BAND_LOCK_HOLD_MS);
+    });
+    ["pointerup", "pointercancel", "pointerleave"].forEach(
+      ev => btn.addEventListener(ev, stop));
+    btn.addEventListener("click", () => {
+      if (!bandLocked) { send(btn); return; }
+      if (passed) { passed = false; return; }
+      toast(`Band choice locked — hold ${label} to switch`);
+    });
+  });
+}
+
 function bindControls() {
   // mic UP / DW keys — step the displayed band one step (Enter applies a freq)
   $$(".step-btn").forEach(btn => btn.addEventListener("click", async () => {
@@ -731,17 +810,12 @@ function bindControls() {
     catch (e) { toast("Mode: " + e.message, "err"); }
   }));
 
-  // control band
-  $$(".ctrl-band-btn").forEach(btn => btn.addEventListener("click", async () => {
-    try { await api("POST", "/api/control-band", { control_band: Number(btn.dataset.band) }); }
-    catch (e) { toast("CTRL: " + e.message, "err"); }
-  }));
-
-  // PTT (transmit) band — BC <control>,<ptt>
-  $$(".ptt-band-btn").forEach(btn => btn.addEventListener("click", async () => {
-    try { await api("POST", "/api/ptt-band", { ptt_band: Number(btn.dataset.band) }); }
-    catch (e) { toast("PTT: " + e.message, "err"); }
-  }));
+  // control band, and the PTT (transmit) band — the radio takes both in one BC
+  // command, and both are guarded by the band lock (see above)
+  bindBandPicker(".ctrl-band-btn", "ctrl");
+  bindBandPicker(".ptt-band-btn", "ptt");
+  $("#band-lock")?.addEventListener("click", () => setBandLock(!bandLocked));
+  paintBandLock();
 
   // air-band toggle (Band A): on → air band (memory 997), off → back to 2 m
   const airBtn = $("#air-0");
