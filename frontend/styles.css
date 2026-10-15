@@ -952,6 +952,12 @@ body.theme-light .asr-tip{background:#ffffffF2; border-color:#c5cfd8; box-shadow
    rotated 180°), the swipe "deck" of panels (center, full height), and a narrow
    icon tab-rail (right). Keyed on a short viewport (phone, not tablet). */
 .panel-tabs{display:none}            /* hidden on desktop */
+
+/* A panel switched off in Settings ▸ Panels, and its tab in the mobile deck
+   bar. display:none rather than removal: the markup stays live, so switching it
+   back on needs nothing but this class going away. !important because a panel
+   carries display rules of its own at both breakpoints. */
+.panel-off{display:none !important}
 .hdr-hide, .hdr-reveal{display:none} /* title-bar hide toggle: mobile only */
 .ptt-vu{display:none}                /* mini mic VU: PWA/mobile only */
 
@@ -2298,6 +2304,14 @@ body.theme-light .switch{--track-empty:#c8d2d9}
 /* settings ▸ Audio: USB mixer rows */
 .acd-hint{font-family:var(--font-mono); font-size:11px; color:var(--text-dim); letter-spacing:.04em}
 .mixer-field{margin-top:18px}
+/* settings ▸ Panels: one switch per console panel */
+.panel-list{display:flex; flex-direction:column; gap:9px; margin-top:10px}
+.panel-row{align-items:flex-start}
+.panel-row .switch{margin-top:1px}
+.panel-row-txt{display:flex; flex-direction:column; gap:3px}
+.panel-row-txt b{font-weight:600; letter-spacing:.14em}
+.panel-row-txt small{font-family:var(--font-mono); font-size:10px; letter-spacing:.04em;
+  line-height:1.5; color:var(--text-dim)}
 .mixer-list{display:flex; flex-direction:column; gap:10px; margin-top:8px}
 .mixer-row{display:flex; align-items:center; gap:12px}
 .mixer-row .mx-name{flex:0 0 130px; font-family:var(--font-mono); font-size:12px;

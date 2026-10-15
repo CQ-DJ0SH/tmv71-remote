@@ -1699,6 +1699,7 @@ function switchTab(name) {
   if (name === "dtmf") loadDtmf();
   if (name === "audio") { loadAudioDevices(); loadMixer(); loadTones(); }
   if (name === "logging") loadLogConfig();
+  if (name === "panels") renderPanelRows();
   if (name === "hardware") {
     loadSystem(); sysTimer = setInterval(loadSystem, 2000);
     loadSysHistory();                       // one sample a minute — poll to match
@@ -2118,6 +2119,13 @@ function bindSettings() {
   };
   $("#set-cancel").addEventListener("click", close);
   $("#set-cancel-audio")?.addEventListener("click", close);
+  $("#set-cancel-panels")?.addEventListener("click", close);
+  $("#set-panels-all")?.addEventListener("click", () => {
+    if (!panelsOff.size) { toast("Every panel is already shown", "ok"); return; }
+    [...panelsOff].forEach(k => setPanelHidden(k, false));   // copy: the set shrinks
+    renderPanelRows();
+    toast("All panels shown", "ok");
+  });
   $("#set-close").addEventListener("click", close);
   $("#settings").addEventListener("click", e => { if (e.target.id === "settings") close(); });
   $$(".tab").forEach(t => t.addEventListener("click", () => switchTab(t.dataset.tab)));
@@ -2549,6 +2557,124 @@ function bindPanels() {
   });
 }
 
+// ---- panels this station does without --------------------------------------
+// A shack without a HackRF, or one that never runs digimodes, carries two
+// screens of furniture around. Switching a panel off here hides it on the
+// desktop AND drops its tab from the PWA deck, so the swipe order closes up
+// behind it instead of snapping onto an empty slide.
+//
+// Hidden, not removed: the markup stays in the DOM and keeps taking its status
+// updates, so a panel switched back on is live in the same moment — which also
+// means no other code has to learn about this setting. The one place that pays
+// for a hidden panel is the HackRF, where the sweep really does cost the Pi
+// something; hrfVisible() reads layout rather than a class, so simply hiding
+// the panel is enough to make hrfSync() stop it.
+//
+// Per browser, like the collapse arrows beside it: the phone in the car and the
+// PC in the shack are allowed to show different consoles.
+const PANELS = [
+  { key: "band-a",  sel: "#band-0",       name: "VFO A" },
+  { key: "band-b",  sel: "#band-1",       name: "VFO B",
+    hint: "The radio keeps both bands; this only takes the display away." },
+  { key: "ptt",     sel: ".ptt-zone",     name: "PTT · memory",
+    hint: "Holds the transmit button and the quick memories — the spacebar still keys." },
+  { key: "audio",   sel: ".audio",        name: "Audio · WebRTC/Opus",
+    hint: "Holds CONNECT, the gain sliders and the level graph." },
+  { key: "hackrf",  sel: "#hackrf-zone",  name: "HackRF waterfall",
+    hint: "Needs a HackRF on the Pi. Hiding it stops the sweep." },
+  { key: "selcall", sel: "#selcall-zone", name: "Selcall · DTMF" },
+  { key: "digi",    sel: "#digi-zone",    name: "Digimodes" },
+  { key: "log",     sel: "#log-zone",     name: "Logbook" },
+  { key: "scan",    sel: "#scan-zone",    name: "Band · memory scan" },
+  { key: "asr",     sel: "#debug-zone",   name: "ASR · contacts",
+    hint: "The contact columns at the margins have their own handle in the title bar." },
+  { key: "foot",    sel: ".console-foot", name: "App & browser info" },
+];
+const PANELS_KEY = "tmv71.panelsOff";
+let panelsOff = new Set();
+// Keys of panels this build no longer has are dropped on the way in: a stale
+// one would sit in the set for good and make SHOW ALL a button that does
+// nothing (the set never empties).
+try {
+  const saved = JSON.parse(localStorage.getItem(PANELS_KEY) || "[]");
+  panelsOff = new Set(saved.filter(k => PANELS.some(p => p.key === k)));
+} catch {}
+
+function panelEl(p) { return document.querySelector(p.sel); }
+// The deck tab pointing at this panel, if it has one (scan, ASR and the footer
+// have none). Matched by resolving data-target, not by string, so the tab bar
+// and this list cannot drift apart.
+function panelDeckTab(el) {
+  return $$(".panel-tabs .ptab").find(t => {
+    try { return document.querySelector(t.dataset.target) === el; } catch { return false; }
+  });
+}
+let deckResync = null;                  // set by bindPanelDeck once it is wired
+
+function applyPanelVisibility() {
+  PANELS.forEach(p => {
+    const el = panelEl(p);
+    if (!el) return;
+    const off = panelsOff.has(p.key);
+    el.classList.toggle("panel-off", off);
+    panelDeckTab(el)?.classList.toggle("panel-off", off);
+  });
+  if (deckResync) deckResync();
+}
+
+function setPanelHidden(key, hidden) {
+  const p = PANELS.find(x => x.key === key);
+  if (!p) return;
+  if (hidden) panelsOff.add(key); else panelsOff.delete(key);
+  try { localStorage.setItem(PANELS_KEY, JSON.stringify([...panelsOff])); } catch {}
+  applyPanelVisibility();
+  // A canvas laid out while its panel was hidden comes up zero-sized, and a
+  // list that was never on screen was never filled: re-measure on the way back.
+  if (!hidden) {
+    try {
+      if (key === "audio") sizeLevelGraph();
+      else if (key === "scan") sizeScanCanvas();
+      else if (key === "log") loadLogRecent();
+      else if (key === "hackrf") sizeHrfCanvases();
+      else if (key === "asr") { asrFillSlots(); asrRailBuild(); }
+    } catch {}
+  }
+  if (key === "hackrf") hrfSync();      // hidden: stop the sweep, shown: resume
+}
+
+// Settings ▸ Panels — one switch per panel, checked = on screen. Built from
+// PANELS rather than written out in the HTML, so a new panel needs one line.
+function renderPanelRows() {
+  const box = $("#panel-list");
+  if (!box) return;
+  box.textContent = "";
+  PANELS.forEach(p => {
+    if (!panelEl(p)) return;            // a panel this build does not have
+    const row = document.createElement("label");
+    row.className = "switch-label panel-row";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.className = "switch";
+    cb.checked = !panelsOff.has(p.key);
+    cb.addEventListener("change", () => {
+      setPanelHidden(p.key, !cb.checked);
+      toast(`${p.name}: ${cb.checked ? "shown" : "hidden"}`, "ok");
+    });
+    const txt = document.createElement("span");
+    txt.className = "panel-row-txt";
+    const b = document.createElement("b");
+    b.textContent = p.name;
+    txt.appendChild(b);
+    if (p.hint) {
+      const small = document.createElement("small");
+      small.textContent = p.hint;
+      txt.appendChild(small);
+    }
+    row.append(cb, txt);
+    box.appendChild(row);
+  });
+}
+
 // ---- HackRF waterfall ------------------------------------------------------
 const hrf = {
   on: false, mode: "pan", follow: true, lna: 24, vga: 20, amp: false,
@@ -2966,10 +3092,12 @@ function bindPanelDeck() {
   if (!deck || !tabs.length) return;
   const mq = window.matchMedia("(max-width:760px)");
   const targets = tabs.map(t => document.querySelector(t.dataset.target));
+  // a panel switched off in Settings ▸ Panels is not part of the deck at all
+  const shown = el => !!el && !el.classList.contains("panel-off");
 
   tabs.forEach((t, i) => t.addEventListener("click", () => {
     const el = targets[i];
-    if (el) deck.scrollTo({ top: el.offsetTop, behavior: "smooth" });
+    if (shown(el)) deck.scrollTo({ top: el.offsetTop, behavior: "smooth" });
   }));
 
   const setActive = i => tabs.forEach((t, k) => t.classList.toggle("active", k === i));
@@ -2996,14 +3124,20 @@ function bindPanelDeck() {
   }, { root: deck, threshold: [0.5, 0.75] });
 
   let observing = false;
+  // Idempotent: also called when a panel is switched on or off, where the set of
+  // slides changes under the observer.
   const sync = () => {
-    if (mq.matches && !observing) {
-      targets.forEach(el => el && io.observe(el)); observing = true; setActive(0);
-    } else if (!mq.matches && observing) {
-      targets.forEach(el => el && io.unobserve(el)); observing = false;
+    if (observing) {
+      targets.forEach(el => el && io.unobserve(el));
+      observing = false;
     }
+    if (!mq.matches) return;
+    targets.forEach(el => { if (shown(el)) io.observe(el); });
+    observing = true;
+    setActive(targets.findIndex(shown));      // -1 = everything off, no tab lit
   };
   mq.addEventListener("change", sync);
+  deckResync = sync;
   sync();
 }
 
@@ -3507,7 +3641,8 @@ function bindCallsign() {
   if (chip) chip.addEventListener("click", () => {
     const deck = document.querySelector(".console");
     const dbg = document.querySelector(".debug-zone");
-    if (deck && dbg && window.matchMedia("(max-width:760px)").matches) {
+    if (deck && dbg && !dbg.classList.contains("panel-off")
+        && window.matchMedia("(max-width:760px)").matches) {
       deck.scrollTo({ top: dbg.offsetTop, behavior: "smooth" });
       return;
     }
@@ -5190,6 +5325,7 @@ function bindLogbook() {
 
 // ---- boot -----------------------------------------------------------------
 bindTheme();
+applyPanelVisibility();   // before the deck is wired: it skips hidden panels
 bindPanelDeck();
 bindHeaderHide();
 bindRadioHint();

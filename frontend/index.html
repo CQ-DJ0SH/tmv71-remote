@@ -743,6 +743,7 @@
     <div class="tabs" role="tablist">
       <button class="tab active" data-tab="general" role="tab">General</button>
       <button class="tab" data-tab="audio" role="tab">Audio</button>
+      <button class="tab" data-tab="panels" role="tab">Panels</button>
       <button class="tab" data-tab="info" role="tab">Rig-Info</button>
       <button class="tab" data-tab="memory" role="tab">Rig-Memory</button>
       <button class="tab" data-tab="dtmf" role="tab">Rig-DTMF</button>
@@ -929,6 +930,20 @@
       </div>
       <div class="modal-actions">
         <button id="set-cancel-audio" class="btn-ghost">CLOSE</button>
+      </div>
+    </section>
+
+    <!-- PANELS (which console panels this browser shows) -->
+    <section class="tab-pane" data-pane="panels">
+      <p class="pane-hint">Not every station needs every panel. What is switched off here stays off across reloads — on the desktop, and in the app its tab goes from the bottom bar too, so the swipe order closes up behind it. The choice belongs to this browser, like the collapse arrows: the phone in the car and the PC in the shack may show a different console.</p>
+      <div class="mixer-field">
+        <span class="logo-label">Console panels</span>
+        <div class="panel-list" id="panel-list"></div>
+        <p class="pane-hint">Nothing is unloaded: a hidden panel keeps its live data and comes back complete, so this is a view setting, not a switch-off. The one exception is the HackRF — hiding it stops the sweep, because that one costs the Pi real work.</p>
+      </div>
+      <div class="modal-actions">
+        <button id="set-panels-all" class="btn-ghost">SHOW ALL</button>
+        <button id="set-cancel-panels" class="btn-primary">CLOSE</button>
       </div>
     </section>
 

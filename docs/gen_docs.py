@@ -1540,8 +1540,24 @@ EN = [
           "serial port/baud, GPIO power, "
           "auto power-off, logo, GitHub self-update, Root-CA download), Audio "
           "(device, USB mixer, voice filters, test tone, audio timing), Rig-Info, "
-          "Rig-Memory, Rig-DTMF, Logging (Wavelog + QRZ.com), and Pi-Hardware "
+          "Rig-Memory, Rig-DTMF, Logging (Wavelog + QRZ.com), Panels (which "
+          "panels this browser shows) and Pi-Hardware "
           "(host metrics, and the backend's own resident size beside them)."),
+    ("h3", "Panels"),
+    ("p", "A shack without a HackRF, or one that never runs digimodes, carries "
+          "two screens of furniture around. Settings > Panels has one switch per "
+          "console panel — both VFOs, PTT, audio, HackRF, selcall, digimodes, "
+          "logbook, scan, contact cards and the app/browser footer. Switching "
+          "one off takes it out of the desktop console, and in the app its tab "
+          "leaves the bottom bar with it, so the swipe order closes up behind it "
+          "instead of snapping onto an empty slide. Nothing is unloaded: a "
+          "hidden panel keeps taking its status updates and is live again the "
+          "moment it is switched back on, so this is a view setting rather than "
+          "a switch-off. The one exception is the HackRF, where hiding the panel "
+          "also stops the sweep, because that one costs the Pi real work. The "
+          "choice is stored in the browser, like the collapse arrows beside it: "
+          "the phone in the car and the PC in the shack may show different "
+          "consoles, and SHOW ALL brings everything back."),
     ("h3", "Memory"),
     ("p", "The backend starts at roughly 320 MB — mostly the callsign list and, "
           "with recognition on, the two Vosk models. With nobody listening it "
@@ -2493,8 +2509,26 @@ DE = [
           "API-Backend-URL, serieller Port/Baud, "
           "GPIO-Power, Auto-Abschaltung, Logo, GitHub-Update, Root-CA-Download), "
           "Audio (Gerät, USB-Mixer, Sprachfilter, Testton, Audio-Timing), Rig-Info, "
-          "Rig-Speicher, Rig-DTMF, Logging (Wavelog + QRZ.com) und Pi-Hardware "
+          "Rig-Speicher, Rig-DTMF, Logging (Wavelog + QRZ.com), Panels (welche "
+          "Panels dieser Browser zeigt) und Pi-Hardware "
           "(Host-Metriken, daneben der Speicherbedarf des Dienstes selbst)."),
+    ("h3", "Panels"),
+    ("p", "Eine Station ohne HackRF, oder eine, die nie Digimodes fährt, "
+          "schleppt zwei Bildschirme Möbel mit sich herum. Einstellungen > "
+          "Panels hat einen Schalter je Konsolen-Panel — beide VFOs, PTT, "
+          "Audio, HackRF, Selcall, Digimodes, Logbuch, Scan, Kontaktkarten und "
+          "die App-/Browser-Fußzeile. Wer eines abschaltet, nimmt es aus der "
+          "Konsole heraus, und in der App verschwindet zugleich sein Reiter aus "
+          "der unteren Leiste — die Wischreihenfolge schließt sich dahinter, "
+          "statt auf eine leere Seite zu rasten. Entladen wird nichts: ein "
+          "verborgenes Panel nimmt seine Statusmeldungen weiter an und ist im "
+          "Moment des Wiedereinschaltens wieder aktuell. Es ist also eine "
+          "Ansichts-Einstellung, keine Abschaltung. Die Ausnahme ist der "
+          "HackRF — dort hält das Verbergen auch den Sweep an, weil der den Pi "
+          "echte Arbeit kostet. Die Auswahl liegt im Browser, wie die "
+          "Einklapp-Pfeile daneben: Das Telefon im Auto und der PC im "
+          "Shack dürfen verschiedene Konsolen zeigen, und SHOW ALL holt alles "
+          "zurück."),
     ("h3", "Speicher"),
     ("p", "Der Dienst startet bei etwa 320 MB — überwiegend die "
           "Rufzeichenliste und, bei eingeschalteter Erkennung, die beiden "

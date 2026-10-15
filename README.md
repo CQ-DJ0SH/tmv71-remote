@@ -69,6 +69,14 @@ the theme toggle in the header (light is the default).*
     dump (823,264 active licences). A call that is not in the register is still
     shown, flagged **·VOID**. Switching reloads model and register in about
     three seconds; the voice profiles are language-independent and survive it.
+- **A console you can trim** — *Settings ▸ Panels* switches off whatever the
+  station does not use (HackRF, digimodes, selcall, logbook, scan, contact
+  cards, down to a whole VFO). The panel leaves the desktop console, and in the
+  PWA its tab leaves the deck bar with it, so the swipe order closes up behind
+  it instead of snapping onto an empty slide. Nothing is unloaded — a panel
+  switched back on is live in the same moment — and the choice belongs to the
+  browser, so the phone in the car and the PC in the shack may show different
+  consoles.
 - **No build step for the control UI** — the SPA is plain HTML/CSS/JS served
   directly by the backend. No Node toolchain required on the Pi.
 - **Installable PWA / mobile-ready** — runs as an installable Progressive Web App
@@ -454,6 +462,11 @@ backend reachable). The screen is kept awake (Wake Lock) while the app is open.
 
 *The PTT panel has mini RX/TX VU bars (with 1 s peak-hold) flanking the key, and
 shows a count-up timer with a clock-style ring sweep while transmitting.*
+
+Panels the station does not need are switched off under *Settings ▸ Panels*:
+they leave the deck and take their tab in the rail with them, so a two-panel
+console is two swipes wide. The setting is per browser — the phone may carry a
+different console than the PC in the shack.
 
 To install: open the site, then in the browser menu choose **Install** /
 **Add to Home Screen** (Chrome offers an install icon in the address bar; on iOS
