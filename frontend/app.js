@@ -2646,15 +2646,17 @@ function bindPanels() {
 //
 // Per browser, like the collapse arrows beside it: the phone in the car and the
 // PC in the shack are allowed to show different consoles.
-// One line per panel, in the order they stand in the console. No per-row note:
-// a row that carries one is twice as tall as a row that does not, and then the
-// switches sit at uneven distances down the list, which looks like a mistake.
-// What the few special cases need to say is said once, under the list.
+// One tile per panel, in the order and the shape they have in the console:
+// `half` marks the four that share a row there (the two VFOs, then PTT beside
+// audio), the rest run the full width. So the list is a small map of the
+// console, and a switched-off tile shows the console you are going to get. No
+// note under a name: a taller row breaks the pitch of the switches, and what
+// the few special cases need to say stands once under the map.
 const PANELS = [
-  { key: "band-a",  sel: "#band-0",       name: "VFO A" },
-  { key: "band-b",  sel: "#band-1",       name: "VFO B" },
-  { key: "ptt",     sel: ".ptt-zone",     name: "PTT · memory" },
-  { key: "audio",   sel: ".audio",        name: "Audio · WebRTC/Opus" },
+  { key: "band-a",  sel: "#band-0",       name: "VFO A",            half: true },
+  { key: "band-b",  sel: "#band-1",       name: "VFO B",            half: true },
+  { key: "ptt",     sel: ".ptt-zone",     name: "PTT · memory",     half: true },
+  { key: "audio",   sel: ".audio",        name: "Audio · Opus",     half: true },
   { key: "hackrf",  sel: "#hackrf-zone",  name: "HackRF waterfall" },
   { key: "selcall", sel: "#selcall-zone", name: "Selcall · DTMF" },
   { key: "digi",    sel: "#digi-zone",    name: "Digimodes" },
@@ -2715,7 +2717,7 @@ function setPanelHidden(key, hidden) {
   if (key === "hackrf") hrfSync();      // hidden: stop the sweep, shown: resume
 }
 
-// Settings ▸ Panels — one switch per panel, checked = on screen. Built from
+// Settings ▸ Panels — one tile per panel, switch on = on screen. Built from
 // PANELS rather than written out in the HTML, so a new panel needs one line.
 function renderPanelRows() {
   const box = $("#panel-list");
@@ -2723,21 +2725,26 @@ function renderPanelRows() {
   box.textContent = "";
   PANELS.forEach(p => {
     if (!panelEl(p)) return;            // a panel this build does not have
-    const row = document.createElement("label");
-    row.className = "switch-label panel-row";
+    const tile = document.createElement("label");
+    tile.className = "switch-label panel-tile" + (p.half ? " is-half" : "");
+    tile.title = p.name;                // the name is clipped in a half tile
+    const txt = document.createElement("span");
+    txt.className = "panel-row-txt";
+    txt.textContent = p.name;
     const cb = document.createElement("input");
     cb.type = "checkbox";
     cb.className = "switch";
     cb.checked = !panelsOff.has(p.key);
+    tile.classList.toggle("is-off", !cb.checked);
     cb.addEventListener("change", () => {
+      tile.classList.toggle("is-off", !cb.checked);
       setPanelHidden(p.key, !cb.checked);
       toast(`${p.name}: ${cb.checked ? "shown" : "hidden"}`, "ok");
     });
-    const txt = document.createElement("span");
-    txt.className = "panel-row-txt";
-    txt.textContent = p.name;
-    row.append(cb, txt);
-    box.appendChild(row);
+    // name first, switch at the right edge: in a tile the switch is the control
+    // and the name is the label, the other way round from a plain settings row
+    tile.append(txt, cb);
+    box.appendChild(tile);
   });
 }
 

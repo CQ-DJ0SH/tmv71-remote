@@ -2327,13 +2327,35 @@ body.theme-light .switch{--track-empty:#c8d2d9}
 /* settings ▸ Audio: USB mixer rows */
 .acd-hint{font-family:var(--font-mono); font-size:11px; color:var(--text-dim); letter-spacing:.04em}
 .mixer-field{margin-top:18px}
-/* settings ▸ Panels: one switch per console panel. Every row is one line of the
-   same height, so the switches sit at an even pitch down the list — a row with
-   a second line of its own would break that rhythm, and the notes those rows
-   carried now stand once under the list. */
-.panel-list{display:flex; flex-direction:column; gap:10px; margin-top:10px}
-.panel-row{align-items:center; min-height:22px}
-.panel-row-txt{font-weight:600}
+/* settings ▸ Panels. The tiles are laid out the way the panels are laid out in
+   the console: two per row where the console puts two (the VFOs, then PTT
+   beside audio), full width for the rest, same order top to bottom. So the
+   list reads as a small map of the console rather than as eleven loose
+   switches, and a tile with its switch off shows the console you will get.
+   Every tile is the same height — a second line inside one would break the
+   pitch of the switches down the map. */
+.panel-list{display:grid; grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:8px; margin-top:10px}
+.panel-tile{
+  grid-column:1 / -1;          /* the console's full-width panels */
+  align-items:center; justify-content:space-between; gap:12px; min-height:40px;
+  padding:8px 11px; border-radius:8px;
+  background:var(--ctrl-bg); border:1px solid var(--edge); transition:.18s;
+}
+.panel-tile.is-half{grid-column:auto}
+.panel-tile .panel-row-txt{font-weight:600; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+@media (hover:hover){
+.panel-tile:hover{border-color:var(--accent)}}
+/* switched off: dashed and dimmed, so the map shows the gap at a glance */
+.panel-tile.is-off{border-style:dashed; opacity:.6}
+.panel-tile.is-off .panel-row-txt{font-weight:500}
+/* a narrow window (or a phone in the settings sheet) drops the map to one
+   column — two 170 px tiles clip their names to nothing */
+@media (max-width:560px){
+  .panel-list{grid-template-columns:1fr}
+  .panel-tile.is-half{grid-column:1 / -1}
+}
 .mixer-list{display:flex; flex-direction:column; gap:10px; margin-top:8px}
 .mixer-row{display:flex; align-items:center; gap:12px}
 .mixer-row .mx-name{flex:0 0 130px; font-family:var(--font-mono); font-size:12px;
