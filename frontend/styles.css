@@ -2327,14 +2327,13 @@ body.theme-light .switch{--track-empty:#c8d2d9}
 /* settings ▸ Audio: USB mixer rows */
 .acd-hint{font-family:var(--font-mono); font-size:11px; color:var(--text-dim); letter-spacing:.04em}
 .mixer-field{margin-top:18px}
-/* settings ▸ Panels: one switch per console panel */
-.panel-list{display:flex; flex-direction:column; gap:9px; margin-top:10px}
-.panel-row{align-items:flex-start}
-.panel-row .switch{margin-top:1px}
-.panel-row-txt{display:flex; flex-direction:column; gap:3px}
-.panel-row-txt b{font-weight:600; letter-spacing:.14em}
-.panel-row-txt small{font-family:var(--font-mono); font-size:10px; letter-spacing:.04em;
-  line-height:1.5; color:var(--text-dim)}
+/* settings ▸ Panels: one switch per console panel. Every row is one line of the
+   same height, so the switches sit at an even pitch down the list — a row with
+   a second line of its own would break that rhythm, and the notes those rows
+   carried now stand once under the list. */
+.panel-list{display:flex; flex-direction:column; gap:10px; margin-top:10px}
+.panel-row{align-items:center; min-height:22px}
+.panel-row-txt{font-weight:600}
 .mixer-list{display:flex; flex-direction:column; gap:10px; margin-top:8px}
 .mixer-row{display:flex; align-items:center; gap:12px}
 .mixer-row .mx-name{flex:0 0 130px; font-family:var(--font-mono); font-size:12px;

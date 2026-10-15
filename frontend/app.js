@@ -2646,22 +2646,21 @@ function bindPanels() {
 //
 // Per browser, like the collapse arrows beside it: the phone in the car and the
 // PC in the shack are allowed to show different consoles.
+// One line per panel, in the order they stand in the console. No per-row note:
+// a row that carries one is twice as tall as a row that does not, and then the
+// switches sit at uneven distances down the list, which looks like a mistake.
+// What the few special cases need to say is said once, under the list.
 const PANELS = [
   { key: "band-a",  sel: "#band-0",       name: "VFO A" },
-  { key: "band-b",  sel: "#band-1",       name: "VFO B",
-    hint: "The radio keeps both bands; this only takes the display away." },
-  { key: "ptt",     sel: ".ptt-zone",     name: "PTT · memory",
-    hint: "Holds the transmit button and the quick memories — the spacebar still keys." },
-  { key: "audio",   sel: ".audio",        name: "Audio · WebRTC/Opus",
-    hint: "Holds CONNECT, the gain sliders and the level graph." },
-  { key: "hackrf",  sel: "#hackrf-zone",  name: "HackRF waterfall",
-    hint: "Needs a HackRF on the Pi. Hiding it stops the sweep." },
+  { key: "band-b",  sel: "#band-1",       name: "VFO B" },
+  { key: "ptt",     sel: ".ptt-zone",     name: "PTT · memory" },
+  { key: "audio",   sel: ".audio",        name: "Audio · WebRTC/Opus" },
+  { key: "hackrf",  sel: "#hackrf-zone",  name: "HackRF waterfall" },
   { key: "selcall", sel: "#selcall-zone", name: "Selcall · DTMF" },
   { key: "digi",    sel: "#digi-zone",    name: "Digimodes" },
   { key: "log",     sel: "#log-zone",     name: "Logbook" },
   { key: "scan",    sel: "#scan-zone",    name: "Band · memory scan" },
-  { key: "asr",     sel: "#debug-zone",   name: "ASR · contacts",
-    hint: "The contact columns at the margins have their own handle in the title bar." },
+  { key: "asr",     sel: "#debug-zone",   name: "ASR · contacts" },
   { key: "foot",    sel: ".console-foot", name: "App & browser info" },
 ];
 const PANELS_KEY = "tmv71.panelsOff";
@@ -2736,14 +2735,7 @@ function renderPanelRows() {
     });
     const txt = document.createElement("span");
     txt.className = "panel-row-txt";
-    const b = document.createElement("b");
-    b.textContent = p.name;
-    txt.appendChild(b);
-    if (p.hint) {
-      const small = document.createElement("small");
-      small.textContent = p.hint;
-      txt.appendChild(small);
-    }
+    txt.textContent = p.name;
     row.append(cb, txt);
     box.appendChild(row);
   });
