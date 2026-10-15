@@ -1246,6 +1246,13 @@ EN = [
         "— cloning does not copy event handlers, and giving the copies their "
         "own would mean every behaviour existed twice, with the certainty of "
         "drifting apart one day.",
+        "A copy shows the state of its original, not just its text: the "
+        "current mark, the hold ring of a card picked by hand, the voice mark "
+        "and the running talk time. Every move of the mark goes through one "
+        "place that syncs the columns with it — a mark set by hand used to stop "
+        "at the panel, because the only thing that refreshed the columns was "
+        "the running clock, and clicking a card while no carrier is up leaves "
+        "the clock stopped.",
         "One control in the title bar folds both columns away together; they "
         "are one display split over two columns, and leaving one open would "
         "look like a fault rather than a choice. The columns appear from "
@@ -2212,6 +2219,14 @@ DE = [
         "kopiert keine Ereignisbehandler, und eigene zu vergeben hieße, jedes "
         "Verhalten zweimal im Quelltext zu haben, mit der sicheren Aussicht, "
         "dass beide Fassungen eines Tages auseinanderlaufen.",
+        "Eine Kopie zeigt den Zustand ihres Originals, nicht nur dessen Text: "
+        "die aktuelle Markierung, den Haltering einer von Hand gewählten "
+        "Karte, die Stimm-Markierung und die laufende Redezeit. Jeder Wechsel "
+        "der Markierung läuft durch eine Stelle, die die Spalten mitzieht — "
+        "eine von Hand gesetzte Markierung blieb früher im Panel stehen, weil "
+        "die Spalten nur von der laufenden Uhr aufgefrischt wurden und ein "
+        "Klick auf eine Karte ohne stehenden Träger die Uhr stillstehen "
+        "lässt.",
         "Ein Schalter in der Titelzeile klappt beide Spalten gemeinsam weg; sie "
         "sind eine Anzeige auf zwei Spalten verteilt, und eine offen und eine "
         "zu sähe nach Fehler aus statt nach Entscheidung. Die Spalten "

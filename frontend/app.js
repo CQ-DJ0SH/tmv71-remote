@@ -4007,6 +4007,23 @@ function overRelease(card) {
     asrModSync();                // no focused card -> MOD has nothing to act on
   }
 }
+// Exactly one card carries the "current" mark, and the copy in the rail has to
+// carry it too. Setting it by hand used to stop at the panel: the only thing
+// that ever synced the rail was the running clock (overPaint), and clicking a
+// card while no carrier is up leaves the clock stopped — so the mark moved in
+// the panel and the margin went on showing the previous station. Moving the
+// mark therefore goes through here, and the WHOLE rail is synced rather than
+// the new card alone: the card that loses the mark needs it just as much.
+function asrMoveMark(card, byVoice = false) {
+  const box = $("#asr-log");
+  box?.querySelectorAll(".asr-card.marked").forEach(c => c.classList.remove("marked"));
+  box?.querySelectorAll(".asr-card.byvoice").forEach(c => c.classList.remove("byvoice"));
+  if (card) {
+    card.classList.add("marked");
+    if (byVoice) card.classList.add("byvoice");   // mark WHY this card is current
+  }
+  asrRailSync();
+}
 function overFocus(card, byVoice = false) {
   if (byVoice && overPin) return;
   if (overCard === card) return;
@@ -4419,11 +4436,7 @@ function asrVoice(m) {
   // not moved either, so what is highlighted and what the timer counts on can
   // never drift apart.
   if (!m.accept || !m.act || !card || overPin) return;
-  const box = $("#asr-log");
-  box?.querySelectorAll(".asr-card.marked").forEach(c => c.classList.remove("marked"));
-  box?.querySelectorAll(".asr-card.byvoice").forEach(c => c.classList.remove("byvoice"));
-  card.classList.add("marked");
-  card.classList.add("byvoice");                 // mark WHY this card is current
+  asrMoveMark(card, true);
   overFocus(card, true);                         // no-op while a manual pin holds
   overPaint();
 }
@@ -4617,11 +4630,10 @@ function asrCardBuild(e) {
   card.addEventListener("click", () => {
     // a second click on the held card lets go of it again
     if (overPin && card.classList.contains("pinned")) { overRelease(card); return; }
-    const box = $("#asr-log");
-    box?.querySelectorAll(".asr-card.marked").forEach(c => c.classList.remove("marked"));
-    box?.querySelectorAll(".asr-card.byvoice").forEach(c => c.classList.remove("byvoice"));
-    card.classList.add("marked");
+    // the pin first, the mark second: the mark is what syncs the margin, and the
+    // hold ring belongs to the same pick, so it has to be on the card by then
     overSetPin(card);           // hand-picked: the voice must not move it again
+    asrMoveMark(card);
     overTeach(card);            // ...and it teaches the voice recognition
     overFocus(card);            // deliberately no repaint — see overPaint()
   });
@@ -4994,15 +5006,13 @@ function asrLog(e, fresh = true) {
   if (isNew) box.insertBefore(card, box.firstChild);
   if (fresh) {
     overUnpin();               // a heard callsign supersedes a hand-picked card
-    box.querySelectorAll(".asr-card.marked").forEach(c => c.classList.remove("marked"));
-    card.classList.add("marked");                      // exactly one current card
+    asrMoveMark(card);                                 // exactly one current card
     card.classList.remove("flash");
     void card.offsetWidth;                             // restart the animation
     card.classList.add("flash");
     overFocus(card);                                   // this over's duration
     overPaint();
     if (box.scrollTop < 24) box.scrollTop = 0;
-    asrRailSync();
   }
   while (box.childElementCount > 120) {                // drop the oldest card
     const last = box.lastElementChild;
@@ -5092,7 +5102,8 @@ function connectCallsignWS() {
       (m.lines || []).forEach(l => asrLog(l, false));
       // mark the most recent contact of the restored history, and point the
       // timer (and with it MOD) at it, as a live sighting would
-      box?.firstElementChild?.classList.add("marked");
+      asrMoveMark(box?.firstElementChild?.classList.contains("asr-card")
+                  ? box.firstElementChild : null);
       overFocus(box?.firstElementChild?.classList.contains("asr-card")
                 ? box.firstElementChild : null);
       asrFillSlots();
