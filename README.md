@@ -231,69 +231,21 @@ signalling — no extra services. For a reboot-proof setup see [`deploy/`](deplo
 > with your own root CA and trust that CA on the phone — see
 > [Mobile app (PWA)](#mobile-app-pwa).
 
-**Memory.** The backend starts at roughly **320 MB** on this build — most of it
-the callsign list and, when callsign recognition is on, the two Vosk models.
-With nobody listening it stays there: measured over ten hours with the sound
-card running the whole time, 361 MB start to finish, ±1 MB. *Settings ▸
+**Memory.** The backend sits at roughly **320 MB** on this build — most of it
+the callsign list and, when callsign recognition is on, the two Vosk models —
+and it stays there: with nobody listening, 361 MB at the start of a ten-hour
+stretch with the sound card running the whole time and the same at the end,
+±1 MB; a connected listener costs about a megabyte an hour. *Settings ▸
 Hardware* shows the service's own resident size next to the host's, and the
 **24 h graph** below it answers the question a single reading cannot — whether
 it has been climbing all night.
 
-A connected listener used to cost about **45 MB an hour**, which is what filled
-up the 1 GB Pi behind the original bug report. That is fixed, and the chase is
-worth recording because almost every intuition about it was wrong:
-
-| | |
-|---|---|
-| Callsign recognition off | unchanged, 41 MB/h — not the ASR |
-| Bare `aiortc` loopback, empty process | +0.43 MB/min, **+2 Python objects in 5 min** |
-| glibc tuned / jemalloc / default | identical slopes — not fragmentation |
-| Rebuilding the codec context every minute | reclaims nothing, and costs the listener a 105 ms burst |
-| Mono instead of stereo, same resampler | no change at all |
-| `pcm_s16le` instead of libopus | **flat to the byte** |
-| libopus called directly, via `ctypes` | +0.03 MB/min |
-
-Same frames, same PyAV machinery, same packet objects — only the codec swapped,
-and the growth disappears. The leak is in **libavcodec's libopus wrapper** (PyAV
-16.1.0, bundled libavcodec 62.11.100); libopus itself is clean. On top of that,
-aiortc's encoder hard-codes `layout="stereo"` and resamples our mono there,
-although the offer already pins Opus to one channel — half the growth was that
-resample, for a second channel nobody asked for.
-
-So [`opus_mono.py`](backend/app/opus_mono.py) encodes mono straight against
-`libopus.so`, bypassing both. Measured end to end through a real peer
-connection, with a receiver decoding every frame: **+0.42 → +0.02 MB/min**.
-Without `libopus.so` it falls back to the PyAV encoder, still mono, which is
-half.
-
-That left a third of it, and only watching the live curve overnight found it:
-the **same resampler on the way back**. `consume_mic` built one per listener to
-turn the decoder's stereo output into the radio's mono, and ran it fifty times a
-second whether or not anyone was transmitting — 13 MB/h for every connected
-browser, sitting there even while the station was idle. The conversion it was
-doing is a channel downmix at an unchanged rate and format, which is three lines
-of numpy. The slope scaling with the number of listeners is what gave it away:
-
-| | |
-|---|---|
-| before, one listener | +19.2 MB/h |
-| before, two listeners | +26.5 MB/h |
-| **after, two listeners** | **−3.9 MB/h** (±0.4 over 22 min) |
-
-Negative, with two listeners: the five-minute reclaim now wins. So the leak had
-three sites — ffmpeg's Opus wrapper, aiortc's needless mono→stereo resample on
-the way out, and that same resample on the way in — and together they are what
-filled a 1 GB Pi overnight.
-
-Two things keep the rest bounded. Housekeeping hands freed memory back every
-five minutes (`gc.collect()` plus `malloc_trim(0)`, about 7 ms a run). And the
-allocator is capped to two arenas at startup: glibc otherwise gives each thread
-its own 64 MB arena, and this process had grown **thirty** of them, 3 GB of
-address space, each fragmenting on its own — capping them cut the resident size
-from 611 MB to 318 MB and the virtual footprint from 3.0 GB to 0.67 GB.
-`MALLOC_ARENA_MAX` overrides it. The systemd unit in [`deploy/`](deploy/) still
-adds a `MemoryHigh`/`MemoryMax` ceiling and `Restart=always`, so a runaway costs
-a restart rather than a frozen board.
+Freed memory is handed back every five minutes (`gc.collect()` plus
+`malloc_trim(0)`, about 7 ms a run), and the allocator is capped to two arenas
+at startup, since glibc otherwise gives each of the process's threads its own
+64 MB arena (`MALLOC_ARENA_MAX` overrides the cap). The systemd unit in
+[`deploy/`](deploy/) adds a `MemoryHigh`/`MemoryMax` ceiling and
+`Restart=always`, so a runaway costs a restart rather than a frozen board.
 
 ## Audio
 
