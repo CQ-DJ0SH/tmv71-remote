@@ -68,7 +68,9 @@ class RadioService:
         self.tone_1750: bool = False
         # set by main.py: pushes the on/off state to the audio tone generator
         self.tone_1750_sink = None
-        self._status: RadioStatus = RadioStatus(connected=False)
+        self._status: RadioStatus = RadioStatus(
+            connected=False, audio_band_lock=bool(settings.audio_band_lock),
+            audio_band=settings.listen_band if settings.audio_band_lock else 0)
         self._poll_task: asyncio.Task | None = None
         self._stop = asyncio.Event()
         # Optional hook wired up by the audio bridge for PTT coupling.
@@ -168,11 +170,17 @@ class RadioService:
                 self.data_band = int(menu[DATA_BAND_IDX])
             except (TMV71Error, ValueError, IndexError):
                 self.data_band = 0
+        # While the data band is pinned (a TNC on the data connector, the Pi on
+        # the speaker jack) the field says nothing about what the operator
+        # hears, so the app's own listen band answers instead.
+        locked = bool(settings.audio_band_lock)
         return RadioStatus(
             connected=True, model=self.model,
             control_band=control, ptt_band=ptt,
             data_band=self.data_band,
-            audio_band=DATA_BAND_RX.get(self.data_band, 0),
+            audio_band=(settings.listen_band if locked
+                        else DATA_BAND_RX.get(self.data_band, 0)),
+            audio_band_lock=locked,
             tone_1750=self.tone_1750,
             transmitting=self.transmitting, single_band=single, bands=bands,
         )
@@ -182,7 +190,14 @@ class RadioService:
         try:
             self._status = await asyncio.to_thread(self._read_status)
         except Exception as exc:  # noqa: BLE001
-            self._status = RadioStatus(connected=False, error=str(exc))
+            # The offline snapshot still carries the two app-side settings, or a
+            # switch in Settings > Audio would read as off while the radio is
+            # dark and spring back the moment it is touched.
+            self._status = RadioStatus(
+                connected=False, error=str(exc),
+                audio_band_lock=bool(settings.audio_band_lock),
+                audio_band=(settings.listen_band
+                            if settings.audio_band_lock else 0))
         # radio just came (back) online — re-apply the persisted squelch, which
         # the rig loses on a power cycle (GPIO/manual power-on, serial recovery)
         if self._status.connected and not prev:
@@ -318,7 +333,31 @@ class RadioService:
         self.data_band = band
 
     async def set_data_band(self, band: int) -> RadioStatus:
+        # Pinned: move only what the app listens to. The radio's own routing is
+        # somebody else's now (see settings.audio_band_lock), and a single write
+        # to MU 38 would take the TNC's audio away.
+        if settings.audio_band_lock:
+            settings.listen_band = 1 if band else 0
+            config.save_runtime(listen_band=settings.listen_band)
+            await self.refresh()
+            await self.manager.broadcast(self._status.model_dump())
+            return self._status
         await asyncio.to_thread(self._set_data_band, band)
+        await self.refresh()
+        await self.manager.broadcast(self._status.model_dump())
+        return self._status
+
+    async def set_band_lock(self, on: bool) -> RadioStatus:
+        """Pin or release the data band. Nothing is written to the radio either
+        way: pinning only stops this app from writing, and releasing it leaves
+        the field where it stands until the next RX-A/RX-B press."""
+        settings.audio_band_lock = bool(on)
+        if on:
+            # start from what is actually audible, so the squelch and the
+            # S-meter do not jump to the other band the moment it is pinned
+            settings.listen_band = DATA_BAND_RX.get(self.data_band or 0, 0)
+            config.save_runtime(listen_band=settings.listen_band)
+        config.save_runtime(audio_band_lock=settings.audio_band_lock)
         await self.refresh()
         await self.manager.broadcast(self._status.model_dump())
         return self._status

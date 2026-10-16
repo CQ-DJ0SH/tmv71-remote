@@ -45,6 +45,8 @@ class RadioStatus(BaseModel):
     # audio_band = which band's RX audio reaches the data connector / Pi.
     data_band: int = 0
     audio_band: int = 0
+    # the data band is pinned: RX-A/RX-B moves only what the app listens to
+    audio_band_lock: bool = False
     # 1750 Hz tone hold (menu 402): off/on.
     tone_1750: bool = False
     bands: list[BandState] = []
@@ -195,6 +197,11 @@ class TonesRequest(BaseModel):
     rx_deemph_us: Optional[float] = Field(default=None, ge=10, le=500)
     rx_squelch: Optional[bool] = None
     mic_test: Optional[bool] = None
+
+
+class BandLockRequest(BaseModel):
+    """Pin the radio's external data band: the app stops writing MU 38."""
+    on: bool
 
 
 class AsrConfigRequest(BaseModel):

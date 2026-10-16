@@ -53,7 +53,8 @@ from . import memory as memory_io
 from .config import APP_VERSION, save_runtime, settings
 from .models import (AsrManualRequest, AudioDeviceRequest, AudioGainRequest,
                      AutoPowerOffRequest,
-                     BandDisplayRequest, BandModeRequest, CallsignRequest,
+                     BandDisplayRequest, BandLockRequest, BandModeRequest,
+                     CallsignRequest,
                      ThemeRequest,
                      ControlBandRequest, DataBandRequest,
                      DtmfMemory, FrequencyRequest, GpioConfigRequest,
@@ -1640,6 +1641,17 @@ async def set_data_band(req: DataBandRequest) -> RadioStatus:
         return await service.set_data_band(req.band)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, f"data band: {exc}")
+
+
+@app.post("/api/audio/band-lock", response_model=RadioStatus)
+async def set_band_lock(req: BandLockRequest) -> RadioStatus:
+    """Pin the external data band (MU 38) so this app never writes it — for a
+    station that has given the data connector to a TNC and feeds the Pi from the
+    speaker jack. RX-A/RX-B then only moves the app's own listen band."""
+    try:
+        return await service.set_band_lock(req.on)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"band lock: {exc}")
 
 
 @app.post("/api/tone-1750", response_model=RadioStatus)

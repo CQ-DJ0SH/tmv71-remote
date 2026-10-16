@@ -261,9 +261,14 @@ function render(st) {
     p.classList.toggle("is-tx", !!st.transmitting && st.ptt_band === band);
     p.classList.toggle("is-off", !!st.single_band && band !== st.control_band);
   });
-  // audio-band (data band) switch reflects the radio (data band 2/3 -> RX band)
+  // audio-band switch reflects the radio (data band 2/3 -> RX band). While the
+  // data band is pinned the field says nothing about what is audible, so the
+  // backend sends the app's own listen band in audio_band and that is followed.
+  paintAudioChannelLock(st);
   if (st.data_band != null) {
-    const rxBand = (st.data_band === 1 || st.data_band === 2) ? 1 : 0;
+    const rxBand = st.audio_band != null
+      ? (st.audio_band === 1 ? 1 : 0)
+      : ((st.data_band === 1 || st.data_band === 2) ? 1 : 0);
     $$("#audio-band-seg .sg").forEach(b => b.classList.toggle("active", Number(b.dataset.band) === rxBand));
     // detected-callsign field follows the active RX band's colour
     const rc = $("#rx-call");
@@ -1398,6 +1403,26 @@ function setMsUi(id, val) {
     (sl.value - sl.min) / (sl.max - sl.min) * 100 + "%");
 }
 
+// The RX-A/RX-B segment has two meanings, and it has to say which one is in
+// force: normally it moves the radio's external data band, but with audio
+// channel switching disabled (Settings > Audio — a TNC owns the data
+// connector) it moves nothing but the app's own listen band. So the label
+// reads LISTEN instead of BAND, the segment goes dashed (the narrow panel drops
+// the label, and then the dashes are all that is left to say it), and the
+// tooltip spells it out.
+function paintAudioChannelLock(st) {
+  const on = !!st.audio_band_lock;
+  const sw = $("#set-band-lock"); if (sw) sw.checked = on;
+  const lbl = $("#audio-band-lbl");
+  if (lbl) lbl.textContent = on ? "LISTEN" : "BAND";
+  const seg = $("#audio-band-seg");
+  if (!seg) return;
+  seg.classList.toggle("locked", on);
+  seg.title = on
+    ? "Which VFO you are listening to. The radio's data band is left where it stands (Settings \u25b8 Audio), so this only tells the app — the software squelch, the S-meter and the callsign recognition follow it."
+    : "Which VFO's received audio you hear (TX always goes via the radio's front mic input, so only the RX band matters)";
+}
+
 async function loadTones() {
   try {
     const s = await api("GET", "/api/audio/status");
@@ -1432,9 +1457,25 @@ function bindAudio() {
   }
   $$("#audio-band-seg .sg").forEach(b => b.addEventListener("click", async () => {
     const band = Number(b.dataset.band);
+    // the backend decides what this means: with the data band pinned it moves
+    // the app's listen band only, otherwise it moves the radio's MU 38
     try { const st = await api("POST", "/api/data-band", { band }); render(st); }
     catch (err) { toast("Audio band: " + err.message, "err"); }
   }));
+  // Pin the data band: for a station whose data connector belongs to a TNC and
+  // whose Pi listens on the speaker jack, one write to MU 38 takes the TNC's
+  // audio away. Server-side, so it holds for every browser and across restarts.
+  $("#set-band-lock")?.addEventListener("change", async e => {
+    const on = e.target.checked;
+    try {
+      render(await api("POST", "/api/audio/band-lock", { on }));
+      toast(on ? "Audio channel switching off — the radio's data band stays put"
+               : "Audio channel switching on — RX-A/RX-B moves the data band", "ok");
+    } catch (err) {
+      toast("Band lock: " + err.message, "err");
+      e.target.checked = !on;
+    }
+  });
   $("#set-testtone")?.addEventListener("change", async e => {
     try {
       await api("POST", "/api/audio/tones", { test_tone: e.target.checked });

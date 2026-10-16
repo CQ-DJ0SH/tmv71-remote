@@ -423,6 +423,14 @@ body.theme-light .rx-call:hover{background:rgba(0,0,0,0.06)}}
 @media (hover:hover){
 .seg .sg:hover{color:var(--accent)}}
 .seg .sg.active{color:#06222a; background:var(--accent); font-weight:600; box-shadow:0 0 10px -3px var(--accent-glow)}
+/* The RX-A/RX-B segment while the radio's data band is pinned (Settings ▸ Audio,
+   for a station whose data connector belongs to a TNC): it still selects, but
+   only what the app listens to — the radio's own routing is left alone. A
+   dashed edge says the choice stops at the app; the label beside it reads
+   LISTEN rather than BAND, and on a narrow panel, where that label is dropped,
+   the dashes are what is left to say it. */
+#audio-band-seg.locked{border-style:dashed}
+#audio-band-seg.locked .sg+.sg{border-left-style:dashed}
 .tone-sel, .tone-tx-sel{
   font-family:var(--font-mono); font-size:11px; color:var(--text);
   background:var(--field-bg); border:1px solid var(--edge); border-radius:7px;

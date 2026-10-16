@@ -349,7 +349,7 @@
     </div>
     <div class="audio-conn">
       <div class="acd audio-band-field">
-        <span>BAND</span>
+        <span id="audio-band-lbl">BAND</span>
         <div class="seg" id="audio-band-seg" title="Which VFO's received audio you hear (TX always goes via the radio's front mic input, so only the RX band matters)">
           <button type="button" class="sg" data-band="0">RX-A</button>
           <button type="button" class="sg" data-band="1">RX-B</button>
@@ -815,6 +815,14 @@
         <label>Audio device<select id="audio-device"></select></label>
       </div>
       <p class="pane-hint">The radio's USB sound interface (full-duplex: capture = RX, playback = TX to the mic).</p>
+      <div class="mixer-field">
+        <span class="logo-label">Audio channel (data band)</span>
+        <label class="switch-label">
+          <input type="checkbox" id="set-band-lock" class="switch">
+          <span>Disable audio channel switching</span>
+        </label>
+        <p class="pane-hint">RX-A/RX-B normally moves the radio's external data band (menu 38), because the data connector carries one band's audio only — and that is where the Pi's sound card usually sits. Switch this on when the data connector belongs to something else, a KISS TNC for APRS or packet, and the Pi listens on the speaker jack instead: the app then never writes that menu field, so nothing here can cut the TNC's audio off. RX-A/RX-B keeps working but only tells the app which band you are listening to — what the software squelch, the S-meter feed and the callsign recognition go by — and the label beside it reads LISTEN to say so. Over the speaker jack both bands are audible anyway. Kept on the Pi, so it holds for every browser and across restarts.</p>
+      </div>
       <div class="mixer-field">
         <span class="logo-label">USB mixer levels</span>
         <div id="mixer-list" class="mixer-list"></div>

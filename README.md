@@ -308,6 +308,14 @@ microphone. Listen there; hold the large **PTT** button to transmit. Pick which
 band's RX audio you hear with the **BAND** switch (RX‑A / RX‑B); TX always goes
 via the radio's front mic input.
 
+**Sharing the radio with a TNC.** RX-A/RX-B normally moves the radio's external
+data band (menu 38), because the data connector carries one band's audio only.
+If that connector belongs to a KISS TNC (APRS, packet) and the Pi listens on the
+speaker jack instead, switch on *Settings → Audio → Disable audio channel
+switching*: the app then never writes menu 38, and RX-A/RX-B moves only its own
+listen band (the label reads LISTEN). Note the speaker output is low-passed, so
+the digimode and selcall decoders need the flat data connector.
+
 Optional processing (Settings → Audio; the decoders always get the raw signal):
 
 - **RX de-emphasis** (adjustable time constant, on by default) — restores natural

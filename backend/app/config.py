@@ -72,6 +72,19 @@ class Settings(BaseSettings):
     roger_beep_enabled: bool = False
     roger_beep_level: float = 0.01   # roger-beep amplitude (0..1 of full scale)
 
+    # Leave the radio's external data band (MU 38) alone. The RX-A/RX-B switch
+    # normally moves it, because the data connector carries the audio of one
+    # band only and that is where the Pi's sound card usually sits. A station
+    # that has given the data connector to a TNC — APRS, packet — and taken the
+    # Pi's audio off the speaker jack instead needs that field to stay exactly
+    # where the TNC wants it: one CAT write to it cuts the TNC's audio off. With
+    # this on, nothing in the app writes that field; RX-A/RX-B then only tells
+    # the app which band the operator is listening to (``listen_band``), which
+    # is what the software squelch, the S-meter feed and the recognition's band
+    # label go by. Over the speaker jack both bands are audible anyway.
+    audio_band_lock: bool = False
+    listen_band: int = 0             # 0=A, 1=B — only consulted while locked
+
     # Band-limit the transmitted (mic) audio with a low-pass filter so only the
     # voice range goes out — tames hiss/high-frequency content on TX.
     tx_lowpass_enabled: bool = False
@@ -180,6 +193,7 @@ _RUNTIME_KEYS = ("serial_port", "serial_baud", "gpio_power_pin",
                  "rx_deemph_us", "rx_squelch_enabled", "asr_callsign_enabled",
                  "asr_region",
                  "rx_buffer_ms",
+                 "audio_band_lock", "listen_band",
                  "wavelog_url", "wavelog_key", "wavelog_station_id",
                  "qrz_api_key", "qrz_username", "qrz_password",
                  "selcall_own", "selcall_code",
