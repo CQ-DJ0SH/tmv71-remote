@@ -8,7 +8,8 @@ browser audio (WebRTC/Opus), and complete memory-channel management.
 ![TM-V71 Remote — dark theme](docs/preview.png)
 
 *A light and a dark theme are both included — switch between them any time with
-the theme toggle in the header (light is the default).*
+the theme toggle in the header (dark is the default; the choice is kept on the
+Pi, so it follows you to every browser).*
 
 ![TM-V71 Remote — light theme](docs/preview-light.png)
 

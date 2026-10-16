@@ -812,7 +812,7 @@ EN = [
         "auto-reconnects after a network glitch, and a backend watchdog releases "
         "a latched PTT if every client disappears.",
         "GPIO power switch, auto power-off, TX power, squelch, in-display S-meter.",
-        "Two themes (dark/light); no build step for the UI.",
+        "Two themes, dark by default; the choice is kept on the Pi, so it follows every browser. No build step for the UI.",
     ]),
     ("h1", "3  Architecture"),
     ("p", "Everything below runs on the Pi. The radio is reached over two "
@@ -1732,7 +1732,7 @@ DE = [
         "Backend-Watchdog beendet ein eingerastetes PTT, wenn alle Clients "
         "verschwinden.",
         "GPIO-Power-Schalter, Auto-Abschaltung, TX-Leistung, Squelch, S-Meter.",
-        "Zwei Themes (dunkel/hell); kein Build-Schritt für die Oberfläche.",
+        "Zwei Themes, dunkel als Voreinstellung; die Wahl liegt auf dem Pi und folgt damit jedem Browser. Kein Build-Schritt für die Oberfläche.",
     ]),
     ("h1", "3  Architektur"),
     ("p", "Alles Folgende läuft auf dem Pi. Das Funkgerät hängt über zwei "

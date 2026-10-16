@@ -3188,7 +3188,9 @@ function applyTheme(light, persist = true) {
 function bindTheme() {
   // apply the cached theme at once (avoids a flash), then sync the
   // server-persisted choice without re-saving it.
-  applyTheme(localStorage.getItem("tmv71.theme") !== "dark", false);   // light is the default
+  // dark unless this browser has asked for light — the same default the backend
+  // ships with, and the one the stylesheet's base already paints
+  applyTheme(localStorage.getItem("tmv71.theme") === "light", false);
   api("GET", "/api/theme").then(r => {
     if (r && (r.theme === "light" || r.theme === "dark")) applyTheme(r.theme === "light", false);
   }).catch(() => {});

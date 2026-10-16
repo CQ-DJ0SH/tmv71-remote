@@ -146,8 +146,11 @@ class Settings(BaseSettings):
     locator: str = ""
 
     # UI colour theme ("light" | "dark"). Persisted server-side so the choice
-    # survives across browsers/devices and storage clears.
-    theme: str = "light"
+    # survives across browsers/devices and storage clears. Dark is the one the
+    # app ships in: it is what a radio console looks like, and it matches the
+    # stylesheet's own base (light is a class on top of it), so a fresh install
+    # paints the right thing before the first script runs.
+    theme: str = "dark"
 
     # Logbook integration: Wavelog (locally installed) for QSO logging, QRZ.com
     # for callsign lookup. Secrets live only in runtime.json (gitignored).
