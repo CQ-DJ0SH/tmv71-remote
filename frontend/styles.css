@@ -216,8 +216,6 @@ body.theme-light .launch{background:radial-gradient(120% 90% at 50% 34%, #ffffff
 .rh-cert{display:flex; flex-direction:column; align-items:center; gap:8px;
   width:100%; padding-top:13px; border-top:1px solid var(--edge)}
 .rh-cert[hidden]{display:none}
-.rh-cert-why{color:var(--text-dim); font-family:var(--font-ui); font-size:10px;
-  letter-spacing:.06em; text-transform:uppercase; line-height:1.5; max-width:54ch}
 .rh-cert-btn{display:inline-flex; align-items:center; gap:9px; text-decoration:none;
   padding:8px 15px; border-radius:8px; border:1px solid var(--edge-hi);
   background:linear-gradient(180deg,var(--panel-2),var(--ctrl-bg));
