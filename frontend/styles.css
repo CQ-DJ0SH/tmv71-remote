@@ -312,7 +312,16 @@ body.theme-light .rh-cert-btn:hover{color:var(--ink)}}
   filter:brightness(.9) contrast(1.03);
 }
 
-.status-cluster{display:flex; align-items:center; gap:22px}
+/* CAT / USB Audio / clock belong with the controls on the right, not against
+   the nameplate in the middle. The whole cluster hangs on the right edge, so
+   the only way to move the readouts right is to make the cluster narrower:
+   the icon buttons keep a tight 12px rhythm (they read as one row of chrome
+   anyway), the three readouts keep more air between them, and the clock holds
+   a wider gap before the first button. That frees ~60px of width, which is
+   where the readouts move to — away from the logo plate. */
+.status-cluster{display:flex; align-items:center; gap:12px}
+.status-cluster>.stat, .status-cluster>.audio-status{margin-right:6px}
+.status-cluster>.clock{margin-right:10px}
 .stat{display:flex; align-items:center; gap:9px}
 .stat-label{font-size:11px; letter-spacing:.24em; color:var(--text-dim)}
 .led{
@@ -1102,6 +1111,8 @@ body.theme-light .asr-tip{background:#ffffffF2; border-color:#c5cfd8; box-shadow
   .app-title{writing-mode:vertical-rl; transform:rotate(180deg); text-orientation:mixed;
     font-size:13px; letter-spacing:.1em; white-space:nowrap; overflow:visible; text-overflow:clip}
   .status-cluster{flex-direction:column-reverse; align-items:center; gap:9px; justify-self:auto}
+  /* the desktop right-margins would shove the readouts off the strip's centre */
+  .status-cluster>.stat, .status-cluster>.audio-status, .status-cluster>.clock{margin-right:0}
   .topbar .clock{display:none}
   #audio-text, .stat-label{display:none}
   /* normalise the controls so they sit centred in the strip (the desktop power
