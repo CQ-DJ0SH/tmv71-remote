@@ -101,7 +101,6 @@
          worth installing (a cert from a public CA, or a private CA whose own
          file is not on the Pi). -->
     <div class="rh-cert" id="rh-cert" hidden>
-      <span class="rh-cert-why" id="rh-cert-why">No HTTPS warning on this device once the certificate is installed</span>
       <a class="rh-cert-btn" id="rh-cert-dl" href="/api/cert/download" target="_blank" rel="noopener">
         <svg class="cert-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M12 3l7 3v5.2c0 4.3-2.9 7.6-7 8.8-4.1-1.2-7-4.5-7-8.8V6l7-3z"></path>
@@ -109,11 +108,11 @@
         </svg>
         <span id="rh-cert-label">INSTALL CERTIFICATE</span>
       </a>
-      <!-- split in pieces on purpose: the fingerprint has to break anywhere,
-           the date must not break at all (it was wrapping inside the year) -->
+      <span class="rh-cert-why" id="rh-cert-why">No HTTPS warning once installed</span>
+      <!-- two pieces on purpose: the date must not break at all (it was
+           wrapping inside the year) -->
       <span class="rh-cert-meta" id="rh-cert-meta">
         <span class="rh-cert-line"><span id="rh-cert-subj"></span><span class="nobr" id="rh-cert-valid"></span></span>
-        <span class="rh-cert-fp" id="rh-cert-fp"></span>
       </span>
     </div>
     <button class="rh-x" id="radio-hint-x" title="Dismiss" aria-label="Dismiss">✕</button>
@@ -823,7 +822,7 @@
         <div class="logo-row">
           <a id="ca-download" class="mini-btn" href="/api/cert/download" target="_blank" rel="noopener">Download CA certificate</a>
         </div>
-        <p class="cert-meta" id="cert-meta"><span id="cert-meta-subj"></span><span class="nobr" id="cert-meta-valid"></span><span class="cert-meta-fp" id="cert-meta-fp"></span></p>
+        <p class="cert-meta" id="cert-meta"><span id="cert-meta-subj"></span><span class="nobr" id="cert-meta-valid"></span></p>
         <p class="pane-hint">Installing it on a device is what makes this server trusted — and only then does the PWA install and the service worker run. The same link sits on the power-off plate, where a device that has just arrived meets it first. Reach the Pi by one of the names the certificate carries (hover the link), or the browser warns even after installing.</p>
         <p class="pane-hint cert-step"><span class="cert-os">Android</span> Settings → Security → Encryption &amp; credentials → Install a certificate → CA certificate, then pick the downloaded file. One step; it is trusted from then on.</p>
         <p class="pane-hint cert-step"><span class="cert-os">iPhone · iPad</span> Two steps, and the second is the one everyone misses. The download arrives as a <em>profile</em>: install it under Settings → General → VPN &amp; Device Management → Downloaded Profile → Install (asks for the passcode). Then switch the trust on separately under Settings → General → About → Certificate Trust Settings → turn this certificate to full trust. Until that second switch, Safari warns exactly as before and the app still refuses to install — the profile alone changes nothing.</p>

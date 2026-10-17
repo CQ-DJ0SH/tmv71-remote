@@ -229,21 +229,12 @@ body.theme-light .launch{background:radial-gradient(120% 90% at 50% 34%, #ffffff
 @media (hover:hover){
 .rh-cert-btn:hover{border-color:var(--ok); color:#fff}
 body.theme-light .rh-cert-btn:hover{color:var(--ink)}}
-.rh-cert-meta{display:flex; flex-direction:column; gap:1px;
-  color:var(--text-dim); font-family:var(--font-mono); font-size:9.5px;
-  letter-spacing:.02em; line-height:1.5;
-  /* room for the whole fingerprint on one line where the screen allows it —
-     the plate is wide enough, and a 32-byte hash chopped into three lines is
-     unreadable. Narrow screens fall back to wrapping, never wider than here. */
-  /* 112ch, not 103: the glyph advance plus the letter-spacing above adds up
-     to a little more per character than 1ch, and 2 characters over the edge
-     cost a whole second line */
-  max-width:min(100%, 112ch)}
+.rh-cert-meta{color:var(--text-dim); font-family:var(--font-mono); font-size:9.5px;
+  letter-spacing:.02em; line-height:1.5; max-width:min(100%, 60ch)}
 /* name and date stay on one line: two unbreakable pieces that only come apart
    on a screen too narrow to hold both (the date broke inside the year before) */
 .rh-cert-line{display:flex; flex-wrap:wrap; justify-content:center}
 .rh-cert-line>span{white-space:nowrap}
-.rh-cert-fp{word-break:break-all}
 .nobr{white-space:nowrap}   /* the date, here and in the settings line */
 .rh-x{position:absolute; top:7px; right:9px; background:none; border:0; color:var(--text-dim);
   font-size:13px; cursor:pointer; padding:2px 5px; border-radius:5px; line-height:1}
@@ -2558,13 +2549,9 @@ body.theme-light .stats-tab tbody tr:first-child td.st-bar i{
 .logo-field{margin-top:16px}
 .update-field{margin-top:18px}
 .cert-field{margin-top:18px}
-/* subject · validity · fingerprint under the download link, so the cert can
-   be checked against what the phone shows while installing it */
+/* name and validity under the download link */
 .cert-meta{margin:5px 0 0; color:var(--text-dim); font-family:var(--font-mono);
   font-size:9.5px; letter-spacing:.02em; line-height:1.55; overflow-wrap:anywhere}
-/* own line, so the fingerprint starts at the left edge and wraps once at most
-   instead of being pushed around by the name in front of it */
-.cert-meta-fp{display:block; word-break:break-all}
 /* the per-platform install paths: tighter than a normal hint so the two read
    as one block, each opened by the device it belongs to */
 .cert-step{margin-bottom:7px}

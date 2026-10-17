@@ -1736,13 +1736,10 @@ async function refreshCaLink() {
   link.textContent = c.kind === "ca" ? "Download CA certificate"
                                       : "Download certificate";
   link.title = `${c.filename} · ${c.subject} · valid to ${c.not_after}`
-             + `\nSHA-256 ${c.fingerprint}`
              + (c.names?.length ? `\nValid for: ${c.names.join(", ")}` : "");
-  const mSubj = $("#cert-meta-subj"), mValid = $("#cert-meta-valid"),
-        mFp = $("#cert-meta-fp");
+  const mSubj = $("#cert-meta-subj"), mValid = $("#cert-meta-valid");
   if (mSubj) mSubj.textContent = c.subject || "";
   if (mValid) mValid.textContent = c.not_after ? ` · valid to ${c.not_after}` : "";
-  if (mFp) mFp.textContent = c.fingerprint ? `SHA-256 ${c.fingerprint}` : "";
 }
 
 async function refreshLogo() {
@@ -3343,12 +3340,10 @@ async function loadCertOffer() {
   const label = $("#rh-cert-label");
   if (label) label.textContent = c.kind === "ca" ? "INSTALL CA CERTIFICATE"
                                                  : "INSTALL CERTIFICATE";
-  // the date goes in its own no-wrap piece, the fingerprint in the one that
-  // may break anywhere — one text node for all of it split "2036-06-16"
-  const subj = $("#rh-cert-subj"), valid = $("#rh-cert-valid"), fp = $("#rh-cert-fp");
+  // the date in its own no-wrap piece: one text node for both split "2036-06-16"
+  const subj = $("#rh-cert-subj"), valid = $("#rh-cert-valid");
   if (subj) subj.textContent = c.subject || "";
   if (valid) valid.textContent = c.not_after ? ` · valid to ${c.not_after}` : "";
-  if (fp) fp.textContent = c.fingerprint ? `SHA-256 ${c.fingerprint}` : "";
   const meta = $("#rh-cert-meta");
   if (meta && c.names?.length) meta.title = `Reach the Pi by one of these, or the `
     + `certificate does not match: ${c.names.join(", ")}`;
