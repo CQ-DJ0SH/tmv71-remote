@@ -195,7 +195,7 @@ body.theme-light .launch{background:radial-gradient(120% 90% at 50% 34%, #ffffff
 .radio-hint[hidden]{display:none}
 .rh-plate{
   position:relative; display:flex; flex-direction:column; align-items:center; gap:14px;
-  padding:26px 56px; text-align:center;
+  padding:26px 56px; text-align:center; max-width:100%; box-sizing:border-box;
   background:linear-gradient(180deg,var(--panel-2),var(--panel));
   border:1px solid var(--edge); border-radius:14px;
   box-shadow:
@@ -211,6 +211,40 @@ body.theme-light .launch{background:radial-gradient(120% 90% at 50% 34%, #ffffff
 .rh-msg{display:flex; align-items:center; gap:8px; color:var(--text);
   font-family:var(--font-ui); font-size:12px; letter-spacing:.04em}
 .rh-msg .rh-ico{color:var(--tx); font-size:30px; display:flex; align-items:center}
+/* certificate offer: a quiet second row on the plate, divided off from the
+   power message so it never reads as part of "radio is off". */
+.rh-cert{display:flex; flex-direction:column; align-items:center; gap:8px;
+  width:100%; padding-top:13px; border-top:1px solid var(--edge)}
+.rh-cert[hidden]{display:none}
+.rh-cert-why{color:var(--text-dim); font-family:var(--font-ui); font-size:10px;
+  letter-spacing:.06em; text-transform:uppercase; line-height:1.5; max-width:54ch}
+.rh-cert-btn{display:inline-flex; align-items:center; gap:9px; text-decoration:none;
+  padding:8px 15px; border-radius:8px; border:1px solid var(--edge-hi);
+  background:linear-gradient(180deg,var(--panel-2),var(--ctrl-bg));
+  color:var(--text); font-family:var(--font-ui); font-size:11px; letter-spacing:.1em;
+  box-shadow:inset 0 1px 0 #ffffff14, 0 2px 0 #0000002e;
+  -webkit-tap-highlight-color:transparent}
+.rh-cert-btn .cert-svg{width:17px; height:17px; color:var(--ok); flex:0 0 auto}
+.rh-cert-btn:active{transform:translateY(1px); box-shadow:inset 0 1px 2px #00000055}
+@media (hover:hover){
+.rh-cert-btn:hover{border-color:var(--ok); color:#fff}
+body.theme-light .rh-cert-btn:hover{color:var(--ink)}}
+.rh-cert-meta{display:flex; flex-direction:column; gap:1px;
+  color:var(--text-dim); font-family:var(--font-mono); font-size:9.5px;
+  letter-spacing:.02em; line-height:1.5;
+  /* room for the whole fingerprint on one line where the screen allows it —
+     the plate is wide enough, and a 32-byte hash chopped into three lines is
+     unreadable. Narrow screens fall back to wrapping, never wider than here. */
+  /* 112ch, not 103: the glyph advance plus the letter-spacing above adds up
+     to a little more per character than 1ch, and 2 characters over the edge
+     cost a whole second line */
+  max-width:min(100%, 112ch)}
+/* name and date stay on one line: two unbreakable pieces that only come apart
+   on a screen too narrow to hold both (the date broke inside the year before) */
+.rh-cert-line{display:flex; flex-wrap:wrap; justify-content:center}
+.rh-cert-line>span{white-space:nowrap}
+.rh-cert-fp{word-break:break-all}
+.nobr{white-space:nowrap}   /* the date, here and in the settings line */
 .rh-x{position:absolute; top:7px; right:9px; background:none; border:0; color:var(--text-dim);
   font-size:13px; cursor:pointer; padding:2px 5px; border-radius:5px; line-height:1}
 @media (hover:hover){
@@ -2513,6 +2547,20 @@ body.theme-light .stats-tab tbody tr:first-child td.st-bar i{
 .logo-field{margin-top:16px}
 .update-field{margin-top:18px}
 .cert-field{margin-top:18px}
+/* subject · validity · fingerprint under the download link, so the cert can
+   be checked against what the phone shows while installing it */
+.cert-meta{margin:5px 0 0; color:var(--text-dim); font-family:var(--font-mono);
+  font-size:9.5px; letter-spacing:.02em; line-height:1.55; overflow-wrap:anywhere}
+/* own line, so the fingerprint starts at the left edge and wraps once at most
+   instead of being pushed around by the name in front of it */
+.cert-meta-fp{display:block; word-break:break-all}
+/* the per-platform install paths: tighter than a normal hint so the two read
+   as one block, each opened by the device it belongs to */
+.cert-step{margin-bottom:7px}
+.cert-step:last-of-type{margin-bottom:14px}
+.cert-os{color:var(--text); letter-spacing:.14em; text-transform:uppercase;
+  margin-right:7px}
+.cert-step em{font-style:normal; color:var(--text)}
 .update-status{flex:1 1 auto; min-width:0; font-family:var(--font-mono); font-size:11px;
   color:var(--text-dim); letter-spacing:.03em}
 .logo-label{

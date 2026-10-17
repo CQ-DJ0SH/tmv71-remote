@@ -75,6 +75,7 @@ from . import mixer
 from . import opus_mono
 from . import speaker_id
 from . import sys_history
+from . import tlscert
 from . import system_info
 from . import updater
 from .power_switch import MIN_OFF_S, PowerSwitch
@@ -1958,6 +1959,32 @@ async def set_theme(req: ThemeRequest) -> dict:
     settings.theme = req.theme
     save_runtime(theme=req.theme)
     return {"theme": req.theme}
+
+
+# ------------------------------------------------------------- TLS certificate
+# A device that has not been told to trust the Pi's certificate meets a warning
+# on every visit, and the installed app has no way past it at all. Both
+# endpoints only hand out what the TLS handshake already shows the world.
+
+
+@app.get("/api/cert")
+async def cert_info() -> dict:
+    return tlscert.info()
+
+
+@app.get("/api/cert/download")
+async def cert_download() -> FileResponse:
+    path, cert, kind, reason = tlscert.resolve()
+    if not path or cert is None:
+        raise HTTPException(404, reason or "no certificate to install")
+    # x-x509-ca-cert with an *inline* disposition: that is the combination iOS
+    # needs to offer "Profile Downloaded" instead of dropping an unopenable
+    # file in Downloads. The filename is still there for a desktop save.
+    return FileResponse(
+        path, media_type="application/x-x509-ca-cert",
+        headers={"Cache-Control": "no-cache",
+                 "Content-Disposition":
+                     f'inline; filename="{tlscert.filename(kind, cert)}"'})
 
 
 GITHUB_URL = "https://github.com/CQ-DJ0SH/tmv71-remote"

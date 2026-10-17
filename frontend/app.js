@@ -1721,15 +1721,28 @@ async function syncCallsign() {
 }
 
 // Title-bar logo (stored server-side in a gitignored dir, never committed).
-// Root-CA download (settings): only shown when the backend actually serves it
-// (the file is local/gitignored — absent on a fresh clone until a CA is made).
+// Certificate download (settings): the same offer as on the power-off plate,
+// and the same source — /api/cert reads what the backend is actually serving
+// HTTPS with, so this needs no copy of the CA under frontend/ and is right
+// again after a renewal. Hidden when there is nothing to install.
 async function refreshCaLink() {
   const field = $("#cert-field"), link = $("#ca-download");
   if (!field || !link) return;
-  const url = apiUrl("/tm-v71-ca.crt");
-  link.href = url;
-  try { field.hidden = !(await fetch(url, { method: "HEAD" })).ok; }
-  catch { field.hidden = true; }
+  let c = null;
+  try { c = await api("GET", "/api/cert"); } catch {}
+  field.hidden = !c?.available;
+  if (!c?.available) return;
+  link.href = apiUrl("/api/cert/download");
+  link.textContent = c.kind === "ca" ? "Download CA certificate"
+                                      : "Download certificate";
+  link.title = `${c.filename} · ${c.subject} · valid to ${c.not_after}`
+             + `\nSHA-256 ${c.fingerprint}`
+             + (c.names?.length ? `\nValid for: ${c.names.join(", ")}` : "");
+  const mSubj = $("#cert-meta-subj"), mValid = $("#cert-meta-valid"),
+        mFp = $("#cert-meta-fp");
+  if (mSubj) mSubj.textContent = c.subject || "";
+  if (mValid) mValid.textContent = c.not_after ? ` · valid to ${c.not_after}` : "";
+  if (mFp) mFp.textContent = c.fingerprint ? `SHA-256 ${c.fingerprint}` : "";
 }
 
 async function refreshLogo() {
@@ -3299,7 +3312,49 @@ function updateRadioHint() {
   const off = !!(powerState && powerState.available && powerState.on === false);
   if (!off) el.dataset.dismissed = "";          // re-arm once it's on
   el.hidden = !off || el.dataset.dismissed === "1";
+  if (!el.hidden) loadCertOffer();              // lazy: only once it is on screen
 }
+// The certificate the Pi serves HTTPS with, offered on the power-off plate: a
+// new device needs it before anything is warning-free, and the installed app
+// has no "proceed anyway" to click past at all. Fetched once, the first time
+// the plate is really shown — a browser that never sees the radio off never
+// asks. The backend decides what is worth installing (the private CA above the
+// server certificate, or a self-signed one itself) and answers
+// available:false when there is nothing, which leaves the row hidden.
+let certOfferDone = false;
+async function loadCertOffer() {
+  if (certOfferDone) return;
+  certOfferDone = true;
+  const box = $("#rh-cert");
+  if (!box) return;
+  let c;
+  try { c = await api("GET", "/api/cert"); } catch { return; }
+  if (!c || !c.available) return;
+  const dl = $("#rh-cert-dl");
+  if (dl) {
+    dl.href = apiUrl("/api/cert/download");
+    // deliberately NO download attribute: iOS only offers to install a
+    // certificate when Safari opens it as a profile, and that attribute sends
+    // it to Files instead. Desktop browsers cannot render the type and save it
+    // anyway, under the name the backend puts in Content-Disposition.
+    dl.title = `${c.filename} — ${c.kind === "ca" ? "root CA" : "server certificate"}`
+             + (c.names?.length ? `, valid for ${c.names.join(", ")}` : "");
+  }
+  const label = $("#rh-cert-label");
+  if (label) label.textContent = c.kind === "ca" ? "INSTALL CA CERTIFICATE"
+                                                 : "INSTALL CERTIFICATE";
+  // the date goes in its own no-wrap piece, the fingerprint in the one that
+  // may break anywhere — one text node for all of it split "2036-06-16"
+  const subj = $("#rh-cert-subj"), valid = $("#rh-cert-valid"), fp = $("#rh-cert-fp");
+  if (subj) subj.textContent = c.subject || "";
+  if (valid) valid.textContent = c.not_after ? ` · valid to ${c.not_after}` : "";
+  if (fp) fp.textContent = c.fingerprint ? `SHA-256 ${c.fingerprint}` : "";
+  const meta = $("#rh-cert-meta");
+  if (meta && c.names?.length) meta.title = `Reach the Pi by one of these, or the `
+    + `certificate does not match: ${c.names.join(", ")}`;
+  box.hidden = false;
+}
+
 function bindRadioHint() {
   const el = $("#radio-hint");
   if (!el) return;
