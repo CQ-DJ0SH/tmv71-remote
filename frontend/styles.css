@@ -350,7 +350,9 @@ body.theme-light .rh-cert-btn:hover{color:var(--ink)}}
   display:inline-flex; align-items:center; justify-content:center; cursor:pointer;
   color:var(--text-dim); background:var(--ctrl-bg); border:1px solid var(--edge);
   border-radius:9px; width:38px; height:38px; padding:0; transition:.18s;
-  margin-left:-10px;   /* tighten the gap to the settings gear (cluster gap is 22px) */
+  /* no pull-in any more: that -10px was written against the old 22px cluster
+     gap, and once the gap came down to 12px it ate the space to the settings
+     gear entirely. The row's own rhythm is the right distance here. */
 }
 .power-switch .ps-icon{font-size:18px; line-height:1}
 /* inline power glyph as SVG (the ⏻ codepoint isn't in the UI font) — sized via
