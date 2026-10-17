@@ -1652,10 +1652,10 @@ EN = [
           "no \"proceed anyway\" button of its own. Nothing has to be copied "
           "anywhere: /api/cert reads what the server is actually serving HTTPS "
           "with, offers the root CA above it (or a self-signed server "
-          "certificate itself), and prints subject, validity and SHA-256 "
-          "fingerprint beside the link so it can be checked against what the "
-          "phone shows while installing. The link disappears when there is "
-          "nothing to install."),
+          "certificate itself), and prints its name and validity beside the "
+          "link; the same endpoint also reports the SHA-256 fingerprint and the "
+          "names the certificate is valid for. The link disappears when there "
+          "is nothing to install."),
     ("code", CA),
     ("p", "Android: Settings > Security > Encryption & credentials > Install a "
           "certificate > CA certificate, then pick the downloaded file. One step, "
@@ -2674,9 +2674,9 @@ DE = [
           "hat. Kopiert werden muss nichts: /api/cert liest, womit der Server "
           "tatsächlich HTTPS ausliefert, bietet die Root-CA darüber an (oder ein "
           "selbstsigniertes Serverzertifikat selbst) und nennt neben dem Link "
-          "Inhaber, Gültigkeit und SHA-256-Fingerprint - vergleichbar mit dem, "
-          "was das Handy beim Installieren anzeigt. Gibt es nichts zu "
-          "installieren, verschwindet der Link."),
+          "Name und Gültigkeit; derselbe Endpunkt liefert zusätzlich den "
+          "SHA-256-Fingerprint und die Namen, für die das Zertifikat gilt. "
+          "Gibt es nichts zu installieren, verschwindet der Link."),
     ("code", CA),
     ("p", "Android: Einstellungen > Sicherheit > Verschlüsselung & "
           "Anmeldedaten > Zertifikat installieren > CA-Zertifikat, dann die "

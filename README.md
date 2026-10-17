@@ -486,11 +486,11 @@ phones that already trust it keep working). **Install the CA on the phone:**
    radio is off, where a device that has just arrived meets it first) and under
    **Settings ▸ General**. Both point at `/api/cert/download`, which serves
    whatever this server is really using for HTTPS: the root CA above the
-   server certificate, or a self-signed server certificate itself. Subject,
-   validity and the SHA-256 fingerprint are printed beside the link, to check
-   against what the phone shows while installing. Nothing has to be copied
-   into the web root, and the link is simply absent when there is nothing to
-   install. This matters most in the **installed app**, which has no "proceed
+   server certificate, or a self-signed server certificate itself. Name and
+   validity are printed beside the link; `GET /api/cert` adds the SHA-256
+   fingerprint and the names the certificate is valid for. Nothing has to be
+   copied into the web root, and the link is simply absent when there is
+   nothing to install. This matters most in the **installed app**, which has no "proceed
    anyway" button of its own.
 2. Android: **Settings → Security → Encryption & credentials → Install a
    certificate → CA certificate**, then pick the file. iOS: open the `.crt`,
