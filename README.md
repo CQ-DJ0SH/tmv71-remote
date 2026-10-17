@@ -481,7 +481,17 @@ sudo systemctl restart tmv71-remote.service   # pick up the new cert
 The leaf cert is valid 825 days; re-run step 2 to renew (the CA is unchanged, so
 phones that already trust it keep working). **Install the CA on the phone:**
 
-1. Get `ca/ca.crt` onto the phone (download it in the browser, or copy it over).
+1. Get the CA onto the phone — the app hands it out itself. A **download link
+   sits on the power-off plate** (the sign that covers the console while the
+   radio is off, where a device that has just arrived meets it first) and under
+   **Settings ▸ General**. Both point at `/api/cert/download`, which serves
+   whatever this server is really using for HTTPS: the root CA above the
+   server certificate, or a self-signed server certificate itself. Subject,
+   validity and the SHA-256 fingerprint are printed beside the link, to check
+   against what the phone shows while installing. Nothing has to be copied
+   into the web root, and the link is simply absent when there is nothing to
+   install. This matters most in the **installed app**, which has no "proceed
+   anyway" button of its own.
 2. Android: **Settings → Security → Encryption & credentials → Install a
    certificate → CA certificate**, then pick the file. iOS: open the `.crt`,
    install the profile, then enable it under **Settings → General → About →

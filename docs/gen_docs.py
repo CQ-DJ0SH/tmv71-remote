@@ -727,6 +727,7 @@ API_SYS = (
     "POST /api/auto-power-off     idle auto-off\n"
     "GET/POST /api/serial-config  serial port/baud\n"
     "GET/POST /api/callsign /theme\n"
+    "GET  /api/cert               cert to trust (+ /download)\n"
     "GET  /api/system             Pi host metrics\n"
     "GET/POST /api/update         GitHub self-update\n"
 )
@@ -1644,12 +1645,31 @@ EN = [
     ("p", "A self-signed certificate is fine on the desktop, but mobile browsers "
           "will not install the PWA or run the service worker without a trusted "
           "certificate. Create your own root CA, sign the server certificate with "
-          "it, and trust the CA on the phone. A download link for the CA appears in "
-          "Settings > General once it exists."),
+          "it, and trust the CA on the phone. The backend hands the certificate "
+          "out itself: a download link sits in Settings > General and, for a "
+          "device that has just arrived, on the power-off plate that covers the "
+          "console while the radio is off - in the installed app too, which has "
+          "no \"proceed anyway\" button of its own. Nothing has to be copied "
+          "anywhere: /api/cert reads what the server is actually serving HTTPS "
+          "with, offers the root CA above it (or a self-signed server "
+          "certificate itself), and prints subject, validity and SHA-256 "
+          "fingerprint beside the link so it can be checked against what the "
+          "phone shows while installing. The link disappears when there is "
+          "nothing to install."),
     ("code", CA),
-    ("p", "Install ca/ca.crt on the phone (Settings > Security > Install a "
-          "certificate > CA certificate). The leaf is valid 825 days; re-issue it "
-          "from the same CA without re-installing on phones. Keep ca/ca.key secret."),
+    ("p", "Android: Settings > Security > Encryption & credentials > Install a "
+          "certificate > CA certificate, then pick the downloaded file. One step, "
+          "and the CA is trusted from then on."),
+    ("p", "iPhone / iPad: two steps, and the second is the one everyone misses. "
+          "The download arrives as a profile, which is installed under Settings > "
+          "General > VPN & Device Management > Downloaded Profile > Install (it "
+          "asks for the passcode). The trust then has to be switched on "
+          "separately, under Settings > General > About > Certificate Trust "
+          "Settings, where this certificate is turned to full trust. Until that "
+          "second switch Safari warns exactly as before and the app still refuses "
+          "to install - an installed profile on its own changes nothing."),
+    ("p", "The leaf is valid 825 days; re-issue it from the same CA without "
+          "re-installing on phones. Keep ca/ca.key secret."),
     ("h1", "10  Configuration"),
     ("p", "Settings are read from environment variables (prefix TMV71_) or a .env "
           "file, with web-UI changes persisted to backend/app/runtime.json. Key "
@@ -2646,13 +2666,38 @@ DE = [
           "installieren die PWA nicht und starten den Service-Worker nicht ohne "
           "vertrauenswürdiges Zertifikat. Eine eigene Root-CA erstellen, das "
           "Serverzertifikat damit signieren und die CA auf dem Handy als "
-          "vertrauenswürdig installieren. Ein Download-Link erscheint unter "
-          "Einstellungen > Allgemein, sobald die CA existiert."),
+          "vertrauenswürdig installieren. Das Backend gibt das Zertifikat selbst "
+          "heraus: ein Download-Link steht unter Einstellungen > Allgemein und, "
+          "für ein neu dazugekommenes Gerät, auf dem Ausgeschaltet-Schild, das "
+          "die Konsole bei abgeschaltetem Funkgerät abdeckt - auch in der "
+          "installierten App, die keinen eigenen \"trotzdem fortfahren\"-Knopf "
+          "hat. Kopiert werden muss nichts: /api/cert liest, womit der Server "
+          "tatsächlich HTTPS ausliefert, bietet die Root-CA darüber an (oder ein "
+          "selbstsigniertes Serverzertifikat selbst) und nennt neben dem Link "
+          "Inhaber, Gültigkeit und SHA-256-Fingerprint - vergleichbar mit dem, "
+          "was das Handy beim Installieren anzeigt. Gibt es nichts zu "
+          "installieren, verschwindet der Link."),
     ("code", CA),
-    ("p", "ca/ca.crt auf dem Handy installieren (Einstellungen > Sicherheit > "
-          "Zertifikat installieren > CA-Zertifikat). Das Leaf ist 825 Tage gültig "
-          "und kann ohne Neu-Import aus derselben CA erneuert werden. ca/ca.key "
-          "geheim halten."),
+    ("p", "Android: Einstellungen > Sicherheit > Verschlüsselung & "
+          "Anmeldedaten > Zertifikat installieren > CA-Zertifikat, dann die "
+          "geladene Datei auswählen. Ein Schritt, danach ist die CA "
+          "vertrauenswürdig."),
+    ("p", "iPhone / iPad: zwei Schritte, und der zweite ist der, den alle "
+          "übersehen. Der Download kommt als Profil an und wird unter "
+          "Einstellungen > Allgemein > VPN & Geräteverwaltung > Geladenes Profil "
+          "> Installieren eingerichtet (fragt den Code). Das Vertrauen muss "
+          "danach getrennt gesetzt werden: Einstellungen > Allgemein > Info > "
+          # soft hyphens: fpdf2 justifies to the full measure, so a 34-letter
+          # word that does not fit stretches the line before it into a gappy
+          # mess and is then chopped mid-syllable. \u00ad gives it the two
+          # places a German reader would break it anyway.
+          "Zertifikats\u00advertrauens\u00adeinstellungen, dort dieses "
+          "Zertifikat auf volles "
+          "Vertrauen stellen. Bis zu diesem zweiten Schalter warnt Safari genau "
+          "wie vorher und die App lässt sich weiter nicht installieren - das "
+          "installierte Profil allein ändert nichts."),
+    ("p", "Das Leaf ist 825 Tage gültig und kann ohne Neu-Import aus derselben "
+          "CA erneuert werden. ca/ca.key geheim halten."),
     ("h1", "10  Konfiguration"),
     ("p", "Einstellungen kommen aus Umgebungsvariablen (Präfix TMV71_) oder einer "
           ".env-Datei; Änderungen aus der Web-UI werden in "
