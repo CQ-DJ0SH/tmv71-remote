@@ -70,9 +70,9 @@ Pi, so it follows you to every browser).*
     dump (823,264 active licences). A call that is not in the register is still
     shown, flagged **·VOID**. Switching reloads model and register in about
     three seconds; the voice profiles are language-independent and survive it.
-- **Band lock (CTRL / PTT)** — the padlock in the title bar freezes the control
-  and transmit band where they stand, so a stray tap on CTRL or PTT can no
-  longer put you on the band you were not watching. The four buttons then carry
+- **Band lock (CTRL / PTT)** — a switch in *Settings ▸ General* freezes the
+  control and transmit band where they stand, so a stray tap on CTRL or PTT can
+  no longer put you on the band you were not watching. The four buttons then carry
   a padlock and say what is going on instead of acting; a press held for ~0.7 s
   still switches. Per browser, so the phone can run locked while the shack PC
   does not.
