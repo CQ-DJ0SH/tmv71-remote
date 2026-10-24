@@ -329,17 +329,6 @@ body.theme-light .rh-cert-btn:hover{color:var(--ink)}}
 @media (hover:hover){
 .gear:hover{color:var(--amber); border-color:var(--amber); transform:rotate(45deg)}}
 .theme-toggle{font-size:16px}
-/* CTRL/PTT band lock. The shackle carries the state, not the colour: in the
-   PWA this button is 30 px wide in a vertical strip, where a tint reads as
-   "pressed" rather than as "closed". The amber ring is the second cue. */
-.band-lock{display:inline-flex; align-items:center; justify-content:center; padding:0}
-.band-lock .lock-svg{width:17px; height:17px}
-.band-lock .lk-shut{display:none}
-.band-lock[aria-pressed="true"] .lk-shut{display:inline}
-.band-lock[aria-pressed="true"] .lk-open{display:none}
-.band-lock[aria-pressed="true"]{color:var(--amber); border-color:var(--amber)}
-@media (hover:hover){
-.band-lock:hover{color:var(--amber); border-color:var(--amber); transform:none}}
 @media (hover:hover){
 .theme-toggle:hover{color:var(--cyan); border-color:var(--cyan); transform:none}}
 

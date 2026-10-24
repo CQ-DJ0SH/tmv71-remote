@@ -740,13 +740,8 @@ let bandLocked = false;
 try { bandLocked = localStorage.getItem(BAND_LOCK_KEY) === "1"; } catch {}
 
 function paintBandLock() {
-  const b = $("#band-lock");
-  if (b) {
-    b.setAttribute("aria-pressed", String(bandLocked));
-    b.title = bandLocked
-      ? "CTRL/PTT band choice locked — hold a CTRL or PTT button to switch anyway"
-      : "Lock the CTRL/PTT band choice against a stray tap";
-  }
+  const sw = $("#set-band-pick-lock");
+  if (sw) sw.checked = bandLocked;
   $$(".ctrl-band-btn, .ptt-band-btn").forEach(btn => {
     btn.classList.toggle("is-locked", bandLocked);
     // aria-disabled, not disabled: the button still takes a held press, and a
@@ -819,7 +814,8 @@ function bindControls() {
   // command, and both are guarded by the band lock (see above)
   bindBandPicker(".ctrl-band-btn", "ctrl");
   bindBandPicker(".ptt-band-btn", "ptt");
-  $("#band-lock")?.addEventListener("click", () => setBandLock(!bandLocked));
+  $("#set-band-pick-lock")?.addEventListener("change",
+    e => setBandLock(e.target.checked));
   paintBandLock();
 
   // air-band toggle (Band A): on → air band (memory 997), off → back to 2 m
