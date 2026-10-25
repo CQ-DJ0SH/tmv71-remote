@@ -392,8 +392,13 @@
       <canvas id="level-graph"></canvas>
       <span class="graph-bytes" id="graph-bytes" title="WebRTC audio data rate (RX ↓ from radio · TX ↑ mic)"></span>
       <div class="graph-axis"><span>30s</span><span>20s</span><span>10s</span><span>now</span></div>
+      <div class="spec-wrap" title="Audio spectrum: receive audio (violet, yellow = peak hold); your microphone while you transmit or test (red)">
+        <canvas id="spec-graph"></canvas>
+        <span class="spec-hint" id="spec-hint">AUDIO SPECTRUM · CONNECT</span>
+      </div>
+      <div class="graph-axis spec-axis"><span style="left:0%">0</span><span style="left:25%">1</span><span style="left:50%">2</span><span style="left:75%">3</span><span style="left:100%">4 kHz</span></div>
       <div class="graph-legend">
-        <span class="lg rx">RX</span><span class="lg mic">MIC</span>
+        <span class="lg rx">RX</span><span class="lg mic">MIC</span><button type="button" class="lg peak" id="lg-peak" title="Peak hold in the audio spectrum on/off">PEAK</button>
       </div>
     </div>
   </section>

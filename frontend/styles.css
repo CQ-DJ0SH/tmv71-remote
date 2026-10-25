@@ -2217,7 +2217,18 @@ body.theme-light #audio-toggle.connected:hover{
   border:1px solid #4a5a67; border-radius:10px; background:var(--field-bg);
   box-shadow:inset 0 1px 6px #00000033;
 }
-#level-graph{flex:1 1 auto; width:100%; min-height:0; display:block}
+/* level graph and audio spectrum share the height (basis 0: a canvas's pixel size must not grow the panel) */
+#level-graph{flex:1 1 0; height:0; width:100%; min-height:60px; display:block}
+.spec-wrap{position:relative; flex:1 1 0; min-height:60px; border-top:1px solid var(--edge)}
+.spec-wrap canvas{position:absolute; inset:0; width:100%; height:100%; display:block}
+.spec-hint{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none;
+  font-family:var(--font-mono); font-size:9px; letter-spacing:.16em; color:rgba(127,140,150,0.6)}
+.spec-hint[hidden]{display:none}
+/* kHz labels exactly under the grid lines */
+.graph-axis.spec-axis{position:relative; display:block; height:1.3em; padding:3px 0 4px; white-space:nowrap}
+.spec-axis span{position:absolute; transform:translateX(-50%)}
+.spec-axis span:first-child{transform:none; margin-left:8px}
+.spec-axis span:last-child{transform:translateX(-100%); margin-left:-8px}
 /* WebRTC data-rate readout in the top-right corner of the level graph */
 .graph-bytes{position:absolute; top:6px; right:8px; z-index:2; pointer-events:none;
   font-family:var(--font-mono); font-size:11px; letter-spacing:.02em; white-space:nowrap;
@@ -2244,6 +2255,10 @@ body.theme-light .graph-bytes .gb-tx{color:#b64a42}
 .graph-legend .lg::before{content:""; width:10px; height:10px; border-radius:2px; display:inline-block}
 .graph-legend .lg.rx::before{background:#8b7ad6; box-shadow:0 0 6px #8b7ad688}
 .graph-legend .lg.mic::before{background:#cf6159; box-shadow:0 0 6px #cf615988}
+.graph-legend .lg.peak{font:inherit; letter-spacing:inherit; background:none; border:0; padding:0; cursor:pointer}
+.graph-legend .lg.peak::before{background:#ffcf6a; box-shadow:0 0 6px #ffcf6a88}
+body.theme-light .graph-legend .lg.peak::before{background:#b86a00; box-shadow:none}
+.graph-legend .lg.peak.off{opacity:.4}
 
 /* ---------------- band scan ---------------- */
 .scan-zone{padding:22px 30px 26px}   /* top as every other panel: see .collapsed */

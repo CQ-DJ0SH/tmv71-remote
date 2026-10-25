@@ -1228,6 +1228,7 @@ function teardownAudio() {
   if (audioPc) { try { audioPc.close(); } catch {} audioPc = null; }
   if (audioMic) { audioMic.getTracks().forEach(tr => tr.stop()); audioMic = null; }
   const a = $("#rx-audio"); if (a) a.srcObject = null;
+  specStop();
 }
 function scheduleAudioReconnect() {
   if (audioReconnectT || !audioWant) return;
@@ -1248,6 +1249,7 @@ function audioDropped() {
   if (was) { toast("Audio lost — reconnecting…", "err"); scheduleAudioReconnect(); }
 }
 async function audioConnect() {
+  specStart();
   audioWant = true;
   try { localStorage.setItem("tmv71.audioOn", "1"); } catch {}   // persist: auto-connect next launch
   const t = $("#audio-toggle");
@@ -1264,7 +1266,12 @@ async function audioConnect() {
     audioMic = mic;
     audioPc = new RTCPeerConnection();
     audioMic.getTracks().forEach(tr => audioPc.addTrack(tr, audioMic));
-    audioPc.addEventListener("track", e => { $("#rx-audio").srcObject = e.streams[0]; });
+    specAttach("mic", audioMic);
+    audioPc.addEventListener("track", e => {
+      const st = e.streams[0] || new MediaStream([e.track]);
+      $("#rx-audio").srcObject = st;
+      specAttach("rx", st);
+    });
     audioPc.addEventListener("connectionstatechange", () => {
       updateAudioToggle();
       if (!audioPc) return;
@@ -5657,6 +5664,101 @@ try {
 
 // Persistent audio: auto-reconnect if it was on last session. RX playback may
 // need a user gesture (autoplay policy) — resume it on the first tap.
+// ---------------------------------------------------------------- audio spectrum
+// Under the level graph: Web Audio analysers on the received WebRTC stream and
+// on the own microphone (drawn while transmitting or in MIC TEST), 0–4 kHz,
+// with a decaying peak hold on RX. Analysis only — nothing goes to the speakers.
+const SPEC_HZ = 4000, SPEC_DB = [-100, -25], SPEC_PEAK_DECAY = 0.8;   // decay per frame (~30 fps)
+const spec = { ctx: null, rx: null, mic: null, nodes: [], raf: 0, last: 0, buf: null, peak: null,
+  peakOn: (() => { try { return localStorage.getItem("tmv71.specPeak") !== "0"; } catch { return true; } })() };
+function specStart() {
+  try {
+    spec.ctx = spec.ctx || new (window.AudioContext || window.webkitAudioContext)();
+    spec.ctx.resume().catch(() => {});
+  } catch { spec.ctx = null; }
+}
+// audio may auto-connect on load (no user gesture yet): the context then waits
+// for the first touch/click anywhere to start
+document.addEventListener("pointerdown", () => { if (spec.ctx && spec.ctx.state !== "running") spec.ctx.resume().catch(() => {}); });
+function specAttach(which, stream) {
+  if (!spec.ctx || !stream) return;
+  try {
+    const src = spec.ctx.createMediaStreamSource(stream), an = spec.ctx.createAnalyser();
+    an.fftSize = 4096; an.smoothingTimeConstant = 0.6;
+    an.minDecibels = SPEC_DB[0]; an.maxDecibels = SPEC_DB[1];
+    src.connect(an);
+    spec.nodes.push(src);
+    spec[which] = an;
+    const h = $("#spec-hint"); if (h) h.hidden = true;
+    if (!spec.raf) spec.raf = requestAnimationFrame(specDraw);
+  } catch { /* no Web Audio: the graph stays empty */ }
+}
+function specStop() {
+  for (const n of spec.nodes) { try { n.disconnect(); } catch {} }
+  spec.nodes = []; spec.rx = spec.mic = null; spec.peak = null;
+  cancelAnimationFrame(spec.raf); spec.raf = 0;
+  const cv = $("#spec-graph"); if (cv) cv.getContext("2d").clearRect(0, 0, cv.width, cv.height);
+  const h = $("#spec-hint"); if (h) h.hidden = false;
+}
+function showSpecPeak() {
+  const b = $("#lg-peak"); if (!b) return;
+  b.classList.toggle("off", !spec.peakOn);
+  b.setAttribute("aria-pressed", String(spec.peakOn));
+}
+if ($("#lg-peak")) $("#lg-peak").onclick = () => {
+  spec.peakOn = !spec.peakOn; spec.peak = null;
+  try { localStorage.setItem("tmv71.specPeak", spec.peakOn ? "1" : "0"); } catch {}
+  showSpecPeak();
+};
+showSpecPeak();
+function specDraw(t) {
+  spec.raf = requestAnimationFrame(specDraw);
+  if (t - spec.last < 33 || document.hidden) return;              // ~30 fps
+  spec.last = t;
+  const cv = $("#spec-graph"); if (!cv) return;
+  const dpr = window.devicePixelRatio || 1, r = cv.getBoundingClientRect();
+  const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+  if (!w || !h) return;                                            // panel collapsed / hidden
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, w, h);
+  ctx.strokeStyle = "rgba(127,140,150,0.15)"; ctx.lineWidth = dpr;
+  for (let k = 1; k < 4; k++) {                                    // 1, 2, 3 kHz
+    const x = Math.round(k / 4 * w) + 0.5;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+  }
+  const light = document.body.classList.contains("theme-light");
+  const micOn = txActive || micTestActive;
+  for (const [an, col, fill] of [[spec.rx, "#8b7ad6", "rgba(139,122,214,0.22)"], [micOn ? spec.mic : null, "#cf6159", null]]) {
+    if (!an) continue;
+    const n = an.frequencyBinCount, top = Math.min(n, Math.ceil(SPEC_HZ / (spec.ctx.sampleRate / 2) * n));
+    if (!spec.buf || spec.buf.length !== n) spec.buf = new Uint8Array(n);
+    an.getByteFrequencyData(spec.buf);
+    const cols = Math.ceil(w / dpr), isRx = an === spec.rx;
+    if (isRx && spec.peakOn && (!spec.peak || spec.peak.length !== cols)) spec.peak = new Float32Array(cols);
+    const pk = isRx && spec.peakOn ? spec.peak : null;
+    ctx.beginPath();
+    for (let x = 0, c = 0; x < w; x += dpr, c++) {                 // per pixel column: peak of its bins
+      const b0 = Math.floor(x / w * top), b1 = Math.max(b0 + 1, Math.floor((x + dpr) / w * top));
+      let v = 0;
+      for (let b = b0; b < b1; b++) if (spec.buf[b] > v) v = spec.buf[b];
+      if (pk) pk[c] = Math.max(v, pk[c] - SPEC_PEAK_DECAY);
+      const y = h - v / 255 * h;
+      if (x) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+    }
+    ctx.strokeStyle = col; ctx.lineWidth = 1.4 * dpr; ctx.stroke();
+    if (fill) { ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); }
+    if (pk) {
+      ctx.beginPath();
+      for (let c = 0; c < pk.length; c++) {
+        const x = c * dpr, y = h - pk[c] / 255 * h;
+        if (c) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+      }
+      ctx.strokeStyle = light ? "#b86a00" : "#ffcf6a"; ctx.lineWidth = dpr; ctx.stroke();
+    }
+  }
+}
+
 if (localStorage.getItem("tmv71.audioOn") === "1") {
   audioConnect();
   // RX playback may need a user gesture (autoplay policy) — resume on first tap
@@ -5676,3 +5778,4 @@ function addPanelScrews() {
   });
 }
 addPanelScrews();
+
