@@ -334,6 +334,8 @@ class HackRFConfig(BaseModel):
     lna: Optional[int] = Field(default=None, ge=0, le=40)
     vga: Optional[int] = Field(default=None, ge=0, le=62)
     amp: Optional[bool] = None
+    zoom: Optional[list[int]] = Field(default=None, max_length=2,
+                                      description="[lo, hi] Hz: extra fine row zf0/zf1/zdb; [0, 0] = off")
 
 
 class LogConfigRequest(BaseModel):

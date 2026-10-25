@@ -29,6 +29,11 @@ log = logging.getLogger("hackrf")
 PAN_SAMPLE_RATE = 2_000_000      # HackRF minimum; panadapter span = sample rate
 PAN_FFT = 2048                   # FFT size per frame (finer frequency resolution)
 OUT_BINS = 512                   # spectrum bins sent to the browser (downsampled)
+# Optional zoom (e.g. FT-950 Remote showing one HF band): a finer FFT over just
+# that range, sent as extra fields zf0/zf1/zdb next to the normal row.
+ZOOM_FFT = 8192                  # 244 Hz per bin at 2 MS/s
+ZOOM_AVG = 4                     # FFT blocks averaged (power) against speckle
+ZOOM_MAX_BINS = 1200             # wider zooms are peak-downsampled to this
 TARGET_FPS = 25                  # waterfall rows per second (panadapter)
 DC_NOTCH_BINS = 2                # hide the HackRF centre DC spike
 
@@ -69,6 +74,7 @@ class HackRFSpectrum:
         self.lna = 24
         self.vga = 20
         self.amp = False
+        self.zoom: Optional[tuple[int, int]] = None   # (lo, hi) Hz for the fine zoom row
         self.error: Optional[str] = None
         self._fps = 0.0
         # device-presence probe (hackrf_info), cached so the status endpoint
@@ -116,6 +122,7 @@ class HackRFSpectrum:
             "sweep_start": self.sweep_start, "sweep_stop": self.sweep_stop,
             "lna": self.lna, "vga": self.vga, "amp": self.amp,
             "bins": OUT_BINS, "fps": round(self._fps, 1), "error": self.error,
+            "zoom": list(self.zoom) if self.zoom else None,
             "dropped": self.dropped, "clients": len(self._subs),
         }
 
@@ -189,6 +196,9 @@ class HackRFSpectrum:
         if "amp" in cfg:
             a = bool(cfg["amp"])
             if a != self.amp: self.amp = a; restart = True
+        if "zoom" in cfg:                       # [lo, hi] Hz; [0, 0] / [] = off (no restart)
+            z = cfg["zoom"] or []
+            self.zoom = (int(z[0]), int(z[1])) if len(z) == 2 and 0 < z[0] < z[1] else None
         return restart
 
     def _start_sync(self, loop: asyncio.AbstractEventLoop, cfg: dict) -> None:
@@ -282,6 +292,8 @@ class HackRFSpectrum:
     def _run_pan(self) -> None:
         win = np.hanning(PAN_FFT).astype(np.float32)
         need = PAN_FFT * 2                      # bytes for one FFT block (int8 IQ)
+        keep = max(need * 2, ZOOM_FFT * 2 * ZOOM_AVG)   # recent samples kept (zoom needs more)
+        zwin = np.hanning(ZOOM_FFT).astype(np.float32)
         buf = bytearray()
         next_frame = time.monotonic()
         frame_dt = 1.0 / TARGET_FPS
@@ -298,8 +310,8 @@ class HackRFSpectrum:
                         break
                     continue
                 buf += chunk
-                if len(buf) > need * 4:         # keep only the most recent samples
-                    del buf[:-need * 2]
+                if len(buf) > keep * 2:         # keep only the most recent samples
+                    del buf[:-keep]
                 now = time.monotonic()
                 if now < next_frame or len(buf) < need:
                     continue
@@ -312,11 +324,16 @@ class HackRFSpectrum:
                 psd[mid - DC_NOTCH_BINS: mid + DC_NOTCH_BINS + 1] = psd.min()
                 row = self._downsample(psd, OUT_BINS)
                 half = PAN_SAMPLE_RATE // 2
-                self._emit({
+                frame = {
                     "t": "pan", "center": self.center, "span": PAN_SAMPLE_RATE,
                     "f0": self.center - half, "f1": self.center + half,
                     "db": [round(float(x), 1) for x in row],
-                })
+                }
+                if self.zoom:
+                    z = zoom_row(bytes(buf[-keep:]), self.center, *self.zoom, zwin)
+                    if z:
+                        frame.update(zf0=z[0], zf1=z[1], zdb=[round(float(x), 1) for x in z[2]])
+                self._emit(frame)
                 fps_n += 1
                 if now - fps_t >= 1.0:
                     self._fps = fps_n / (now - fps_t); fps_t, fps_n = now, 0
@@ -412,3 +429,36 @@ class HackRFSpectrum:
         # fewer input bins than output → interpolate up for a smooth row
         xp = np.linspace(0, 1, len(psd))
         return np.interp(np.linspace(0, 1, n), xp, psd).astype(np.float32)
+
+
+def zoom_row(raw: bytes, center: int, lo: int, hi: int,
+             win: Optional[np.ndarray] = None) -> Optional[tuple[float, float, np.ndarray]]:
+    """Fine spectrum of [lo, hi] from the newest int8 IQ bytes: up to ZOOM_AVG
+    Hann-windowed ZOOM_FFT blocks, power-averaged, in dB on the scale of the
+    normal row (noise level matched). Returns (f_first, f_last, dB) or None
+    when the range is not inside the captured span."""
+    blk = ZOOM_FFT * 2
+    k = min(ZOOM_AVG, len(raw) // blk)
+    if k < 1:
+        return None
+    if win is None:
+        win = np.hanning(ZOOM_FFT).astype(np.float32)
+    # int8 I,Q pairs → complex64 without copies of the halves
+    iq = (np.frombuffer(raw[-k * blk:], dtype=np.int8).astype(np.float32) / 128.0).view(np.complex64).reshape(k, ZOOM_FFT)
+    x = np.fft.fft(iq * win, axis=1)
+    pw = np.mean(x.real ** 2 + x.imag ** 2, axis=0)
+    psd = 10.0 * np.log10(np.fft.fftshift(pw) + 1e-12) - 10.0 * np.log10(ZOOM_FFT / PAN_FFT)
+    mid = ZOOM_FFT // 2
+    notch = DC_NOTCH_BINS * ZOOM_FFT // PAN_FFT
+    psd[mid - notch: mid + notch + 1] = np.median(psd)
+    bw = PAN_SAMPLE_RATE / ZOOM_FFT
+    base = center - PAN_SAMPLE_RATE / 2
+    i0 = max(0, int(np.ceil((lo - base) / bw)))
+    i1 = min(ZOOM_FFT - 1, int((hi - base) // bw))
+    if i1 - i0 < 8:
+        return None
+    sub = psd[i0:i1 + 1]
+    f0, f1 = base + i0 * bw, base + i1 * bw
+    if len(sub) > ZOOM_MAX_BINS:
+        sub = HackRFSpectrum._downsample(sub, ZOOM_MAX_BINS)
+    return f0, f1, sub.astype(np.float32)
