@@ -162,12 +162,24 @@ class _HighPass:
         hp[int(m)] += 1.0                    # spectral inversion: δ − lowpass
         self.h = hp.astype(np.float64)
         self._tail = np.zeros(ntaps - 1, dtype=np.float64)
+        self._H: dict[int, np.ndarray] = {}   # FFT size -> spectrum of h
 
     def process(self, pcm: np.ndarray) -> np.ndarray:
         x = np.concatenate([self._tail, pcm.astype(np.float64)])
-        y = np.convolve(x, self.h, mode="valid")
-        self._tail = x[-(self.h.size - 1):]
-        return np.clip(y, -32768, 32767).astype(np.int16)
+        m = self.h.size
+        if m > 255:
+            # Overlap-save via FFT: same result as np.convolve(..., "valid"),
+            # but 2001 taps cost ~0.2 ms a block instead of ~2.7 ms on the Pi 4 —
+            # time the audio callback needs (RX dropouts under ASR load).
+            n = 1 << (x.size - 1).bit_length()
+            H = self._H.get(n)
+            if H is None:
+                H = self._H[n] = np.fft.rfft(self.h, n)
+            y = np.fft.irfft(np.fft.rfft(x, n) * H, n)[m - 1:x.size]
+        else:
+            y = np.convolve(x, self.h, mode="valid")
+        self._tail = x[-(m - 1):]
+        return np.clip(np.rint(y), -32768, 32767).astype(np.int16)
 
     def reset(self) -> None:
         self._tail[:] = 0.0
@@ -431,6 +443,12 @@ class RadioAudio:
         self.connected = False
         self.error: Optional[str] = None
         self.rx_frames = 0
+        # RX dropout diagnostics (Audio status): PortAudio xruns, slow callbacks,
+        # WebRTC side running dry (gaps) or falling behind (drops)
+        self.rx_overflows = self.out_underflows = self.cb_slow = 0
+        self.rx_gaps = self.rx_drops = 0
+        self.cb_max_ms = 0.0
+        self._xrun_logged = 0.0
         self.rx_db: Optional[float] = None
         self.tx_db: Optional[float] = None
         self.peers = 0
@@ -597,8 +615,29 @@ class RadioAudio:
 
     # -- PortAudio callback (runs in PortAudio thread) ---------------------
     def _callback(self, indata, outdata, frames, time_info, status):
+        """Times the real callback and counts PortAudio over/underruns: RX
+        dropouts show up here (or as rx_gaps / rx_drops on the WebRTC side)."""
+        t0 = time.perf_counter()
         if status:
-            log.debug("audio status: %s", status)
+            if status.input_overflow:
+                self.rx_overflows += 1
+            if status.output_underflow:
+                self.out_underflows += 1
+            now = time.monotonic()
+            if now - self._xrun_logged > 60:
+                self._xrun_logged = now
+                log.warning("audio status: %s (overflows %d, underflows %d so far)",
+                            status, self.rx_overflows, self.out_underflows)
+        try:
+            self._callback_body(indata, outdata, frames)
+        finally:
+            dt = (time.perf_counter() - t0) * 1000.0
+            if dt > self.cb_max_ms:
+                self.cb_max_ms = dt
+            if dt > 15.0:
+                self.cb_slow += 1
+
+    def _callback_body(self, indata, outdata, frames):
         # RX: radio capture (mono ch0) -> WebRTC subscribers
         samples = indata[:, 0].copy()
         self._update_smeter(samples)            # FM-quieting S-meter (pre-gain, raw)
@@ -684,6 +723,7 @@ class RadioAudio:
                     q.append(blk)
                     while len(q) > cap:      # peer fell behind -> drop the oldest
                         q.popleft()
+                        self.rx_drops += 1
         # TX: radio mic source. The two-tone test is emitted continuously on the
         # mic line regardless of PTT (so deviation can be set without holding the
         # key); the roger beep and queued browser mic only play while keyed.
@@ -1147,6 +1187,9 @@ class RadioAudio:
     def status(self) -> dict:
         return {"enabled": True, "connected": self.connected, "error": self.error,
                 "rx_frames": self.rx_frames, "ptt_open": self._ptt_open,
+                "rx_overflows": self.rx_overflows, "out_underflows": self.out_underflows,
+                "cb_slow": self.cb_slow, "cb_max_ms": round(self.cb_max_ms, 2),
+                "rx_gaps": self.rx_gaps, "rx_drops": self.rx_drops,
                 "rx_db": self.rx_db, "tx_db": self.tx_db, "rx_s": self.rx_s,
                 "rx_gain": self.rx_gain, "tx_gain": self.tx_gain,
                 "tx_auto_gain": self.tx_auto_gain,
@@ -1242,6 +1285,7 @@ class RadioRxTrack(MediaStreamTrack):
             self._fill = False
         if not q:
             self._fill = True
+            self._radio.rx_gaps += 1         # ran dry: an audible gap follows
             return None
         return q.popleft()
 
