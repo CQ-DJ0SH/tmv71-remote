@@ -1897,6 +1897,14 @@ async function loadSystem() {
   // is a question host memory cannot answer
   set("sys-app", s.app_rss ? `${fmtBytes(s.app_rss)} · ${s.app_threads} threads` : "—");
   set("sys-uptime", fmtUptime(s.uptime_sec));
+  // RX dropout counters of the audio path (since the service started)
+  try {
+    const a = await api("GET", "/api/audio/status");
+    set("sys-audio-card", a.rx_overflows == null ? "—" :
+      `${a.rx_overflows} overflows · ${a.out_underflows} underflows · ${a.cb_slow} slow (max ${a.cb_max_ms} ms)`);
+    set("sys-audio-web", a.rx_gaps == null ? "—" :
+      `${a.rx_gaps} gaps · ${a.rx_drops} drops · ${a.peers} listening`);
+  } catch { /* audio status is optional here */ }
 }
 
 // ---- 24 h graph: temperature, load, memory ----

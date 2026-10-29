@@ -1018,6 +1018,8 @@
         <dt>Disk (/)</dt><dd id="sys-disk">—</dd>
         <dt title="Resident memory of the backend itself. It settles within a few minutes of a restart and should stay there: freed memory is handed back to the system every five minutes.">This service</dt><dd id="sys-app">—</dd>
         <dt>Uptime</dt><dd id="sys-uptime">—</dd>
+        <dt title="Since the last service start. Overflows/underflows: the sound card ran out of time (an RX dropout). Slow: audio callbacks over 15 ms of their 20 ms budget — harmless while the xrun counters stay put.">Audio · sound card</dt><dd id="sys-audio-card">—</dd>
+        <dt title="Since the last service start. Gaps: a browser's RX buffer ran dry (a short silence). Drops: a browser fell behind and the oldest audio was discarded — a few right after (re)connecting are normal.">Audio · to browser</dt><dd id="sys-audio-web">—</dd>
       </dl>
       <figure class="sys-graph">
         <div class="sys-graph-head">
