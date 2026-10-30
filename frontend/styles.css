@@ -1332,25 +1332,30 @@ body.theme-light .screw::before{
 .band::before, .ptt-zone::before, .audio::before, .scan-zone::before,
 .hackrf-zone::before, .digi-zone::before, .selcall-zone::before, .log-zone::before,
 .debug-zone::before{ /* color rail */
-  content:""; position:absolute; left:0; top:14px; bottom:14px; width:3px;
-  border-radius:3px; background:var(--accent); box-shadow:0 0 12px var(--accent-glow);
+  content:""; position:absolute; inset:0; pointer-events:none;
+  border-radius:inherit; border:0 solid transparent; border-left:3px solid var(--accent);
+  /* the left border bends into the rounded corners and tapers there; the ends fade out */
+  -webkit-mask:linear-gradient(180deg,transparent 0,#000 9px,#000 calc(100% - 9px),transparent 100%);
+          mask:linear-gradient(180deg,transparent 0,#000 9px,#000 calc(100% - 9px),transparent 100%);
+  --rail-glow:var(--accent-glow);
+  filter:drop-shadow(0 0 2px var(--rail-glow)) drop-shadow(0 0 9px var(--rail-glow));
 }
 #band-0{--accent:var(--amber); --accent-glow:var(--amber-glow)}
 #band-1{--accent:var(--cyan);  --accent-glow:var(--cyan-glow)}
 .ptt-zone{--accent:#c1392f; --accent-glow:#c1392f}   /* PTT panel = red */
 .audio{--accent:#8b7ad6; --accent-glow:#8b7ad6}      /* audio = violet/indigo */
-.audio::before{box-shadow:0 0 9px -2px var(--accent-glow)}   /* subtler glow */
+.audio::before{--rail-glow:color-mix(in srgb,var(--accent-glow) 55%,transparent)}   /* subtler glow */
 .scan-zone{--accent:var(--sw-edge); --accent-glow:var(--sw-edge)}  /* scan = light grey */
-.scan-zone::before{box-shadow:0 0 6px -2px var(--accent-glow)}
+.scan-zone::before{--rail-glow:color-mix(in srgb,var(--accent-glow) 35%,transparent)}
 .hackrf-zone{--accent:#3a9ff0; --accent-glow:#3a9ff0}   /* HackRF = waterfall blue */
-.hackrf-zone::before{box-shadow:0 0 9px -2px var(--accent-glow)}
+.hackrf-zone::before{--rail-glow:color-mix(in srgb,var(--accent-glow) 55%,transparent)}
 .digi-zone{--accent:#6fd89a; --accent-glow:#6fd89a}   /* digimodes = light green */
-.digi-zone::before{box-shadow:0 0 9px -2px var(--accent-glow)}
+.digi-zone::before{--rail-glow:color-mix(in srgb,var(--accent-glow) 55%,transparent)}
 .digi-zone{padding:22px 26px}
 .log-zone{--accent:#1fb6a6; --accent-glow:#1fb6a6}   /* logbook = wavelog teal */
-.log-zone::before{box-shadow:0 0 9px -2px var(--accent-glow)}
+.log-zone::before{--rail-glow:color-mix(in srgb,var(--accent-glow) 55%,transparent)}
 .debug-zone{--accent:#454a4f; --accent-glow:#454a4f; padding:22px 26px}  /* debug = dark grey */
-.debug-zone::before{box-shadow:0 0 9px -2px var(--accent-glow)}
+.debug-zone::before{--rail-glow:color-mix(in srgb,var(--accent-glow) 55%,transparent)}
 .digi-modes{display:inline-flex; border:1px solid var(--accent); border-radius:7px; overflow:hidden}
 .digi-mode{font-family:var(--font-ui); font-size:11px; letter-spacing:.12em; padding:5px 12px;
   color:var(--text-dim); background:var(--ctrl-bg); border:none; cursor:pointer; transition:.15s}
@@ -1421,7 +1426,7 @@ body.theme-light .digi-decode{background:#f3f7f4; border-color:#cfe0d6;
 
 /* ---------------- selcall (5-tone) — muted bronze ---------------- */
 .selcall-zone{--accent:#c9a066; --accent-glow:#c9a066; padding:22px 26px}
-.selcall-zone::before{box-shadow:0 0 9px -2px var(--accent-glow)}
+.selcall-zone::before{--rail-glow:color-mix(in srgb,var(--accent-glow) 55%,transparent)}
 .sel-std-field{display:flex; align-items:center; gap:8px;
   font-family:var(--font-ui); font-size:10px; letter-spacing:.16em; color:var(--text-dim)}
 .sel-std-field select, #sel-tone{font-family:var(--font-mono); font-size:12px; color:var(--text);
