@@ -188,6 +188,7 @@ function toneLabel(m) {
 }
 
 // ---- rendering ------------------------------------------------------------
+const shLive = [{ hz: 0, until: 0 }, { hz: 0, until: 0 }];   // frequency shuttle per band (see bindShuttles)
 function setSqlUi(band, val) {
   const v = Number(val);
   const lbl = document.getElementById(`sql-val-${band}`);
@@ -198,7 +199,8 @@ function setSqlUi(band, val) {
 
 function renderBand(b) {
   const i = b.band;
-  $(`#freq-${i}`).textContent = fmtMHz(b.rx_freq);
+  // while the shuttle tunes, the display shows its target, not the lagging radio
+  if (Date.now() >= shLive[i].until) $(`#freq-${i}`).textContent = fmtMHz(b.rx_freq);
 
   // mirror the live frequency into the tuner digits unless the user is editing
   if (!dirty[i]) { editHz[i] = b.rx_freq; setSpinner(i, b.rx_freq); }
@@ -795,7 +797,70 @@ function bindBandPicker(sel, kind) {
   });
 }
 
+// Frequency shuttle beside SQL (as in FT-950 Remote): offset from the centre =
+// direction and step size — the band's channel step, 100 kHz, 1 MHz. The
+// display follows at once; the radio gets the newest target, one request at a time.
+function bindShuttles() {
+  const STEPS = [[0.12, 0], [0.5, -1], [0.82, 100000], [1.01, 1000000]];   // -1 = channel step
+  const fmtStep = (s) => (s >= 1e6 ? s / 1e6 + " MHz" : s / 1000 + " kHz");
+  $$(".shuttle").forEach(sh => {
+    const band = Number(sh.dataset.band), knob = sh.querySelector(".sh-knob"), lbl = sh.querySelector(".sh-lbl");
+    const live = shLive[band];
+    let held = false, frac = 0, timer = null, busy = false, want = 0;
+    const stepOf = (f) => {
+      const s = (STEPS.find(([lim]) => Math.abs(f) < lim) || STEPS[STEPS.length - 1])[1];
+      return s < 0 ? (last?.bands?.[band]?.step_hz || 12500) : s;
+    };
+    const place = (f) => {
+      knob.style.left = `${50 + f * 50}%`;
+      const s = stepOf(f);
+      lbl.textContent = held && s ? (f < 0 ? `◀ ${fmtStep(s)}` : `${fmtStep(s)} ▶`) : "TUNE";
+      sh.classList.toggle("down", held && f < 0 && !!s);
+      sh.classList.toggle("up", held && f > 0 && !!s);
+    };
+    const at = (e) => {
+      const r = sh.getBoundingClientRect();
+      frac = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / (r.width / 2)));
+      place(frac);
+    };
+    const send = async () => {
+      if (busy) return;
+      busy = true;
+      while (want) {
+        const hz = want; want = 0;
+        try { await api("POST", "/api/frequency", { band, freq_hz: hz }); }
+        catch (e) { toast("Frequency: " + e.message, "err"); live.until = 0; want = 0; }
+      }
+      busy = false;
+    };
+    const tick = () => {
+      const s = stepOf(frac);
+      if (!s) return;
+      const base = Date.now() < live.until && live.hz ? live.hz : last?.bands?.[band]?.rx_freq;
+      if (!base) return;
+      // next point of the step grid in the tuning direction
+      const hz = frac < 0 ? Math.ceil(base / s - 1) * s : Math.floor(base / s + 1) * s;
+      if (hz < 1e6) return;
+      live.hz = hz; live.until = Date.now() + 1500;
+      $(`#freq-${band}`).textContent = fmtMHz(hz);
+      want = hz; send();
+    };
+    sh.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      held = true;
+      sh.setPointerCapture(e.pointerId);
+      at(e); tick();
+      clearInterval(timer);
+      timer = setInterval(tick, 200);
+    });
+    sh.addEventListener("pointermove", (e) => { if (held) at(e); });
+    const release = () => { held = false; clearInterval(timer); frac = 0; place(0); };
+    for (const ev of ["pointerup", "pointercancel", "lostpointercapture"]) sh.addEventListener(ev, release);
+  });
+}
+
 function bindControls() {
+  bindShuttles();
   // mic UP / DW keys — step the displayed band one step (Enter applies a freq)
   $$(".step-btn").forEach(btn => btn.addEventListener("click", async () => {
     const band = Number(btn.dataset.band), direction = btn.dataset.dir;

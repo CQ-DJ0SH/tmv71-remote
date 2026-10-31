@@ -2912,3 +2912,24 @@ body.theme-light .log-recent-list{
 #log-wl-status, #log-qrz-status{font-family:var(--font-mono); font-size:11px}
 #log-wl-status.ok, #log-qrz-status.ok{color:#3ec98a}
 #log-wl-status.err, #log-qrz-status.err{color:#e0635a}
+
+/* SQL slider a third of its old width; the frequency shuttle (as in FT-950 Remote) beside it */
+.sql-row .sql-slider{flex:1 1 0; min-width:60px}
+.shuttle{position:relative; flex:2 1 0; min-width:120px; height:24px; margin-left:6px; cursor:ew-resize;
+  border:1px solid var(--sw-edge); border-radius:7px; touch-action:none; user-select:none; overflow:hidden;
+  background:linear-gradient(90deg, color-mix(in srgb,var(--accent) 26%,var(--ctrl-bg)), var(--ctrl-bg) 44%, var(--ctrl-bg) 56%,
+    color-mix(in srgb,var(--accent) 26%,var(--ctrl-bg)))}
+.shuttle .sh-zones{position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(90deg, transparent calc(50% - 1px), var(--ctrl-bg) calc(50% - 1px) 50%, transparent 50%),
+    repeating-linear-gradient(90deg, transparent 0 calc(12.5% - 1px), color-mix(in srgb,var(--text-dim) 35%,transparent) calc(12.5% - 1px) 12.5%)}
+.shuttle .sh-knob{position:absolute; top:3px; bottom:3px; left:50%; width:14px; margin-left:-7px; border-radius:4px;
+  background:var(--accent); box-shadow:0 0 8px -1px var(--accent-glow, var(--accent)); transition:left .18s ease-out; pointer-events:none}
+.shuttle.up .sh-knob, .shuttle.down .sh-knob{transition:none}
+.shuttle .sh-lbl{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); padding:0 6px; line-height:13px; border-radius:3px;
+  pointer-events:none; white-space:nowrap; font:600 10px var(--font-ui); letter-spacing:.12em; color:var(--text);
+  background:color-mix(in srgb,var(--ctrl-bg) 88%,transparent)}
+.shuttle .sh-end{position:absolute; top:0; bottom:0; display:flex; align-items:center; pointer-events:none;
+  font:600 9px var(--font-ui); letter-spacing:.1em; color:var(--text-dim); transition:opacity .15s}
+.shuttle .sh-end.dn{left:7px}
+.shuttle .sh-end.up{right:7px}
+.shuttle.up .sh-end, .shuttle.down .sh-end{opacity:0}
