@@ -173,24 +173,24 @@ def toc(pdf, outline, lang):
         pdf.set_font("DV", "B" if chapter else "", 10.5 if chapter else 9.5)
         pdf.set_text_color(*(DARK if chapter else GREY))
         if chapter:
-            pdf.ln(1.6)
+            pdf.ln(1.3)
         x0 = 18 if chapter else 24
         pdf.set_x(x0)
         label = e.name
         num = str(e.page_number)
         wl = pdf.get_string_width(label)
         wn = pdf.get_string_width(num)
-        pdf.cell(wl + 1, 5.4, label)
+        pdf.cell(wl + 1, 5.0, label)
         # dotted leader, drawn rather than typed: dots that always land on the
         # same baseline and never wrap
         pdf.set_draw_color(*RULE)
         pdf.set_line_width(0.2)
         pdf.set_dash_pattern(dash=0.4, gap=1.1)
-        ly = pdf.get_y() + 3.6
+        ly = pdf.get_y() + 3.4
         pdf.line(x0 + wl + 2, ly, 192 - wn - 2, ly)
         pdf.set_dash_pattern()
         pdf.set_x(192 - wn - 1)
-        pdf.cell(wn + 1, 5.4, num, align="R", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(wn + 1, 5.0, num, align="R", new_x="LMARGIN", new_y="NEXT")
 
 
 # ---------------------------------------------------------------------------
@@ -683,6 +683,7 @@ API_AUDIO = (
     "POST /api/audio/buffer      tx buffer / ptt tail / rx buffer\n"
     "POST /api/audio/tones       roger/test/mic/lowpass/de-emph/squelch\n"
     "POST /api/audio/record[/clear]  raw RX recorder\n"
+    "POST /api/audio/dual        dual sound card (on, listen device)\n"
     "GET  /api/audio/record.wav  download recording (WAV)\n"
     "GET/POST /api/audio/mixer   USB card mixer\n"
 )
@@ -1280,6 +1281,29 @@ EN = [
         "connected program counts as activity for auto power-off. The status "
         "line under the description shows the connected clients and the "
         "received / sent / dropped counts. Keep the port inside the LAN.",
+    ]),
+    ("h2", "Dual sound card: listen to one band, TNC on the other"),
+    ("p", "The data connector carries one band only. With the TNC on B, RX-A "
+          "would move the data band and take the TNC's audio away. Settings > "
+          "Audio > Dual sound card adds a second, capture-only USB sound card "
+          "on the speaker jack SP1 (through an attenuator down to line level) "
+          "and chooses it under Listen device."),
+    ("ul", [
+        "SECOND CARD (speaker jack): what you hear — web audio, AF meter, "
+        "recorder, callsign recognition, selcall decoder. The radio already "
+        "squelches and de-emphasises this output, so the software squelch and "
+        "de-emphasis stay out of it.",
+        "MAIN CARD (data connector): APRS and digimode decoders, KISS TNC, "
+        "S-meter and all transmitting, as before. The S-meter therefore shows "
+        "the TNC's band.",
+        "SP1 AND SP2: while SP2 is unused the radio bridges it to SP1, so SP1 "
+        "carries both bands. With a plug in SP2 — a speaker, or just a dummy "
+        "plug — the bands are split between the two jacks and SP1 carries one "
+        "band only.",
+        "Switching it on also turns on \"Disable audio channel switching\", so "
+        "RX-A/RX-B never moves the TNC's band. A status line shows whether the "
+        "second card delivers. If it fails or goes silent, listening falls "
+        "back to the main card within 0.3 s and the watchdog keeps reopening it.",
     ]),
     ("h2", "Contact columns beside the console"),
     ("p", "On a wide screen the console leaves a few hundred pixels unused on "
@@ -2297,6 +2321,31 @@ DE = [
         "Abschaltung als Aktivität. Die Statuszeile unter der Beschreibung "
         "zeigt verbundene Programme und die Zähler empfangen / gesendet / "
         "verworfen. Den Port im LAN lassen.",
+    ]),
+    ("h2", "Zwei Soundkarten: ein Band hören, TNC auf dem anderen"),
+    ("p", "Die Datenbuchse führt nur ein Band. Läuft der TNC auf B, würde RX-A "
+          "das Datenband umstellen und dem TNC sein Audio wegnehmen. "
+          "Einstellungen > Audio > Dual sound card nimmt eine zweite, reine "
+          "Aufnahme-USB-Soundkarte an der Lautsprecherbuchse SP1 dazu (über "
+          "einen Abschwächer auf Line-Pegel); sie wird unter Listen device "
+          "gewählt."),
+    ("ul", [
+        "ZWEITE KARTE (Lautsprecherbuchse): was man hört — Web-Audio, "
+        "AF-Anzeige, Recorder, Rufzeichenerkennung, Selcall-Decoder. Das "
+        "Funkgerät sperrt und entzerrt diesen Ausgang schon selbst, daher "
+        "bleiben Software-Squelch und De-Emphasis dort aus.",
+        "HAUPTKARTE (Datenbuchse): APRS- und Digimode-Decoder, KISS-TNC, "
+        "S-Meter und alles Senden, wie bisher. Das S-Meter zeigt daher das "
+        "Band des TNC.",
+        "SP1 UND SP2: Solange SP2 frei ist, brückt das Gerät ihn auf SP1 — SP1 "
+        "führt dann beide Bänder. Steckt etwas in SP2, ein Lautsprecher oder "
+        "nur ein Blindstecker, werden die Bänder auf die beiden Buchsen "
+        "verteilt und SP1 führt nur noch ein Band.",
+        "Beim Einschalten geht auch „Disable audio channel switching“ an, "
+        "damit RX-A/RX-B das Band des TNC nie verstellt. Eine Statuszeile "
+        "zeigt, ob die zweite Karte liefert. Fällt sie aus oder verstummt, "
+        "hört man nach 0,3 s wieder über die Hauptkarte, und der Watchdog "
+        "öffnet sie immer wieder neu.",
     ]),
     ("h2", "Kontaktspalten neben der Konsole"),
     ("p", "Auf einem breiten Bildschirm bleiben links und rechts der Konsole "
