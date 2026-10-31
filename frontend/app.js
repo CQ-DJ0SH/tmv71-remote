@@ -2217,18 +2217,18 @@ function renderKiss(k) {
   $("#set-kiss-tx").checked = !!k.allow_tx;
   $("#set-kiss-port").value = k.port ?? 8001;
   let txt;
-  if (!k.enabled) txt = "off";
+  if (!k.enabled) txt = "";          // the switch already says so
   else if (k.error) txt = "not listening — " + k.error;
   else {
     const cl = (k.clients || []).map(c => c.addr.replace(/:\d+$/, "")).join(", ");
     txt = `listening on port ${k.port} · ` + (cl ? `connected: ${cl}` : "no client") +
       ` · ${k.rx} received · ${k.tx} sent` + (k.dropped ? ` · ${k.dropped} not sent` : "");
   }
-  $("#kiss-status").textContent = txt;
+  $("#kiss-status").textContent = txt ? " · " + txt : "";
 }
 async function loadKiss() {
   try { renderKiss(await api("GET", "/api/kiss")); }
-  catch { kissCfg = null; $("#kiss-status").textContent = "status unavailable"; }
+  catch { kissCfg = null; $("#kiss-status").textContent = " · status unavailable"; }
 }
 
 function bindSettings() {
