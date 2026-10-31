@@ -691,6 +691,7 @@ API_DIGI = (
     "POST /api/digi/config       mode + parameters\n"
     "POST /api/digi/tx           encode + transmit\n"
     "POST /api/digi/decode-recording  decode the RX buffer\n"
+    "GET/POST /api/kiss          KISS TCP server (enabled/port/tx/band)\n"
     "WS   /ws/digi               decoded text stream\n"
     "GET/POST /api/asr/config    callsign recognition (Vosk)\n"
     "POST /api/asr/log           add a callsign by hand\n"
@@ -1239,16 +1240,47 @@ EN = [
         "misreport which program is on the air. 300 ms of flags precede the "
         "frame: too short and the receiving TNC loses the first bytes, which "
         "looks like a decoder fault at the far end.",
-        "There is no digipeater, no APRS-IS gateway and no automatic repeat. "
-        "A beacon that transmits by itself every few minutes is an operating "
-        "decision, not a default.",
+        "There is no digipeater, no APRS-IS gateway and no automatic repeat "
+        "here — those, and APRS messaging, come from an external program over "
+        "the KISS TNC below. A beacon that transmits by itself every few "
+        "minutes is an operating decision, not a default.",
     ]),
     ("p", "Verified by loop-back — every beacon was decoded again by this "
           "program's own receiver, position, symbol, path and comment intact, "
           "and still error-free at 6 dB signal-to-noise. MIC-E was checked "
           "against known coordinates in both hemispheres, including a "
           "three-digit longitude with its offset. Decoding costs 0.2 ms per "
-          "20 ms of audio."),
+          "20 ms of audio. On the air the beacon goes in through the MIC jack "
+          "(the data connector only passes TX audio under a hardware PTT) and "
+          "was repeated cleanly by the digipeater DM0RBB and heard back here."),
+    ("h2", "KISS TNC for external programs"),
+    ("p", "Settings > General > KISS TNC hands the APRS modem to programs that "
+          "speak KISS over TCP, the way Direwolf does on port 8001: Graywolf "
+          "(KISS interface type tcp-client, mode TNC), YAAC, Xastir, APRSIS32, "
+          "Pat. APRS messaging, digipeating and iGate then come from that "
+          "program; this one stays the modem and keeps the sound card and the "
+          "radio. Off by default — a connected program can key the transmitter."),
+    ("ul", [
+        "RECEIVE: every AX.25 frame decoded with a good CRC goes to every "
+        "connected client — also with the Digi panel off or in another mode; "
+        "a second, silent decoder then runs on the same audio. Reception "
+        "follows the data band (RX-A/RX-B), so that has to sit on the APRS band.",
+        "TRANSMIT: frames from a client are queued (16 at most) and wait for a "
+        "clear channel — squelch closed on the TX band, no voice or digimode "
+        "transmission, p-persistence 63/256 in 100 ms slots. After 20 s of busy "
+        "channel they are dropped, with a note in the Digi panel. Frames queued "
+        "meanwhile share one key-up (600 bytes at most). KISS TXDELAY is "
+        "honoured (100–1000 ms, default 300). Sent frames appear in the Digi "
+        "panel as \"◀ KISS: …\".",
+        "TX BAND: \"PTT band (as set)\" sends wherever the PTT is. Band A or B "
+        "moves the PTT band there for each key-up and back afterwards, so voice "
+        "keeps its band — e.g. voice on a 70 cm repeater on A, APRS on "
+        "144.800 MHz on B.",
+        "Allow transmit off makes it receive-only. Only KISS port 0 exists. A "
+        "connected program counts as activity for auto power-off. The status "
+        "line under the description shows the connected clients and the "
+        "received / sent / dropped counts. Keep the port inside the LAN.",
+    ]),
     ("h2", "Contact columns beside the console"),
     ("p", "On a wide screen the console leaves a few hundred pixels unused on "
           "either side. They hold a copy of the contact cards — the newest in "
@@ -2221,15 +2253,51 @@ DE = [
         "300 ms Flaggen voraus: zu wenig, und die Gegenstelle verliert die "
         "ersten Bytes, was dort wie ein Decoderfehler aussieht.",
         "Digipeater, APRS-IS-Gateway und automatische Wiederholung gibt es "
-        "nicht. Eine Bake, die von selbst alle paar Minuten sendet, ist eine "
-        "Betriebsentscheidung und keine Voreinstellung.",
+        "hier nicht — die, und APRS-Nachrichten, liefert ein externes Programm "
+        "über den KISS-TNC unten. Eine Bake, die von selbst alle paar Minuten "
+        "sendet, ist eine Betriebsentscheidung und keine Voreinstellung.",
     ]),
     ("p", "Nachgewiesen über die Rückschleife — jede Bake wurde vom eigenen "
           "Empfänger dieses Programms wieder gelesen, mit Position, Symbol, "
           "Pfad und Kommentar, und bis 6 dB Störabstand fehlerfrei. MIC-E wurde "
           "gegen bekannte Koordinaten auf beiden Halbkugeln geprüft, "
           "einschließlich dreistelliger Länge mit Offset. Das Dekodieren kostet "
-          "0,2 ms je 20 ms Audio."),
+          "0,2 ms je 20 ms Audio. Auf dem Band geht die Bake über die "
+          "MIC-Buchse hinaus (die Datenbuchse gibt Sende-Audio nur bei "
+          "Hardware-PTT durch); der Digipeater DM0RBB hat sie sauber wiederholt, "
+          "und sie wurde hier wieder empfangen."),
+    ("h2", "KISS-TNC für externe Programme"),
+    ("p", "Einstellungen > Allgemein > KISS TNC stellt das APRS-Modem "
+          "Programmen zur Verfügung, die KISS über TCP sprechen — so wie "
+          "Direwolf auf Port 8001: Graywolf (KISS-Schnittstelle Typ tcp-client, "
+          "Modus TNC), YAAC, Xastir, APRSIS32, Pat. APRS-Nachrichten, "
+          "Digipeater und iGate kommen dann von dort; dieses Programm bleibt "
+          "das Modem und behält Soundkarte und Funkgerät. Ab Werk aus — ein "
+          "verbundenes Programm kann den Sender tasten."),
+    ("ul", [
+        "EMPFANG: Jeder AX.25-Rahmen mit gültiger Prüfsumme geht an alle "
+        "verbundenen Programme — auch bei ausgeschaltetem Digi-Panel oder "
+        "anderer Betriebsart; dann läuft ein zweiter, stiller Decoder auf "
+        "demselben Audio. Der Empfang folgt dem Datenband (RX-A/RX-B), das "
+        "also auf dem APRS-Band stehen muss.",
+        "SENDEN: Rahmen eines Programms kommen in eine Warteschlange (höchstens "
+        "16) und warten auf einen freien Kanal — Squelch auf dem TX-Band zu, "
+        "keine Sprach- oder Digimode-Sendung, p-Persistenz 63/256 in "
+        "100-ms-Schritten. Nach 20 s belegtem Kanal werden sie verworfen, mit "
+        "Hinweis im Digi-Panel. Inzwischen eingetroffene Rahmen gehen in "
+        "derselben Tastung mit (höchstens 600 Byte). KISS-TXDELAY wird "
+        "übernommen (100–1000 ms, Standard 300). Gesendete Rahmen erscheinen "
+        "im Digi-Panel als „◀ KISS: …“.",
+        "TX-BAND: „PTT band (as set)“ sendet dort, wo die PTT liegt. Band A "
+        "oder B legt die PTT für jede Tastung dorthin und danach zurück — "
+        "Sprache bleibt auf ihrem Band, z. B. Sprache über ein 70-cm-Relais "
+        "auf A, APRS auf 144,800 MHz auf B.",
+        "Allow transmit aus macht ihn zum reinen Empfänger. Es gibt nur "
+        "KISS-Port 0. Ein verbundenes Programm zählt für die automatische "
+        "Abschaltung als Aktivität. Die Statuszeile unter der Beschreibung "
+        "zeigt verbundene Programme und die Zähler empfangen / gesendet / "
+        "verworfen. Den Port im LAN lassen.",
+    ]),
     ("h2", "Kontaktspalten neben der Konsole"),
     ("p", "Auf einem breiten Bildschirm bleiben links und rechts der Konsole "
           "einige hundert Pixel ungenutzt. Dort steht eine Kopie der "
