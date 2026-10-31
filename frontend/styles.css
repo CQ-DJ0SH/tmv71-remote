@@ -2575,7 +2575,8 @@ body.theme-light .stats-tab tbody tr:first-child td.st-bar i{
   font-family:var(--font-ui); font-size:10px; letter-spacing:.16em; color:var(--text-dim);
 }
 .logo-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
-.kiss-status{font-family:var(--font-mono); font-size:11px; letter-spacing:.03em}
+.kiss-status{margin:6px 0 0; font-family:var(--font-mono); font-size:11px; letter-spacing:.03em; color:var(--text-dim)}
+.kiss-status:empty{display:none}
 .logo-preview{
   height:34px; min-width:64px; display:inline-flex; align-items:center; justify-content:center;
   background:#b4b8bc; border-radius:7px; padding:4px 8px; box-shadow:inset 0 0 0 1px #0004;

@@ -2224,11 +2224,11 @@ function renderKiss(k) {
     txt = `listening on port ${k.port} · ` + (cl ? `connected: ${cl}` : "no client") +
       ` · ${k.rx} received · ${k.tx} sent` + (k.dropped ? ` · ${k.dropped} not sent` : "");
   }
-  $("#kiss-status").textContent = txt ? " · " + txt : "";
+  $("#kiss-status").textContent = txt;
 }
 async function loadKiss() {
   try { renderKiss(await api("GET", "/api/kiss")); }
-  catch { kissCfg = null; $("#kiss-status").textContent = " · status unavailable"; }
+  catch { kissCfg = null; $("#kiss-status").textContent = "status unavailable"; }
 }
 
 function bindSettings() {
