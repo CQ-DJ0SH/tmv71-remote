@@ -11,6 +11,7 @@ import logging
 import math
 import mimetypes
 import os
+import random
 import re
 import time
 import urllib.request
@@ -52,7 +53,7 @@ from fastapi.staticfiles import StaticFiles
 from . import memory as memory_io
 from .config import APP_VERSION, save_runtime, settings
 from .models import (AsrManualRequest, AudioDeviceRequest, AudioGainRequest,
-                     AutoPowerOffRequest,
+                     AutoPowerOffRequest, KissConfigRequest,
                      BandDisplayRequest, BandLockRequest, BandModeRequest,
                      CallsignRequest,
                      ThemeRequest,
@@ -71,6 +72,7 @@ from .models import (AsrManualRequest, AudioDeviceRequest, AudioGainRequest,
                      LogConfigRequest, LogLookupRequest, LogQsoRequest,
                      LogDeleteRequest, AsrRenameRequest, AsrSpeakerRequest)
 from . import aprs
+from . import kiss
 from . import mixer
 from . import opus_mono
 from . import speaker_id
@@ -156,6 +158,9 @@ class DigiService:
         self._subs: set = set()
         self._task = None
         self._tx_lock = asyncio.Lock()
+        self.kiss = None               # kiss.KissServer, set below
+        self._kiss_dec = None          # own APRS decoder while the panel decodes something else
+        self._kiss_task = None
 
     def status(self) -> dict:
         st = {"mode": self.mode, "rx": self.rx, "tx": self.audio.digi_tx_busy(),
@@ -262,7 +267,7 @@ class DigiService:
 
     def set_rx(self, on: bool) -> None:
         self.rx = on
-        self.audio.set_digi_rx(on)
+        self._sync_rx_audio()
         self._dec = self._new_decoder() if on else None
         if on:
             self._announce()
@@ -282,20 +287,51 @@ class DigiService:
             except Exception:  # noqa: BLE001
                 pass
 
+    def _kiss_wants_rx(self) -> bool:
+        return self.kiss is not None and self.kiss.active
+
+    def _sync_rx_audio(self) -> None:
+        """RX audio flows while the panel decodes or a KISS client listens."""
+        want = self.rx or self._kiss_wants_rx()
+        if want != self.audio.digi_rx:
+            self.audio.set_digi_rx(want)
+
     async def start(self) -> None:
         self._task = asyncio.create_task(self._decode_loop())
+        self._kiss_task = asyncio.create_task(self._kiss_tx_loop())
 
     async def stop(self) -> None:
-        if self._task:
-            self._task.cancel()
+        for t in (self._task, self._kiss_task):
+            if t:
+                t.cancel()
 
     async def _decode_loop(self) -> None:
         while True:
             await asyncio.sleep(0.12)
-            if not self.rx or self._dec is None:
+            # KISS: a client needs APRS frames even while the panel is off or
+            # in another mode — then a second, quiet decoder runs on the same
+            # audio; in APRS mode the panel's decoder serves both.
+            kiss_rx = self._kiss_wants_rx()
+            panel_aprs = self.rx and self._dec is not None and self.mode == "aprs"
+            if kiss_rx and not panel_aprs:
+                if self._kiss_dec is None:
+                    self._kiss_dec = aprs.APRSDecoder(SAMPLE_RATE, verbose=False)
+            else:
+                self._kiss_dec = None
+            self._sync_rx_audio()
+            if not self.audio.digi_rx:
                 continue
             pcm = self.audio.pop_digi_rx()
             if pcm is None or len(pcm) == 0:
+                continue
+            if self._kiss_dec is not None:
+                try:
+                    await asyncio.to_thread(self._kiss_dec.feed, pcm)
+                except Exception:  # noqa: BLE001
+                    pass
+                for fr in self._kiss_dec.take_raw():
+                    self.kiss.send(fr)
+            if not self.rx or self._dec is None:
                 continue
             try:
                 text = await asyncio.to_thread(self._dec.feed, pcm)
@@ -304,6 +340,10 @@ class DigiService:
             if text:
                 self._broadcast(text)
             if self.mode == "aprs":
+                frames = self._dec.take_raw()
+                if kiss_rx:
+                    for fr in frames:
+                        self.kiss.send(fr)
                 # The panel reads its counters from "status", which is only sent
                 # on connect and on a config change — so they stood still while
                 # traffic ran. Push them whenever they move; a CRC failure
@@ -317,6 +357,79 @@ class DigiService:
                     if key != self._aprs_last:
                         self._aprs_last = key
                         self._broadcast({"t": "aprsstat", **st})
+
+    # --- KISS transmit ---------------------------------------------------
+    async def _channel_busy(self) -> bool:
+        """Someone on the frequency, or this station already transmitting."""
+        if service.transmitting or self.audio.digi_keyed:
+            return True
+        st = service.status
+        if not st.connected or getattr(service, "_scanning", False):
+            return False                   # cannot tell — set_ptt reports the real fault
+        try:
+            return bool(await asyncio.to_thread(
+                service.radio.get_squelch_open, st.audio_band or 0))
+        except Exception:  # noqa: BLE001
+            return False
+
+    async def _wait_clear(self) -> bool:
+        """p-persistence CSMA as a TNC does it: 100 ms slots, p = 63/256."""
+        deadline = time.monotonic() + KISS_BUSY_MAX_S
+        while time.monotonic() < deadline:
+            if not await self._channel_busy() and random.random() < 63 / 256:
+                return True
+            await asyncio.sleep(0.1)
+        return False
+
+    async def _kiss_tx_loop(self) -> None:
+        while True:
+            try:
+                if self.kiss is None:
+                    await asyncio.sleep(1.0)
+                    continue
+                frames = [await self.kiss.queue.get()]
+                if not await self._wait_clear():
+                    n = len(frames) + self.kiss.queue.qsize()
+                    while not self.kiss.queue.empty():
+                        self.kiss.queue.get_nowait()
+                    self.kiss.dropped += n
+                    self._broadcast(f"{time.strftime('%H:%M:%S')} ✗ KISS: channel busy for "
+                                    f"{KISS_BUSY_MAX_S:.0f} s — {n} frame(s) not sent\n")
+                    continue
+                # whatever queued meanwhile goes out in the same key-up, within limits
+                total = sum(len(f) for f in frames)
+                while not self.kiss.queue.empty() and total < KISS_MAX_KEY_BYTES:
+                    f = self.kiss.queue.get_nowait()
+                    frames.append(f)
+                    total += len(f)
+                await self._kiss_transmit(frames)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:  # noqa: BLE001
+                logging.getLogger("tmv71").warning("KISS transmit: %s", e)
+                self._broadcast(f"{time.strftime('%H:%M:%S')} ✗ KISS transmit failed: {e}\n")
+                await asyncio.sleep(1.0)
+
+    async def _kiss_transmit(self, frames: list) -> None:
+        parts = [aprs.modulate(aprs.with_fcs(f), SAMPLE_RATE,
+                               self.kiss.txdelay_ms if i == 0 else 30)
+                 for i, f in enumerate(frames)]
+        pcm = np.concatenate(parts)
+        async with self._tx_lock:
+            touch_activity()
+            await service.set_ptt(True)
+            try:
+                self.audio.play_digi(pcm)
+                deadline = time.monotonic() + len(pcm) / SAMPLE_RATE + 3.0
+                while self.audio.digi_tx_busy() and time.monotonic() < deadline:
+                    await asyncio.sleep(0.05)
+                self.audio.stop_digi_tx()
+            finally:
+                await service.set_ptt(False)
+        self.kiss.tx += len(frames)
+        ts = time.strftime("%H:%M:%S")
+        for f in frames:
+            self._broadcast(f"{ts} ◀ KISS: {aprs.frame_text(f)}\n")
 
     async def decode_recording(self) -> dict:
         """Run the current-mode decoder over the raw RX recorder buffer and push
@@ -365,7 +478,12 @@ class DigiService:
         return {"sent": text}
 
 
+KISS_BUSY_MAX_S = 20.0           # give up on a frame after this long on a busy channel
+KISS_MAX_KEY_BYTES = 600          # about 4.5 s of AFSK per key-up at most
+
+kiss_srv = kiss.KissServer()
 digi = DigiService(radio_audio)
+digi.kiss = kiss_srv
 
 
 class SelcallService:
@@ -1330,7 +1448,7 @@ async def _auto_power_off_loop() -> None:
         if not power_switch.available or power_switch.state is not True:
             continue
         # A connected client counts as activity (don't power off while watching).
-        if manager.count > 0:
+        if manager.count > 0 or kiss_srv.active:
             touch_activity()
             continue
         if time.monotonic() - _last_activity >= settings.auto_power_off_seconds:
@@ -1537,6 +1655,9 @@ async def lifespan(app: FastAPI):
         # let the band scan read the live RX AF level
         service.level_provider = lambda: radio_audio.rx_db
         await digi.start()
+        kiss_srv.allow_tx = settings.kiss_allow_tx
+        if settings.kiss_enabled:
+            await kiss_srv.start(settings.kiss_host, settings.kiss_port)
         await sel.start()
         await callsign_svc.start()
         # Restore the persisted "callsign ASR on" state (loads the Vosk model).
@@ -1556,6 +1677,7 @@ async def lifespan(app: FastAPI):
     if audio_wd:
         audio_wd.cancel()
     await digi.stop()
+    await kiss_srv.stop()
     await sel.stop()
     await callsign_svc.stop()
     apo_task.cancel()
@@ -2289,6 +2411,29 @@ async def digi_configure(cfg: DigiConfig) -> dict:
     if not settings.audio_enabled:
         raise HTTPException(503, "audio disabled")
     return digi.configure(cfg)
+
+
+@app.get("/api/kiss")
+async def kiss_status() -> dict:
+    return {"enabled": settings.kiss_enabled, **kiss_srv.status(),
+            "port": settings.kiss_port}
+
+
+@app.post("/api/kiss")
+async def kiss_configure(req: KissConfigRequest) -> dict:
+    if req.enabled and not settings.audio_enabled:
+        raise HTTPException(503, "audio disabled")
+    settings.kiss_enabled = req.enabled
+    settings.kiss_port = req.port
+    settings.kiss_allow_tx = req.allow_tx
+    save_runtime(kiss_enabled=req.enabled, kiss_port=req.port, kiss_allow_tx=req.allow_tx)
+    kiss_srv.allow_tx = req.allow_tx
+    if req.enabled:
+        if not kiss_srv.listening or kiss_srv.port != req.port:
+            await kiss_srv.start(settings.kiss_host, req.port)
+    else:
+        await kiss_srv.stop()
+    return await kiss_status()
 
 
 @app.post("/api/digi/tx")

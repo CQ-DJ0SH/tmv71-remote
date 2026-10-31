@@ -402,6 +402,26 @@ recorder to see the current duration and RAM use (~330 MB for a full hour).
 Endpoints: `POST /api/audio/record`, `/api/audio/record/clear`,
 `GET /api/audio/record.wav`.
 
+## KISS TNC (external APRS / packet programs)
+
+The TM-V71 has no TNC of its own; the APRS modem in the Digi panel is one in
+software. *Settings → General → KISS TNC* hands it to programs that speak
+**KISS over TCP**, the way Direwolf does on port 8001: Graywolf (KISS interface
+type `tcp-client`, mode TNC), YAAC, Xastir, APRSIS32, Pat. APRS messaging,
+digipeating and iGate then come from that program.
+
+- **Receive:** every AX.25 frame decoded with a good CRC goes to every connected
+  client. This works with the Digi panel off or in another mode — a second,
+  silent decoder then runs on the same audio.
+- **Transmit:** data frames from a client are queued (16 at most), wait for a
+  clear channel (squelch closed, no voice or digimode TX, p-persistence 63/256 in
+  100 ms slots, up to 20 s — then dropped with a note in the Digi panel) and go
+  out keyed like the APRS beacon. Frames queued meanwhile share one key-up
+  (≤ 600 bytes). KISS TXDELAY is honoured (100–1000 ms, default 300).
+  *Allow transmit* off makes it receive-only.
+- Off by default. Only KISS port 0 exists. A connected client counts as activity
+  for auto power off. Tune the data band to the APRS frequency yourself.
+
 ## Mobile app (PWA)
 
 The UI is an installable **Progressive Web App**. Once installed it runs
@@ -578,6 +598,7 @@ the repository.
 | `POST` | `/api/data-band` | `{band}` which VFO's RX audio you hear |
 | `GET`/`POST` | `/api/power-switch` | GPIO power on/off + auto-power-off status |
 | `GET`/`POST` | `/api/digi` · `/api/digi/config` · `/api/digi/tx` | CW / RTTY / **POCSAG** decode + transmit |
+| `GET`/`POST` | `/api/kiss` | KISS TCP server status / `{enabled, port, allow_tx}` |
 | `POST` | `/api/digi/decode-recording` | decode the raw RX recorder buffer (current mode) |
 | `POST` | `/api/selcall/config` | 5-tone selcall config + transmit |
 | `GET`/`POST` | `/api/asr/config` | off-air callsign recognition state / enable (Vosk) |
@@ -599,7 +620,8 @@ the repository.
 
 LAN-only by design. There is no authentication. Do **not** expose port 8443
 directly to the internet — use a VPN (e.g. WireGuard/Tailscale) or a reverse
-proxy with TLS + auth.
+proxy with TLS + auth. The same goes for the KISS port (8001 by default): any
+program that reaches it can key the transmitter.
 
 ## Status & roadmap
 

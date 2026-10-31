@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     # call from the browser. Changeable in the web settings.
     auto_power_off_enabled: bool = False
     auto_power_off_seconds: int = 60
+    # KISS over TCP for external APRS/packet programs (Graywolf, YAAC, Xastir …):
+    # off by default, since a connected program can key the transmitter
+    kiss_enabled: bool = False
+    kiss_host: str = "0.0.0.0"
+    kiss_port: int = 8001
+    kiss_allow_tx: bool = True
 
     # Last commanded state of that switch. The GPIO line is released when the
     # process exits — the pin falls back to input and the radio loses its DC —
@@ -189,6 +195,7 @@ _RUNTIME_KEYS = ("serial_port", "serial_baud", "gpio_power_pin",
                  "squelch_a", "squelch_b",
                  "tx_buffer_ms", "ptt_tail_ms",
                  "auto_power_off_enabled", "auto_power_off_seconds",
+                 "kiss_enabled", "kiss_port", "kiss_allow_tx",
                  "gpio_power_on",
                  "callsign", "locator", "roger_beep_enabled", "roger_beep_level", "theme",
                  "tx_lowpass_enabled", "rx_lowpass_enabled", "rx_deemph_enabled",

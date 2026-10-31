@@ -135,6 +135,13 @@ class AutoPowerOffRequest(BaseModel):
     seconds: int = Field(default=60, ge=10, le=86400)
 
 
+class KissConfigRequest(BaseModel):
+    """KISS-over-TCP server for external APRS/packet programs."""
+    enabled: bool
+    port: int = Field(default=8001, ge=1024, le=65535)
+    allow_tx: bool = True
+
+
 class CallsignRequest(BaseModel):
     """Operator callsign and locator, persisted server-side."""
     callsign: str = Field(default="", max_length=12)

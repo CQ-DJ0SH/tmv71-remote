@@ -795,6 +795,16 @@
       </div>
       <p class="pane-hint">Auto power off cuts the radio's power via GPIO when no command arrives and no browser is connected for this long — the Pi does it itself, even if the page is closed.</p>
       <div class="mixer-field">
+        <span class="logo-label">KISS TNC (TCP)</span>
+        <div class="form-grid">
+          <label class="check-label"><input type="checkbox" id="set-kiss-on"> KISS server</label>
+          <label>TCP port<input type="number" id="set-kiss-port" min="1024" max="65535" placeholder="8001"></label>
+          <label class="check-label"><input type="checkbox" id="set-kiss-tx"> Allow transmit</label>
+        </div>
+        <p class="update-status" id="kiss-status">—</p>
+        <p class="pane-hint">Hands the APRS modem to programs that speak KISS over TCP — Graywolf (KISS interface type <em>tcp-client</em>, mode TNC), YAAC, Xastir, APRSIS32, Pat — the way Direwolf does on port 8001. Every frame received with a good CRC goes to them, and the frames they send go out on the air: after a clear-channel check, keyed like the APRS beacon. Tune the data band to the APRS frequency yourself. A connected program counts as activity for auto power off. Keep the port inside the LAN.</p>
+      </div>
+      <div class="mixer-field">
         <span class="logo-label">Band lock (CTRL / PTT)</span>
         <label class="switch-label">
           <input type="checkbox" id="set-band-pick-lock" class="switch">

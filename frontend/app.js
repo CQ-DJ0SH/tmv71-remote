@@ -2209,6 +2209,28 @@ async function loadDtmf() {
   });
 }
 
+// ---- KISS TNC (Settings > General) ----------------------------------------
+let kissCfg = null;
+function renderKiss(k) {
+  kissCfg = k;
+  $("#set-kiss-on").checked = !!k.enabled;
+  $("#set-kiss-tx").checked = !!k.allow_tx;
+  $("#set-kiss-port").value = k.port ?? 8001;
+  let txt;
+  if (!k.enabled) txt = "off";
+  else if (k.error) txt = "not listening — " + k.error;
+  else {
+    const cl = (k.clients || []).map(c => c.addr.replace(/:\d+$/, "")).join(", ");
+    txt = `listening on port ${k.port} · ` + (cl ? `connected: ${cl}` : "no client") +
+      ` · ${k.rx} received · ${k.tx} sent` + (k.dropped ? ` · ${k.dropped} not sent` : "");
+  }
+  $("#kiss-status").textContent = txt;
+}
+async function loadKiss() {
+  try { renderKiss(await api("GET", "/api/kiss")); }
+  catch { kissCfg = null; $("#kiss-status").textContent = "status unavailable"; }
+}
+
 function bindSettings() {
   $("#open-settings").addEventListener("click", async () => {
     $("#set-apiurl").value = apiBase();
@@ -2222,6 +2244,7 @@ function bindSettings() {
     $("#set-gpio").value = powerState?.pin ?? "";
     $("#set-apo-on").checked = !!powerState?.auto_off_enabled;
     $("#set-apo-sec").value = powerState?.auto_off_seconds ?? 60;
+    loadKiss();
     switchTab("general");
     loadSerialConfig();
     refreshLogo();
@@ -2326,6 +2349,15 @@ function bindSettings() {
     if (apoOn !== !!(powerState?.auto_off_enabled) || apoSec !== (powerState?.auto_off_seconds ?? 60)) {
       try { powerState = await api("POST", "/api/auto-power-off", { enabled: apoOn, seconds: apoSec }); }
       catch (e) { toast("Auto power off: " + e.message, "err"); }
+    }
+    // KISS TNC (server-side, persisted)
+    if (kissCfg) {
+      const kOn = $("#set-kiss-on").checked, kTx = $("#set-kiss-tx").checked;
+      const kPort = Number($("#set-kiss-port").value) || 8001;
+      if (kOn !== kissCfg.enabled || kTx !== kissCfg.allow_tx || kPort !== kissCfg.port) {
+        try { renderKiss(await api("POST", "/api/kiss", { enabled: kOn, port: kPort, allow_tx: kTx })); }
+        catch (e) { toast("KISS: " + e.message, "err"); }
+      }
     }
     const port = $("#set-port").value.trim();
     const baud = Number($("#set-baud").value);

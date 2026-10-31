@@ -340,6 +340,10 @@ class APRSDecoder:
         self.noise = 0
         self.last: Optional[_Frame] = None
         self.stations: dict[str, dict] = {}
+        # every frame with a good CRC, as raw AX.25 bytes (no FCS), for the
+        # KISS server; take_raw() empties it, the cap keeps it bounded when no
+        # one collects
+        self._raw: list[bytes] = []
 
     # --- layer 1: AFSK -> soft bits ---------------------------------------
     def _soft(self, pcm: np.ndarray) -> np.ndarray:
@@ -427,7 +431,15 @@ class APRSDecoder:
             return (time.strftime("%H:%M:%S ")
                     + f"✗ {_call(src, sssid)}>{_call(dst, dssid)} "
                     + f"damaged, bad CRC ({len(data)} B)\n")
+        self._raw.append(data[:-2])
+        if len(self._raw) > 32:
+            del self._raw[0]
         return self._decode(data[:-2])
+
+    def take_raw(self) -> list[bytes]:
+        """The good frames since the last call, oldest first."""
+        out, self._raw = self._raw, []
+        return out
 
     # --- layer 3: AX.25 + APRS -------------------------------------------
     def _decode(self, data: bytes) -> str:
@@ -613,3 +625,36 @@ def beacon(call: str, lat: float, lon: float, symbol: str = "/-",
     text = (f"{head}: {_dm(lat, True)} {_dm(lon, False)}"
             + (f' "{comment.strip()}"' if comment.strip() else ""))
     return pcm, text
+
+
+def with_fcs(frame: bytes) -> bytes:
+    """An AX.25 frame as KISS carries it (no FCS), with its FCS appended."""
+    crc = crc_x25(frame)
+    return bytes(frame) + bytes([crc & 0xFF, crc >> 8])
+
+
+def frame_text(frame: bytes) -> str:
+    """SRC>DST,PATH: payload — one line for the panel log (frame without FCS)."""
+    if len(frame) < 16:
+        return f"({len(frame)} B, too short for AX.25)"
+    dst, dssid, _ = _addr(frame[0:7])
+    src, sssid, _ = _addr(frame[7:14])
+    path, i = [], 14
+    if not frame[13] & 0x01:
+        while i + 7 <= len(frame) and len(path) < 8:
+            c, sd, rep = _addr(frame[i:i + 7])
+            path.append(_call(c, sd) + ("*" if rep else ""))
+            last = bool(frame[i + 6] & 0x01)
+            i += 7
+            if last:
+                break
+    head = f"{_call(src, sssid)}>{_call(dst, dssid)}" + ("," + ",".join(path) if path else "")
+    if i + 2 > len(frame):
+        return head
+    ctrl, pid = frame[i], frame[i + 1]
+    if ctrl != 0x03 or pid != 0xF0:
+        return f"{head}: AX.25 ctrl {ctrl:02X} pid {pid:02X} ({len(frame) - i - 2} B)"
+    info = frame[i + 2:].decode("ascii", "replace").rstrip()
+    if len(info) > 120:
+        info = info[:117] + "…"
+    return f"{head}: {info}"
