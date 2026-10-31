@@ -2958,3 +2958,8 @@ body.theme-light #settings .switch:checked{background:#0c7b71; border-color:#0c7
 #data-gain{--g-accent:#6fd89a}
 #data-gain-val{color:#6fd89a; width:auto; text-align:left}
 .acg[hidden]{display:none}
+/* dual sound card: de-emphasis / software squelch greyed out (not applied to the speaker jack) */
+.mixer-field.dual-off .switch-label, .mixer-field.dual-off .acg{opacity:.45; cursor:not-allowed}
+.mixer-field.dual-off .switch:disabled, .mixer-field.dual-off input[type=range]:disabled{cursor:not-allowed}
+.dual-note{color:var(--cyan)}
+body.theme-light .dual-note{color:#0c7b71}

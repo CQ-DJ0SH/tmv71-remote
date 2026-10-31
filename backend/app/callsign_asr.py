@@ -181,6 +181,11 @@ def _highpass_kernel(fs: int, fc: float, ntaps: int = 221) -> np.ndarray:
 # de-emphasis ⊛ high-pass, precomputed at 16 kHz
 _ASR_FIR = np.convolve(_deemph_kernel(TARGET_SR, DEEMPH_TAU_S),
                        _highpass_kernel(TARGET_SR, HP_CUTOFF_HZ)).astype(np.float32)
+# high-pass only, same length (unit impulse in place of the de-emphasis), for
+# audio the radio has de-emphasised already: the speaker jack (dual sound card)
+_ASR_FIR_HP = np.convolve(np.eye(1, len(_deemph_kernel(TARGET_SR, DEEMPH_TAU_S)),
+                                 dtype=np.float32)[0],
+                          _highpass_kernel(TARGET_SR, HP_CUTOFF_HZ)).astype(np.float32)
 
 
 def normalize_call(call: str) -> str:
@@ -210,6 +215,7 @@ class CallsignRecognizer:
         self.last_text = ""                   # raw words of the last utterance (log)
         self.last_nbest: list = []            # last N-best callsign candidates (log)
         self._fir_hist = np.zeros(len(_ASR_FIR) - 1, dtype=np.float32)   # overlap-save
+        self.deemph = True        # False: the audio is de-emphasised already (speaker jack)
 
     def set_own(self, own_call: str) -> None:
         self.own = normalize_call(own_call)
@@ -311,9 +317,10 @@ class CallsignRecognizer:
         return out
 
     def _shape(self, x16: np.ndarray) -> np.ndarray:
-        """De-emphasis + high-pass (overlap-save, continuous across chunks)."""
+        """De-emphasis + high-pass (overlap-save, continuous across chunks);
+        high-pass only when the source is de-emphasised already."""
         buf = np.concatenate((self._fir_hist, x16))
-        y = np.convolve(buf, _ASR_FIR, mode="valid")
+        y = np.convolve(buf, _ASR_FIR if self.deemph else _ASR_FIR_HP, mode="valid")
         self._fir_hist = buf[-(len(_ASR_FIR) - 1):]
         return np.clip(y, -32768, 32767).astype(np.int16)
 

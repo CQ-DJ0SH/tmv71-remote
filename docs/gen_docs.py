@@ -1292,7 +1292,8 @@ EN = [
         "SECOND CARD (speaker jack): what you hear — web audio, AF meter, "
         "recorder, callsign recognition, selcall decoder. The radio already "
         "squelches and de-emphasises this output, so the software squelch and "
-        "de-emphasis stay out of it.",
+        "de-emphasis stay out of it — greyed out in Settings while dual is on — "
+        "and the callsign recognition drops its own de-emphasis for it.",
         "MAIN CARD (data connector): APRS and digimode decoders, KISS TNC, "
         "S-meter and all transmitting, as before. The S-meter therefore shows "
         "the TNC's band.",
@@ -2336,7 +2337,9 @@ DE = [
         "ZWEITE KARTE (Lautsprecherbuchse): was man hört — Web-Audio, "
         "AF-Anzeige, Recorder, Rufzeichenerkennung, Selcall-Decoder. Das "
         "Funkgerät sperrt und entzerrt diesen Ausgang schon selbst, daher "
-        "bleiben Software-Squelch und De-Emphasis dort aus.",
+        "bleiben Software-Squelch und De-Emphasis dort aus — in den "
+        "Einstellungen sind sie dann ausgegraut —, und die Rufzeichenerkennung "
+        "lässt ihre eigene De-Emphasis weg.",
         "HAUPTKARTE (Datenbuchse): APRS- und Digimode-Decoder, KISS-TNC, "
         "S-Meter und alles Senden, wie bisher. Das S-Meter zeigt daher das "
         "Band des TNC.",

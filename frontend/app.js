@@ -1434,11 +1434,23 @@ function renderAudioDual(d) {
     }
   }
   sw.checked = !!d.dual;
+  paintDualOverrides(!!d.dual);
   const s = $("#audio-dual-status");
   if (s) s.textContent = !d.dual ? ""
     : d.listen_active ? "● listening through the second card"
     : d.listen_error ? `✗ second card: ${d.listen_error} — listening on the main card`
     : "… second card starting";
+}
+// Dual sound card: the speaker jack comes de-emphasised and squelched by the
+// radio, so de-emphasis (+ τ) and the software squelch do not apply there —
+// greyed out with a note; their values stay for a fallback to the main card.
+function paintDualOverrides(dual) {
+  ["#set-rx-deemph", "#deemph-us", "#set-rx-squelch"].forEach(sel => {
+    const el = $(sel); if (!el) return;
+    el.disabled = dual;
+    el.closest(".mixer-field")?.classList.toggle("dual-off", dual);
+  });
+  $$(".dual-note").forEach(p => { p.hidden = !dual; });
 }
 async function setAudioDual(body) {
   try {
@@ -1541,6 +1553,7 @@ async function loadTones() {
     const rde = $("#set-rx-deemph"); if (rde) rde.checked = !!s.rx_deemph;
     const rsq = $("#set-rx-squelch"); if (rsq) rsq.checked = !!s.rx_squelch;
     if (s.rx_deemph_us != null) { const sl = $("#deemph-us"); if (sl) { sl.value = s.rx_deemph_us; setDeemphUi(s.rx_deemph_us); } }
+    paintDualOverrides(!!s.dual);
     if (s.roger_beep_level != null) { const sl = $("#roger-level"); if (sl) { const v = Math.round(s.roger_beep_level * 1000); sl.value = v; setRogerUi(v); } }
     if (s.tx_buffer_ms != null) { const sl = $("#tx-buffer"); if (sl) sl.value = s.tx_buffer_ms; setMsUi("tx-buffer", s.tx_buffer_ms); }
     if (s.ptt_tail_ms != null) { const sl = $("#ptt-tail"); if (sl) sl.value = s.ptt_tail_ms; setMsUi("ptt-tail", s.ptt_tail_ms); }

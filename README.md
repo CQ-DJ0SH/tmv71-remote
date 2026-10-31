@@ -433,7 +433,9 @@ USB sound card on the speaker jack **SP1** (through an attenuator to line level)
 
 - **Second card (speaker jack):** web audio, AF meter, recorder, callsign
   recognition, selcall decoder. The radio already squelches and de-emphasises
-  this output, so the software squelch and de-emphasis stay out of it. While SP2
+  this output, so the software squelch and de-emphasis stay out of it (greyed out
+  in Settings while dual is on), and the callsign recognition drops its own
+  de-emphasis for it. While SP2
   is unused the radio bridges it to SP1, so SP1 carries both bands; with a plug in
   SP2 (a speaker, or just a dummy plug) the bands are split between the two jacks and SP1 carries one band only.
 - **Main card (data connector):** APRS / digimode decoders, KISS TNC, S-meter and

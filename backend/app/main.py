@@ -1059,6 +1059,8 @@ class CallsignService:
                 # the speech, and the trailing silence lets Vosk commit the final
                 # word. Cutting at BUSY swallowed the last spoken letter.
                 if (active or tail > 0) and pcm is not None and len(pcm):
+                    # speaker-jack card (dual): the radio de-emphasised it already
+                    self._rec.deemph = self.audio.asr_flat
                     calls = self._snap(await asyncio.to_thread(self._rec.feed, pcm))
                 if active:
                     tail = 2

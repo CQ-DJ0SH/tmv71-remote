@@ -384,6 +384,7 @@ class RadioAudio:
         self.rx_frames2 = 0               # listen-card blocks (watchdog)
         self._dev_idx: Optional[int] = None
         self._rx_lp_d = _FIRLowpass(RX_LP_CUTOFF, SAMPLE_RATE)   # data-card tap, own state
+        self.asr_flat = True              # ASR feed is the flat data-jack signal (else: speaker jack)
         self.rx_gain = rx_gain
         self.tx_gain = tx_gain
         # RX de-emphasis for a flat discriminator / 9600-baud audio source
@@ -770,6 +771,7 @@ class RadioAudio:
         flat = the flat data-jack feed (single card): it also feeds the digimodes
         tap and gets de-emphasis and the software squelch; the speaker-jack card
         (flat=False) is squelched and de-emphasised by the radio already."""
+        self.asr_flat = flat
         if self.rx_gain != 1.0:
             samples = np.clip(samples.astype(np.float32) * self.rx_gain,
                               -32768, 32767).astype(np.int16)
