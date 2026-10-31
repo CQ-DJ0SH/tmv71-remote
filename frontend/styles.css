@@ -2951,3 +2951,6 @@ body.theme-light .log-recent-list{
 .selcall-zone .sel-std-field select{border-color:var(--accent)}
 /* settings sliders (de-emphasis, roger level, audio timing) outlined in their accent colour */
 #settings input[type=range]{box-shadow:0 0 0 2px var(--ctrl-bg), 0 0 0 3px var(--g-accent, var(--accent))}
+/* settings switches: on = the dialog accent (cyan, like its title and active tab) instead of TX red */
+#settings .switch:checked{background:var(--cyan); border-color:var(--cyan)}
+body.theme-light #settings .switch:checked{background:#0c7b71; border-color:#0c7b71}
