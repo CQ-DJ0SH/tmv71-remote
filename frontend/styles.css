@@ -2942,7 +2942,7 @@ body.theme-light .log-recent-list{
 /* SQL slider outlined in the band accent colour, like the shuttle beside it (a ring, so the layout stays) */
 .sql-slider{box-shadow:0 0 0 2px var(--ctrl-bg), 0 0 0 3px var(--accent)}
 /* SQL value right up to its slider: left-aligned, smaller gap (the ring takes 3 px) */
-.sql-row .sql-val{text-align:left; margin-left:-4px}
+.sql-row .sql-val{text-align:left; margin-left:0}
 /* RX / TX GAIN in the audio panel outlined in its accent colour, like the SQL sliders */
 .audio .audio-ctl input[type=range]{box-shadow:0 0 0 2px var(--ctrl-bg), 0 0 0 3px var(--g-accent, var(--accent))}   /* TX GAIN: red */
 /* Digi Modes sliders (WPM, PITCH, MARK) outlined in the panel accent colour */
