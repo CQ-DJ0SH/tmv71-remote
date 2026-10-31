@@ -2216,6 +2216,7 @@ function renderKiss(k) {
   $("#set-kiss-on").checked = !!k.enabled;
   $("#set-kiss-tx").checked = !!k.allow_tx;
   $("#set-kiss-port").value = k.port ?? 8001;
+  $("#set-kiss-band").value = String(k.tx_band ?? -1);
   let txt;
   if (!k.enabled) txt = "";          // the switch already says so
   else if (k.error) txt = "not listening — " + k.error;
@@ -2354,8 +2355,10 @@ function bindSettings() {
     if (kissCfg) {
       const kOn = $("#set-kiss-on").checked, kTx = $("#set-kiss-tx").checked;
       const kPort = Number($("#set-kiss-port").value) || 8001;
-      if (kOn !== kissCfg.enabled || kTx !== kissCfg.allow_tx || kPort !== kissCfg.port) {
-        try { renderKiss(await api("POST", "/api/kiss", { enabled: kOn, port: kPort, allow_tx: kTx })); }
+      const kBand = Number($("#set-kiss-band").value);
+      if (kOn !== kissCfg.enabled || kTx !== kissCfg.allow_tx || kPort !== kissCfg.port ||
+          kBand !== (kissCfg.tx_band ?? -1)) {
+        try { renderKiss(await api("POST", "/api/kiss", { enabled: kOn, port: kPort, allow_tx: kTx, tx_band: kBand })); }
         catch (e) { toast("KISS: " + e.message, "err"); }
       }
     }

@@ -800,8 +800,13 @@
           <label class="check-label"><input type="checkbox" id="set-kiss-on"> KISS server</label>
           <label>TCP port<input type="number" id="set-kiss-port" min="1024" max="65535" placeholder="8001"></label>
           <label class="check-label"><input type="checkbox" id="set-kiss-tx"> Allow transmit</label>
+          <label title="Band the KISS frames are sent on. A or B moves the PTT band there for each transmission and puts it back afterwards; voice stays on its band.">TX band<select id="set-kiss-band">
+            <option value="-1">PTT band (as set)</option>
+            <option value="0">Band A</option>
+            <option value="1">Band B</option>
+          </select></label>
         </div>
-        <p class="pane-hint">Hands the APRS modem to programs that speak KISS over TCP — Graywolf (KISS interface type <em>tcp-client</em>, mode TNC), YAAC, Xastir, APRSIS32, Pat — the way Direwolf does on port 8001. Every frame received with a good CRC goes to them, and the frames they send go out on the air: after a clear-channel check, keyed like the APRS beacon. Tune the data band to the APRS frequency yourself. A connected program counts as activity for auto power off. Keep the port inside the LAN.</p>
+        <p class="pane-hint">Hands the APRS modem to programs that speak KISS over TCP — Graywolf (KISS interface type <em>tcp-client</em>, mode TNC), YAAC, Xastir, APRSIS32, Pat — the way Direwolf does on port 8001. Every frame received with a good CRC goes to them, and the frames they send go out on the air: after a clear-channel check, keyed like the APRS beacon. Set the TX band to the band tuned to the APRS frequency (e.g. B on 144.800 MHz) — each transmission then moves the PTT band there and back. Reception follows the data band (RX-A/RX-B), so that one has to sit on the APRS band too. A connected program counts as activity for auto power off. Keep the port inside the LAN.</p>
         <p class="kiss-status" id="kiss-status"></p>
       </div>
       <div class="mixer-field">

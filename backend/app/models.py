@@ -140,6 +140,7 @@ class KissConfigRequest(BaseModel):
     enabled: bool
     port: int = Field(default=8001, ge=1024, le=65535)
     allow_tx: bool = True
+    tx_band: int = Field(default=-1, ge=-1, le=1)   # -1 = current PTT band, 0 = A, 1 = B
 
 
 class CallsignRequest(BaseModel):

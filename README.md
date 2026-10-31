@@ -418,9 +418,12 @@ digipeating and iGate then come from that program.
   100 ms slots, up to 20 s — then dropped with a note in the Digi panel) and go
   out keyed like the APRS beacon. Frames queued meanwhile share one key-up
   (≤ 600 bytes). KISS TXDELAY is honoured (100–1000 ms, default 300).
-  *Allow transmit* off makes it receive-only.
+  *Allow transmit* off makes it receive-only. *TX band* A or B moves the PTT
+  band there for each key-up and back afterwards (voice keeps its band); the
+  default sends on whatever the PTT band is.
 - Off by default. Only KISS port 0 exists. A connected client counts as activity
-  for auto power off. Tune the data band to the APRS frequency yourself.
+  for auto power off. Reception follows the data band (RX-A/RX-B), so that has to
+  sit on the APRS band.
 
 ## Mobile app (PWA)
 
@@ -598,7 +601,7 @@ the repository.
 | `POST` | `/api/data-band` | `{band}` which VFO's RX audio you hear |
 | `GET`/`POST` | `/api/power-switch` | GPIO power on/off + auto-power-off status |
 | `GET`/`POST` | `/api/digi` · `/api/digi/config` · `/api/digi/tx` | CW / RTTY / **POCSAG** decode + transmit |
-| `GET`/`POST` | `/api/kiss` | KISS TCP server status / `{enabled, port, allow_tx}` |
+| `GET`/`POST` | `/api/kiss` | KISS TCP server status / `{enabled, port, allow_tx, tx_band}` |
 | `POST` | `/api/digi/decode-recording` | decode the raw RX recorder buffer (current mode) |
 | `POST` | `/api/selcall/config` | 5-tone selcall config + transmit |
 | `GET`/`POST` | `/api/asr/config` | off-air callsign recognition state / enable (Vosk) |

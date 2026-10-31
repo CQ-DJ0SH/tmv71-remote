@@ -359,6 +359,12 @@ class DigiService:
                         self._broadcast({"t": "aprsstat", **st})
 
     # --- KISS transmit ---------------------------------------------------
+    @staticmethod
+    def _kiss_band() -> int:
+        """The band KISS frames go out on: the setting, or the current PTT band."""
+        b = settings.kiss_tx_band
+        return b if b in (0, 1) else (service.status.ptt_band or 0)
+
     async def _channel_busy(self) -> bool:
         """Someone on the frequency, or this station already transmitting."""
         if service.transmitting or self.audio.digi_keyed:
@@ -368,7 +374,7 @@ class DigiService:
             return False                   # cannot tell — set_ptt reports the real fault
         try:
             return bool(await asyncio.to_thread(
-                service.radio.get_squelch_open, st.audio_band or 0))
+                service.radio.get_squelch_open, self._kiss_band()))
         except Exception:  # noqa: BLE001
             return False
 
@@ -417,15 +423,25 @@ class DigiService:
         pcm = np.concatenate(parts)
         async with self._tx_lock:
             touch_activity()
-            await service.set_ptt(True)
+            # a fixed KISS TX band: move the PTT band there for this key-up only
+            # and put it back afterwards, so voice keeps its band
+            band, prev = self._kiss_band(), service.status.ptt_band
+            moved = settings.kiss_tx_band in (0, 1) and prev is not None and prev != band
+            if moved:
+                await service.set_ptt_band(band)
             try:
-                self.audio.play_digi(pcm)
-                deadline = time.monotonic() + len(pcm) / SAMPLE_RATE + 3.0
-                while self.audio.digi_tx_busy() and time.monotonic() < deadline:
-                    await asyncio.sleep(0.05)
-                self.audio.stop_digi_tx()
+                await service.set_ptt(True)
+                try:
+                    self.audio.play_digi(pcm)
+                    deadline = time.monotonic() + len(pcm) / SAMPLE_RATE + 3.0
+                    while self.audio.digi_tx_busy() and time.monotonic() < deadline:
+                        await asyncio.sleep(0.05)
+                    self.audio.stop_digi_tx()
+                finally:
+                    await service.set_ptt(False)
             finally:
-                await service.set_ptt(False)
+                if moved:
+                    await service.set_ptt_band(prev)
         self.kiss.tx += len(frames)
         ts = time.strftime("%H:%M:%S")
         for f in frames:
@@ -2416,7 +2432,7 @@ async def digi_configure(cfg: DigiConfig) -> dict:
 @app.get("/api/kiss")
 async def kiss_status() -> dict:
     return {"enabled": settings.kiss_enabled, **kiss_srv.status(),
-            "port": settings.kiss_port}
+            "port": settings.kiss_port, "tx_band": settings.kiss_tx_band}
 
 
 @app.post("/api/kiss")
@@ -2426,7 +2442,9 @@ async def kiss_configure(req: KissConfigRequest) -> dict:
     settings.kiss_enabled = req.enabled
     settings.kiss_port = req.port
     settings.kiss_allow_tx = req.allow_tx
-    save_runtime(kiss_enabled=req.enabled, kiss_port=req.port, kiss_allow_tx=req.allow_tx)
+    settings.kiss_tx_band = req.tx_band
+    save_runtime(kiss_enabled=req.enabled, kiss_port=req.port, kiss_allow_tx=req.allow_tx,
+                 kiss_tx_band=req.tx_band)
     kiss_srv.allow_tx = req.allow_tx
     if req.enabled:
         if not kiss_srv.listening or kiss_srv.port != req.port:
