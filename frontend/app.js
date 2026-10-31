@@ -5771,6 +5771,14 @@ function specDraw(t) {
     ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
   }
   const light = document.body.classList.contains("theme-light");
+  {                                                                // 1750 Hz tone call, dashed
+    const x = Math.round(1750 / SPEC_HZ * w) + 0.5;
+    ctx.save();
+    ctx.setLineDash([4 * dpr, 4 * dpr]);
+    ctx.strokeStyle = light ? "rgba(60,70,80,0.55)" : "rgba(200,210,220,0.45)";
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+    ctx.restore();
+  }
   const micOn = txActive || micTestActive;
   for (const [an, col, fill] of [[spec.rx, "#8b7ad6", "rgba(139,122,214,0.22)"], [micOn ? spec.mic : null, "#cf6159", null]]) {
     if (!an) continue;
