@@ -2937,3 +2937,5 @@ body.theme-light .log-recent-list{
 .shuttle .sh-knob{width:20px; margin-left:-10px; top:2px; bottom:2px;
   box-shadow:0 0 10px 0 var(--accent-glow, var(--accent)), inset 0 0 0 1px #fff6}
 .shuttle .sh-lbl{background:color-mix(in srgb,var(--ctrl-bg) 62%,transparent)}
+/* shuttle outline in the band accent colour */
+.shuttle{border-color:var(--accent)}
