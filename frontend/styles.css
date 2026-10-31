@@ -2947,3 +2947,5 @@ body.theme-light .log-recent-list{
 .audio .audio-ctl input[type=range]{box-shadow:0 0 0 2px var(--ctrl-bg), 0 0 0 3px var(--g-accent, var(--accent))}   /* TX GAIN: red */
 /* Digi Modes sliders (WPM, PITCH, MARK) outlined in the panel accent colour */
 .digi-zone input[type=range]{box-shadow:0 0 0 2px var(--ctrl-bg), 0 0 0 3px var(--accent)}
+/* Selcall standard picker (STD) outlined in the panel accent colour */
+.selcall-zone .sel-std-field select{border-color:var(--accent)}
