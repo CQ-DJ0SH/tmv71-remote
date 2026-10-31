@@ -2941,3 +2941,5 @@ body.theme-light .log-recent-list{
 .shuttle{border-color:var(--accent)}
 /* SQL slider outlined in the band accent colour, like the shuttle beside it (a ring, so the layout stays) */
 .sql-slider{box-shadow:0 0 0 2px var(--ctrl-bg), 0 0 0 3px var(--accent)}
+/* SQL value right up to its slider: left-aligned, smaller gap (the ring takes 3 px) */
+.sql-row .sql-val{text-align:left; margin-left:-4px}
