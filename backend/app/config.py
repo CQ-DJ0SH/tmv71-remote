@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     audio_dual: bool = False
     audio_listen_device: str = ""
     rx_gain: float = 1.0             # digital gain radio -> browser
+    data_gain: float = 1.0           # dual sound card: gain of the data-jack card (decoders)
     tx_gain: float = 1.0             # digital gain browser mic -> radio
     tx_auto_gain: bool = False       # AGC on the TX mic path (overrides tx_gain)
 
@@ -196,7 +197,7 @@ class Settings(BaseSettings):
 # persisted next to the package so they survive restarts but stay out of git.
 _RUNTIME_FILE = os.path.join(os.path.dirname(__file__), "runtime.json")
 _RUNTIME_KEYS = ("serial_port", "serial_baud", "gpio_power_pin",
-                 "rx_gain", "tx_gain", "tx_auto_gain", "audio_device",
+                 "rx_gain", "tx_gain", "tx_auto_gain", "audio_device", "data_gain",
                  "squelch_a", "squelch_b",
                  "tx_buffer_ms", "ptt_tail_ms",
                  "auto_power_off_enabled", "auto_power_off_seconds",

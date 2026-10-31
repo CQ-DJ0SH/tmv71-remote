@@ -1296,6 +1296,9 @@ EN = [
         "MAIN CARD (data connector): APRS and digimode decoders, KISS TNC, "
         "S-meter and all transmitting, as before. The S-meter therefore shows "
         "the TNC's band.",
+        "TWO GAINS: RX GAIN in the audio panel then sets only the listening "
+        "level of the second card. A DATA GAIN slider appears beside it for "
+        "the data-jack card into the decoders and the KISS TNC.",
         "SP1 AND SP2: while SP2 is unused the radio bridges it to SP1, so SP1 "
         "carries both bands. With a plug in SP2 — a speaker, or just a dummy "
         "plug — the bands are split between the two jacks and SP1 carries one "
@@ -2337,6 +2340,9 @@ DE = [
         "HAUPTKARTE (Datenbuchse): APRS- und Digimode-Decoder, KISS-TNC, "
         "S-Meter und alles Senden, wie bisher. Das S-Meter zeigt daher das "
         "Band des TNC.",
+        "ZWEI PEGEL: RX GAIN im Audio-Panel regelt dann nur den Hörpegel der "
+        "zweiten Karte. Daneben erscheint ein Regler DATA GAIN für die Karte "
+        "an der Datenbuchse, also für Decoder und KISS-TNC.",
         "SP1 UND SP2: Solange SP2 frei ist, brückt das Gerät ihn auf SP1 — SP1 "
         "führt dann beide Bänder. Steckt etwas in SP2, ein Lautsprecher oder "
         "nur ein Blindstecker, werden die Bänder auf die beiden Buchsen "

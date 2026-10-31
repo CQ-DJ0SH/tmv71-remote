@@ -2954,3 +2954,7 @@ body.theme-light .log-recent-list{
 /* settings switches: on = the dialog accent (cyan, like its title and active tab) instead of TX red */
 #settings .switch:checked{background:var(--cyan); border-color:var(--cyan)}
 body.theme-light #settings .switch:checked{background:#0c7b71; border-color:#0c7b71}
+/* dual sound card: DATA GAIN (data-jack card into the decoders) in the digimode green */
+#data-gain{--g-accent:#6fd89a}
+#data-gain-val{color:#6fd89a; width:auto; text-align:left}
+.acg[hidden]{display:none}

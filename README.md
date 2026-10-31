@@ -438,6 +438,9 @@ USB sound card on the speaker jack **SP1** (through an attenuator to line level)
   SP2 (a speaker, or just a dummy plug) the bands are split between the two jacks and SP1 carries one band only.
 - **Main card (data connector):** APRS / digimode decoders, KISS TNC, S-meter and
   all transmitting, as before.
+- **Two gains:** RX GAIN in the audio panel sets the listening level (second
+  card); a DATA GAIN slider appears beside it for the data-jack card into the
+  decoders and the KISS TNC.
 - Switching it on also pins the data band (*Disable audio channel switching*), so
   RX-A/RX-B never moves the TNC's band. If the second card fails or goes silent,
   listening falls back to the main card and the watchdog keeps retrying it.

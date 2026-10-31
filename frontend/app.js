@@ -449,7 +449,8 @@ async function refreshAudio() {
     else if (levelHist.length) { levelHist.length = 0; drawLevelGraph(); }
     updateAudioBytes();     // WebRTC RX/TX data rate readout (throttled inside)
     // mirror gain sliders unless the user is dragging them
-    ["rx", "tx"].forEach(k => {
+    const dgr = $("#data-gain-row"); if (dgr) dgr.hidden = !a.dual;   // dual sound card only
+    ["rx", "tx", "data"].forEach(k => {
       const sl = document.getElementById(k + "-gain"), g = a[k + "_gain"];
       // while AUTO is on, show the live AGC factor in the (disabled) TX slider
       const v = (k === "tx" && a.tx_auto_gain && a.agc_gain != null) ? a.agc_gain : g;
@@ -1662,8 +1663,8 @@ function bindAudio() {
                                : "Mic: browser default", "ok");
     });
   }
-  ["rx", "tx"].forEach(k => {
-    const sl = document.getElementById(k + "-gain");
+  ["rx", "tx", "data"].forEach(k => {
+    const sl = document.getElementById(k + "-gain"); if (!sl) return;
     sl.addEventListener("input", () => setGainUi(k, sl.value));
     sl.addEventListener("change", async () => {
       const body = {}; body[k + "_gain"] = Number(sl.value);

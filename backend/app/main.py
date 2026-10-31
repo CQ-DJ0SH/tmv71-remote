@@ -128,7 +128,8 @@ radio_audio = RadioAudio(device=settings.audio_device,
                          tx_comp=settings.tx_comp_enabled,
                          rx_deemph_us=settings.rx_deemph_us,
                          dual=settings.audio_dual,
-                         listen_device=settings.audio_listen_device)
+                         listen_device=settings.audio_listen_device,
+                         data_gain=settings.data_gain)
 pcs: set = set()      # active WebRTC peer connections
 
 
@@ -2314,6 +2315,10 @@ async def audio_status() -> dict:
 async def set_audio_gain(req: AudioGainRequest) -> dict:
     if req.rx_gain is not None:
         radio_audio.rx_gain = req.rx_gain
+    if req.data_gain is not None:
+        radio_audio.data_gain = req.data_gain
+        settings.data_gain = req.data_gain
+        save_runtime(data_gain=req.data_gain)
     if req.tx_gain is not None:
         radio_audio.tx_gain = req.tx_gain
     if req.tx_auto_gain is not None:

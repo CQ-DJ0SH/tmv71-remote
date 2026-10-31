@@ -368,7 +368,7 @@ class RadioAudio:
                  rx_deemph_us: float = DEEMPH_TAU_US,
                  rx_buffer_ms: int = DEF_RX_BUFFER_MS,
                  tx_preemph: bool = True, tx_comp: bool = False,
-                 dual: bool = False, listen_device: str = ""):
+                 dual: bool = False, listen_device: str = "", data_gain: float = 1.0):
         self.device = device
         # Dual sound card mode: a second, capture-only card on the speaker jack
         # carries what the operator hears (web audio, recorder, ASR, selcall);
@@ -376,6 +376,7 @@ class RadioAudio:
         # and TX. The speaker output is already squelched and de-emphasised by
         # the radio, so the software squelch and de-emphasis stay out of it.
         self.dual = bool(dual)
+        self.data_gain = data_gain        # dual: gain of the data-jack card (decoders)
         self.listen_device = listen_device
         self._lstream: Optional[sd.InputStream] = None
         self._l_ts = 0.0                  # last listen-card callback (monotonic)
@@ -750,11 +751,12 @@ class RadioAudio:
 
     def _rx_data_tap(self, samples: np.ndarray) -> None:
         """Dual sound card mode: the main (data jack) card feeds only the
-        digimodes/APRS/KISS decoder — same gain and low-pass as the single-card tap."""
+        digimodes/APRS/KISS decoder, with its own gain (data_gain) — RX gain is
+        the listening level of the other card here."""
         if not self.digi_rx:
             return
-        if self.rx_gain != 1.0:
-            samples = np.clip(samples.astype(np.float32) * self.rx_gain,
+        if self.data_gain != 1.0:
+            samples = np.clip(samples.astype(np.float32) * self.data_gain,
                               -32768, 32767).astype(np.int16)
         if self.rx_lowpass:
             samples = self._rx_lp_d.process(samples)
@@ -1346,7 +1348,7 @@ class RadioAudio:
                 "rec_seconds": round(self.rec_samples() / SAMPLE_RATE, 1),
                 "rec_bytes": self.rec_samples() * 2,     # buffer RAM (16-bit mono)
                 "digi_rx": self.digi_rx, "digi_tx": self.digi_tx_busy(),
-                "dual": self.dual, "listen_device": self.listen_device,
+                "dual": self.dual, "listen_device": self.listen_device, "data_gain": self.data_gain,
                 "listen_active": self.listen_active, "listen_error": self.listen_error,
                 "transport": "webrtc", "web_client": self.peers > 0}
 

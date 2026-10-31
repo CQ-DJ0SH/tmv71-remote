@@ -178,6 +178,7 @@ class AudioGainRequest(BaseModel):
     rx_gain: Optional[float] = Field(default=None, ge=0, le=12)
     tx_gain: Optional[float] = Field(default=None, ge=0, le=12)
     tx_auto_gain: Optional[bool] = None
+    data_gain: Optional[float] = Field(default=None, ge=0, le=12)   # dual sound card: data-jack card
 
 
 class AudioDeviceRequest(BaseModel):
