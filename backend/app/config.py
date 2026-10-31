@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     # bridged to the radio's USB sound interface.
     audio_enabled: bool = True
     audio_device: str = "NAD"        # substring matched against sound devices
+    # dual sound card mode: a second, capture-only card on the speaker jack
+    # for listening; the main card stays on the data jack (decoders, KISS, TX)
+    audio_dual: bool = False
+    audio_listen_device: str = ""
     rx_gain: float = 1.0             # digital gain radio -> browser
     tx_gain: float = 1.0             # digital gain browser mic -> radio
     tx_auto_gain: bool = False       # AGC on the TX mic path (overrides tx_gain)
@@ -204,7 +208,7 @@ _RUNTIME_KEYS = ("serial_port", "serial_baud", "gpio_power_pin",
                  "rx_deemph_us", "rx_squelch_enabled", "asr_callsign_enabled",
                  "asr_region",
                  "rx_buffer_ms",
-                 "audio_band_lock", "listen_band",
+                 "audio_band_lock", "listen_band", "audio_dual", "audio_listen_device",
                  "wavelog_url", "wavelog_key", "wavelog_station_id",
                  "qrz_api_key", "qrz_username", "qrz_password",
                  "selcall_own", "selcall_code",

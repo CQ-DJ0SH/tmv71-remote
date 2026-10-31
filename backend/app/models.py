@@ -207,6 +207,12 @@ class TonesRequest(BaseModel):
     mic_test: Optional[bool] = None
 
 
+class AudioDualRequest(BaseModel):
+    """Dual sound card mode: second, capture-only card on the speaker jack."""
+    on: Optional[bool] = None
+    device: Optional[str] = None
+
+
 class BandLockRequest(BaseModel):
     """Pin the radio's external data band: the app stops writing MU 38."""
     on: bool

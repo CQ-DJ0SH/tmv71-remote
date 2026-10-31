@@ -425,6 +425,22 @@ digipeating and iGate then come from that program.
   for auto power off. Reception follows the data band (RX-A/RX-B), so that has to
   sit on the APRS band.
 
+## Dual sound card (listen to one band, TNC on the other)
+
+The data connector carries one band only, so with the TNC on B, RX-A would take
+its audio away. *Settings → Audio → Dual sound card* adds a second, capture-only
+USB sound card on the speaker jack **SP1** (through an attenuator to line level):
+
+- **Second card (speaker jack):** web audio, AF meter, recorder, callsign
+  recognition, selcall decoder. The radio already squelches and de-emphasises
+  this output, so the software squelch and de-emphasis stay out of it; both bands
+  are heard there.
+- **Main card (data connector):** APRS / digimode decoders, KISS TNC, S-meter and
+  all transmitting, as before.
+- Switching it on also pins the data band (*Disable audio channel switching*), so
+  RX-A/RX-B never moves the TNC's band. If the second card fails or goes silent,
+  listening falls back to the main card and the watchdog keeps retrying it.
+
 ## Mobile app (PWA)
 
 The UI is an installable **Progressive Web App**. Once installed it runs
@@ -597,6 +613,7 @@ the repository.
 | `POST` | `/api/audio/gain` | `{rx_gain, tx_gain, tx_auto_gain}` RX/TX gain + TX AGC |
 | `POST` | `/api/audio/tones` | roger beep / mic test / TX+RX low-pass / **de-emphasis** / **software squelch** |
 | `POST` | `/api/audio/record` · `/record/clear` | start/stop / clear the raw RX recorder |
+| `POST` | `/api/audio/dual` | `{on, device}` dual sound card mode: listen card on the speaker jack |
 | `GET` | `/api/audio/record.wav` | download the recording (16-bit mono 48 kHz WAV) |
 | `POST` | `/api/data-band` | `{band}` which VFO's RX audio you hear |
 | `GET`/`POST` | `/api/power-switch` | GPIO power on/off + auto-power-off status |

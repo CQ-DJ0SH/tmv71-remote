@@ -52,7 +52,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import memory as memory_io
 from .config import APP_VERSION, save_runtime, settings
-from .models import (AsrManualRequest, AudioDeviceRequest, AudioGainRequest,
+from .models import (AsrManualRequest, AudioDeviceRequest, AudioDualRequest, AudioGainRequest,
                      AutoPowerOffRequest, KissConfigRequest,
                      BandDisplayRequest, BandLockRequest, BandModeRequest,
                      CallsignRequest,
@@ -126,7 +126,9 @@ radio_audio = RadioAudio(device=settings.audio_device,
                          rx_buffer_ms=settings.rx_buffer_ms,
                          tx_preemph=settings.tx_preemph_enabled,
                          tx_comp=settings.tx_comp_enabled,
-                         rx_deemph_us=settings.rx_deemph_us)
+                         rx_deemph_us=settings.rx_deemph_us,
+                         dual=settings.audio_dual,
+                         listen_device=settings.audio_listen_device)
 pcs: set = set()      # active WebRTC peer connections
 
 
@@ -1514,6 +1516,7 @@ async def _audio_watchdog() -> None:
     log = logging.getLogger("tmv71")
     last = -1
     stalls = 0
+    last2, stalls2 = -1, 0
     while True:
         await asyncio.sleep(1.5)
         if not settings.audio_enabled:
@@ -1543,6 +1546,17 @@ async def _audio_watchdog() -> None:
         else:
             stalls = 0
         last = radio_audio.rx_frames
+        # dual sound card: reopen a silent or failed listen card (every ~6 s)
+        if radio_audio.dual:
+            cur2 = radio_audio.rx_frames2
+            if cur2 == last2:
+                stalls2 += 1
+                if stalls2 >= 4:
+                    await asyncio.to_thread(radio_audio.restart_listen)
+                    stalls2 = 0
+            else:
+                stalls2 = 0
+            last2 = cur2
 
 
 RECLAIM_EVERY_S = 300        # how often freed memory is handed back (5 min)
@@ -2355,7 +2369,31 @@ async def set_audio_buffer(req: AudioBufferRequest) -> dict:
 
 @app.get("/api/audio/devices")
 async def audio_devices() -> dict:
-    return {"current": radio_audio.device, "devices": radio_audio.list_devices()}
+    return {"current": radio_audio.device, "devices": radio_audio.list_devices(),
+            "inputs": radio_audio.list_input_devices(),
+            "dual": radio_audio.dual, "listen_device": radio_audio.listen_device,
+            "listen_active": radio_audio.listen_active,
+            "listen_error": radio_audio.listen_error}
+
+
+@app.post("/api/audio/dual")
+async def set_audio_dual(req: AudioDualRequest) -> dict:
+    """Dual sound card mode: the listen path comes from a second, capture-only
+    card on the speaker jack; the main card keeps the data jack (decoders, KISS
+    TNC, TX). Switching it on also pins the data band, as the data jack then
+    belongs to the TNC."""
+    on = radio_audio.dual if req.on is None else bool(req.on)
+    dev = None if req.device is None else req.device.strip()
+    await asyncio.to_thread(radio_audio.set_dual, on, dev)
+    settings.audio_dual = radio_audio.dual
+    settings.audio_listen_device = radio_audio.listen_device
+    save_runtime(audio_dual=settings.audio_dual,
+                 audio_listen_device=settings.audio_listen_device)
+    if on and not settings.audio_band_lock:
+        await service.set_band_lock(True)
+    if on:
+        await asyncio.sleep(0.5)          # let the card deliver its first blocks
+    return {**radio_audio.status(), "audio_band_lock": bool(settings.audio_band_lock)}
 
 
 @app.post("/api/audio/device")

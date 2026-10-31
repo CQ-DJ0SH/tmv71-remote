@@ -367,8 +367,22 @@ class RadioAudio:
                  rx_deemph: bool = False, rx_squelch: bool = False,
                  rx_deemph_us: float = DEEMPH_TAU_US,
                  rx_buffer_ms: int = DEF_RX_BUFFER_MS,
-                 tx_preemph: bool = True, tx_comp: bool = False):
+                 tx_preemph: bool = True, tx_comp: bool = False,
+                 dual: bool = False, listen_device: str = ""):
         self.device = device
+        # Dual sound card mode: a second, capture-only card on the speaker jack
+        # carries what the operator hears (web audio, recorder, ASR, selcall);
+        # the main card stays on the data jack for the decoders, the KISS TNC
+        # and TX. The speaker output is already squelched and de-emphasised by
+        # the radio, so the software squelch and de-emphasis stay out of it.
+        self.dual = bool(dual)
+        self.listen_device = listen_device
+        self._lstream: Optional[sd.InputStream] = None
+        self._l_ts = 0.0                  # last listen-card callback (monotonic)
+        self.listen_error: Optional[str] = None
+        self.rx_frames2 = 0               # listen-card blocks (watchdog)
+        self._dev_idx: Optional[int] = None
+        self._rx_lp_d = _FIRLowpass(RX_LP_CUTOFF, SAMPLE_RATE)   # data-card tap, own state
         self.rx_gain = rx_gain
         self.tx_gain = tx_gain
         # RX de-emphasis for a flat discriminator / 9600-baud audio source
@@ -516,20 +530,106 @@ class RadioAudio:
             log.error("query_devices failed: %s", exc)
         return out
 
+    @staticmethod
+    def list_input_devices() -> list[dict]:
+        """Every capture-capable device — candidates for the listen card."""
+        out = []
+        try:
+            for idx, d in enumerate(sd.query_devices()):
+                if d["max_input_channels"] > 0:
+                    out.append({"index": idx, "name": d["name"]})
+        except Exception as exc:  # noqa: BLE001
+            log.error("query_devices failed: %s", exc)
+        return out
+
     def _open_stream(self) -> None:
         dev = self._find_device()
         self._stream = sd.Stream(
             samplerate=SAMPLE_RATE, blocksize=BLOCK, device=dev,
             channels=(1, 2), dtype="int16", callback=self._callback)
         self._stream.start()
+        self._dev_idx = dev
+        self._open_listen()
 
     def _stop_stream(self) -> None:
+        self._stop_listen()
         try:
             if self._stream:
                 self._stream.stop(); self._stream.close()
         except Exception:  # noqa: BLE001
             pass
         self._stream = None
+
+    # -- dual sound card: the listen card ------------------------------------
+    def _find_listen_device(self) -> int:
+        name = (self.listen_device or "").strip().lower()
+        if not name:
+            raise RuntimeError("no listen device chosen")
+        for idx, d in enumerate(sd.query_devices()):
+            if name in d["name"].lower() and d["max_input_channels"] > 0:
+                if idx == self._dev_idx:
+                    raise RuntimeError("listen device is the main sound card")
+                return idx
+        raise RuntimeError(f"listen device matching {self.listen_device!r} not found")
+
+    def _open_listen(self) -> None:
+        if not self.dual or self._lstream is not None:
+            return
+        try:
+            idx = self._find_listen_device()
+            st = sd.InputStream(samplerate=SAMPLE_RATE, blocksize=BLOCK, device=idx,
+                                channels=1, dtype="int16", callback=self._lcallback)
+            st.start()
+            self._lstream = st
+            if self.listen_error:
+                log.info("listen sound card open: %s", self.listen_device)
+            self.listen_error = None
+        except Exception as exc:  # noqa: BLE001
+            self._lstream = None
+            if str(exc) != self.listen_error:
+                log.warning("listen sound card %r: %s", self.listen_device, exc)
+            self.listen_error = str(exc)
+
+    def _stop_listen(self) -> None:
+        st, self._lstream = self._lstream, None
+        self._l_ts = 0.0
+        try:
+            if st:
+                st.stop(); st.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+    def restart_listen(self) -> None:
+        """Reopen only the listen card (switch on/off, other device, stall)."""
+        self._stop_listen()
+        if self.dual and self._stream is not None:
+            self._open_listen()
+        elif not self.dual:
+            self.listen_error = None
+
+    def set_dual(self, on: bool, listen_device: Optional[str] = None) -> None:
+        self.dual = bool(on)
+        if listen_device is not None:
+            self.listen_device = listen_device
+        self.restart_listen()
+
+    @property
+    def listen_active(self) -> bool:
+        """The listen card is delivering — it feeds the listen path, not the main card."""
+        return self._lstream is not None and time.monotonic() - self._l_ts < 0.3
+
+    def _lcallback(self, indata, frames, time_info, status):
+        if status and status.input_overflow:
+            self.rx_overflows += 1
+        self._l_ts = time.monotonic()
+        self.rx_frames2 += 1
+        try:
+            self._rx_listen(indata[:, 0].copy(), frames, flat=False)
+        except Exception as exc:  # noqa: BLE001
+            now = time.monotonic()
+            if now - self._xrun_logged > 60:
+                self._xrun_logged = now
+                log.warning("listen callback: %s", exc)
 
     def start(self, loop: asyncio.AbstractEventLoop) -> None:
         self._loop = loop
@@ -641,6 +741,33 @@ class RadioAudio:
         # RX: radio capture (mono ch0) -> WebRTC subscribers
         samples = indata[:, 0].copy()
         self._update_smeter(samples)            # FM-quieting S-meter (pre-gain, raw)
+        self.rx_frames += 1
+        if self.listen_active:
+            self._rx_data_tap(samples)          # dual: this card feeds the decoders only
+        else:
+            self._rx_listen(samples, frames, flat=True)
+        self._tx_fill(outdata, frames)
+
+    def _rx_data_tap(self, samples: np.ndarray) -> None:
+        """Dual sound card mode: the main (data jack) card feeds only the
+        digimodes/APRS/KISS decoder — same gain and low-pass as the single-card tap."""
+        if not self.digi_rx:
+            return
+        if self.rx_gain != 1.0:
+            samples = np.clip(samples.astype(np.float32) * self.rx_gain,
+                              -32768, 32767).astype(np.int16)
+        if self.rx_lowpass:
+            samples = self._rx_lp_d.process(samples)
+        with self._digi_lock:
+            self._digi_rx_chunks.append(samples.copy())
+            if len(self._digi_rx_chunks) > 250:
+                self._digi_rx_chunks.pop(0)
+
+    def _rx_listen(self, samples: np.ndarray, frames: int, flat: bool) -> None:
+        """Listen path: recorder, ASR/selcall taps, filters, squelch, publish.
+        flat = the flat data-jack feed (single card): it also feeds the digimodes
+        tap and gets de-emphasis and the software squelch; the speaker-jack card
+        (flat=False) is squelched and de-emphasised by the radio already."""
         if self.rx_gain != 1.0:
             samples = np.clip(samples.astype(np.float32) * self.rx_gain,
                               -32768, 32767).astype(np.int16)
@@ -656,11 +783,11 @@ class RadioAudio:
                     total -= len(self._rec_chunks.pop(0))
         if self.rx_lowpass:
             samples = self._rx_lp.process(samples)
-        self.rx_frames += 1
         # digimodes decoder tap: stash RX blocks for the decode loop to consume
-        if self.digi_rx or self.sel_rx or self.asr_rx:
+        digi = flat and self.digi_rx
+        if digi or self.sel_rx or self.asr_rx:
             with self._digi_lock:
-                if self.digi_rx:
+                if digi:
                     self._digi_rx_chunks.append(samples.copy())
                     if len(self._digi_rx_chunks) > 250:  # ~5 s cap, drop oldest
                         self._digi_rx_chunks.pop(0)
@@ -696,9 +823,9 @@ class RadioAudio:
         # un-squelched signal); off for the echo replay / mic-test mute.
         if live:
             pub = self._rx_hp.process(pub)      # drop CTCSS/sub-audio + DC hum
-            if self.rx_deemph:
+            if self.rx_deemph and flat:
                 pub = self._rx_deemph.process(pub)
-            if self.rx_squelch:                 # gate on the radio's BUSY status
+            if self.rx_squelch and flat:        # gate on the radio's BUSY status
                 now = time.monotonic()
                 if self.rx_busy:
                     self._sq_open_ts = now
@@ -724,6 +851,8 @@ class RadioAudio:
                     while len(q) > cap:      # peer fell behind -> drop the oldest
                         q.popleft()
                         self.rx_drops += 1
+
+    def _tx_fill(self, outdata, frames: int) -> None:
         # TX: radio mic source. The two-tone test is emitted continuously on the
         # mic line regardless of PTT (so deviation can be set without holding the
         # key); the roger beep and queued browser mic only play while keyed.
@@ -1217,6 +1346,8 @@ class RadioAudio:
                 "rec_seconds": round(self.rec_samples() / SAMPLE_RATE, 1),
                 "rec_bytes": self.rec_samples() * 2,     # buffer RAM (16-bit mono)
                 "digi_rx": self.digi_rx, "digi_tx": self.digi_tx_busy(),
+                "dual": self.dual, "listen_device": self.listen_device,
+                "listen_active": self.listen_active, "listen_error": self.listen_error,
                 "transport": "webrtc", "web_client": self.peers > 0}
 
 

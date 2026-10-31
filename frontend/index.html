@@ -873,6 +873,18 @@
         <p class="pane-hint">RX-A/RX-B normally moves the radio's external data band (menu 38), because the data connector carries one band's audio only — and that is where the Pi's sound card usually sits. Switch this on when the data connector belongs to something else, a KISS TNC for APRS or packet, and the Pi listens on the speaker jack instead: the app then never writes that menu field, so nothing here can cut the TNC's audio off. RX-A/RX-B keeps working but only tells the app which band you are listening to — what the software squelch, the S-meter feed and the callsign recognition go by — and the label beside it reads LISTEN to say so. Over the speaker jack both bands are audible anyway. Kept on the Pi, so it holds for every browser and across restarts.</p>
       </div>
       <div class="mixer-field">
+        <span class="logo-label">Dual sound card</span>
+        <label class="switch-label">
+          <input type="checkbox" id="set-audio-dual" class="switch">
+          <span>Listen through a second sound card</span>
+        </label>
+        <div class="form-grid">
+          <label>Listen device<select id="audio-listen-device"></select></label>
+        </div>
+        <p class="pane-hint">For a station whose data connector feeds the TNC (the built-in KISS TNC or APRS decoder) on one band while you want to listen to the other. A second USB sound card on the speaker jack SP1 (through an attenuator, line level) then carries what you hear: the web audio, the AF meter, the recorder, the callsign recognition and the selcall decoder. The audio device above stays on the data connector for the APRS / digimode decoders, the KISS TNC and all transmitting. The speaker output is already squelched and de-emphasised by the radio, so the software squelch and de-emphasis are left out of it, and both bands are heard there. Switching this on also turns on "Disable audio channel switching" above, so RX-A/RX-B never moves the TNC's band. If the second card fails, listening falls back to the main card.</p>
+        <p class="kiss-status" id="audio-dual-status"></p>
+      </div>
+      <div class="mixer-field">
         <span class="logo-label">USB mixer levels</span>
         <div id="mixer-list" class="mixer-list"></div>
         <p class="pane-hint">Hardware levels of the USB sound card (persisted). Playback drives the radio mic on TX; if it's at 0 % nothing comes out. Capture is the RX level into the Pi.</p>

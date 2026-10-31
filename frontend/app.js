@@ -1413,6 +1413,40 @@ async function loadAudioDevices() {
     o.value = d.current; o.textContent = d.current + " (current)";
     sel.appendChild(o); sel.value = d.current;
   }
+  renderAudioDual(d);
+}
+// dual sound card (settings ▸ Audio): listen card on the speaker jack
+function renderAudioDual(d) {
+  const sw = $("#set-audio-dual"), sel = $("#audio-listen-device"); if (!sw || !sel) return;
+  if (d.inputs) {
+    const main = (d.current || "").toLowerCase();
+    sel.replaceChildren(new Option("— choose —", ""), ...d.inputs
+      .filter(x => !main || !x.name.toLowerCase().includes(main))
+      .map(x => new Option(x.name, x.name)));
+    const want = (d.listen_device || "").toLowerCase();
+    const m = want && [...sel.options].find(o => o.value && o.value.toLowerCase().includes(want));
+    if (m) sel.value = m.value;
+    else if (d.listen_device) {
+      const o = document.createElement("option");
+      o.value = d.listen_device; o.textContent = d.listen_device + " (not found)";
+      sel.appendChild(o); sel.value = d.listen_device;
+    }
+  }
+  sw.checked = !!d.dual;
+  const s = $("#audio-dual-status");
+  if (s) s.textContent = !d.dual ? ""
+    : d.listen_active ? "● listening through the second card"
+    : d.listen_error ? `✗ second card: ${d.listen_error} — listening on the main card`
+    : "… second card starting";
+}
+async function setAudioDual(body) {
+  try {
+    const st = await api("POST", "/api/audio/dual", body);
+    renderAudioDual(st);
+    if (st.audio_band_lock) { const bl = $("#set-band-lock"); if (bl) bl.checked = true; }
+    if (body.on === true) toast(st.listen_active ? "Dual sound card on" : "Dual sound card on — second card not delivering", st.listen_active ? "ok" : "err");
+    else if (body.on === false) toast("Dual sound card off", "ok");
+  } catch (err) { toast("Dual sound card: " + err.message, "err"); loadAudioDevices(); }
 }
 // USB sound-card mixer (settings ▸ Audio): a slider (+ on/off) per control
 async function loadMixer() {
@@ -1612,6 +1646,9 @@ function bindAudio() {
   });
   t.addEventListener("click", () => { (audioWant || audioPc) ? audioDisconnect() : audioConnect(); });
 
+  $("#set-audio-dual")?.addEventListener("change", e =>
+    setAudioDual({ on: e.target.checked, device: $("#audio-listen-device")?.value || "" }));
+  $("#audio-listen-device")?.addEventListener("change", e => setAudioDual({ device: e.target.value }));
   $("#audio-device").addEventListener("change", async e => {
     try { await api("POST", "/api/audio/device", { device: e.target.value }); toast("Audio device switched", "ok"); }
     catch (err) { toast("Audio device: " + err.message, "err"); loadAudioDevices(); }
