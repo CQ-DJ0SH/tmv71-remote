@@ -2933,3 +2933,7 @@ body.theme-light .log-recent-list{
 .shuttle .sh-end.dn{left:7px}
 .shuttle .sh-end.up{right:7px}
 .shuttle.up .sh-end, .shuttle.down .sh-end{opacity:0}
+/* shuttle knob a little clearer behind the TUNE label: wider, brighter glow, lighter label pill */
+.shuttle .sh-knob{width:20px; margin-left:-10px; top:2px; bottom:2px;
+  box-shadow:0 0 10px 0 var(--accent-glow, var(--accent)), inset 0 0 0 1px #fff6}
+.shuttle .sh-lbl{background:color-mix(in srgb,var(--ctrl-bg) 62%,transparent)}
