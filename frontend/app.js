@@ -2979,7 +2979,7 @@ function renderPanelRows() {
 
 // ---- HackRF waterfall ------------------------------------------------------
 const hrf = {
-  on: false, mode: "pan", follow: true, lna: 24, vga: 20, amp: false,
+  on: false, mode: "pan", follow: true, lna: 40, vga: 34, amp: false,
   center: null, sweepStart: 144e6, sweepStop: 146e6, sweepCenter: 0,
   ws: null, meta: null, floorEMA: null,   // auto-tracked noise floor (dB)
   level: Number(localStorage.getItem("tmv71.hrf.level") || 50),  // display peak height

@@ -71,8 +71,8 @@ class HackRFSpectrum:
         self.center = 145_000_000          # panadapter centre (Hz)
         self.sweep_start = 144_000_000     # sweep range (Hz)
         self.sweep_stop = 146_000_000
-        self.lna = 24
-        self.vga = 20
+        self.lna = 40
+        self.vga = 34                 # VGA moves in 2 dB steps
         self.amp = False
         self.zoom: Optional[tuple[int, int]] = None   # (lo, hi) Hz for the fine zoom row
         self.error: Optional[str] = None
