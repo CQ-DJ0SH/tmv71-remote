@@ -3138,3 +3138,6 @@ body.theme-light #scan-clear{color:#9c2018}
 body.theme-light #hrf-level{--g-accent:#6b7a85} body.theme-light #hrf-level-v{color:#5a6976}
 /* selcall CALL: larger text */
 .sel-call-field .sel-call{font-size:12px; letter-spacing:.14em}
+/* selcall CALL: antenna icon before the label (it keys the transmitter) */
+.sel-call{display:inline-flex; align-items:center; justify-content:center; gap:6px}
+.sel-call .sc-ico{width:15px; height:15px; flex:none; margin-top:-1px}
