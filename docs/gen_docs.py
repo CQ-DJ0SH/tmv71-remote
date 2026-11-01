@@ -1198,7 +1198,7 @@ EN = [
           "display level are adjustable."),
     ("h2", "Selcall (classic 5-tone)"),
     ("p", "Send and decode classic selective calls (ZVEI-1/2, CCIR, EEA). Enter a "
-          "5-digit TX CALL code and press TRANSMIT (keys PTT). Enter your own ID and press "
+          "5-digit TX CALL code and press CALL (keys PTT). Enter your own ID and press "
           "MUTE to silence RX until your ID is received — then it un-mutes "
           "automatically. Over FM this is AFSK; use a dummy load when setting up."),
     ("h2", "Digimodes (CW / RTTY / POCSAG / APRS)"),
@@ -2271,7 +2271,7 @@ DE = [
           "ein Anzeigepegel sind einstellbar."),
     ("h2", "Selektivruf (klassisch, 5-Ton)"),
     ("p", "Klassische Selektivrufe senden und dekodieren (ZVEI-1/2, CCIR, EEA). "
-          "Einen 5-stelligen TX-CALL-Code eingeben und TRANSMIT drücken (tastet PTT). Den "
+          "Einen 5-stelligen TX-CALL-Code eingeben und CALL drücken (tastet PTT). Den "
           "eigenen Code (MY ID) eingeben und MUTE drücken, um RX stumm zu schalten, "
           "bis der eigene Ruf empfangen wird — dann wird automatisch entstummt. "
           "Über FM ist das AFSK; zum Einstellen einen Dummy-Load verwenden."),

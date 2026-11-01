@@ -3852,7 +3852,7 @@ function bindSelcall() {
     callBtn.disabled = true; callBtn.classList.add("tx"); callBtn.textContent = "…";
     try { await api("POST", "/api/selcall/tx", { code }); toast("Called " + code, "ok"); }
     catch (e) { toast("Call: " + e.message, "err"); }
-    finally { callBtn.disabled = false; callBtn.classList.remove("tx"); callBtn.textContent = "TRANSMIT"; }
+    finally { callBtn.disabled = false; callBtn.classList.remove("tx"); callBtn.textContent = "CALL"; }
   });
   // MUTE until call: mutes RX audio; releases when the own code (or any, if no
   // own set) is decoded. Arming also turns the decoder on.
