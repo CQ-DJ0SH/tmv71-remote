@@ -3049,3 +3049,8 @@ body.theme-light #scan-clear{color:#9c2018}
   .selcall-zone .sel-rx-toggle:not(:has(.switch:checked)):hover,
   .digi-zone .panel-head > .digi-rx-toggle:not(:has(.switch:checked)):hover{color:var(--accent); border-color:var(--accent)}
 }
+/* HackRF OFF/ON: hover like the DECODE buttons (accent text + frame while off, a little brighter while on) */
+@media (hover:hover){
+  .hrf-power:not([aria-pressed="true"]):not(:disabled):hover{color:var(--accent); border-color:var(--accent)}
+  .hrf-power[aria-pressed="true"]:hover{filter:brightness(1.12)}
+}
