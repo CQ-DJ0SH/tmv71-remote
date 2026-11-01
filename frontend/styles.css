@@ -3054,3 +3054,5 @@ body.theme-light #scan-clear{color:#9c2018}
   .hrf-power:not([aria-pressed="true"]):not(:disabled):hover{color:var(--accent); border-color:var(--accent)}
   .hrf-power[aria-pressed="true"]:hover{filter:brightness(1.12)}
 }
+/* OFF and ON are one character apart: a fixed width keeps the head from shifting */
+.hrf-power{min-width:64px; text-align:center; box-sizing:border-box}
