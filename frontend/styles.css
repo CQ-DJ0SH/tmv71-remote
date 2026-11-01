@@ -3078,3 +3078,6 @@ body.theme-light #scan-clear{color:#9c2018}
 }
 /* APRS frame stats brighter while DECODE is on */
 .digi-zone:has(#digi-rx:checked) #aprs-stat{color:var(--text)}
+/* APRS: more room after the mode buttons; the stats get a fixed width (counts grow,
+   "1 station"/"12 stations") so DEBUG behind them no longer moves */
+#aprs-stat{display:inline-block; margin-left:24px; min-width:52ch; white-space:nowrap; font-variant-numeric:tabular-nums}
