@@ -2963,3 +2963,5 @@ body.theme-light #settings .switch:checked{background:#0c7b71; border-color:#0c7
 .mixer-field.dual-off .switch:disabled, .mixer-field.dual-off input[type=range]:disabled{cursor:not-allowed}
 .dual-note{color:var(--cyan)}
 body.theme-light .dual-note{color:#0c7b71}
+/* SQL slider closer to its label: label only as wide as "SQL", smaller gap (the ring takes 3 px) */
+.sql-row .sql-label{width:auto; margin-right:-3px}
