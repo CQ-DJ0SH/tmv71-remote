@@ -3104,3 +3104,5 @@ body.theme-light #scan-clear{color:#9c2018}
 #digi-params-aprs:not([hidden]){flex:1 1 auto; min-width:0}
 #aprs-stat{flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis}
 #digi-params-aprs .digi-rx-toggle{flex:0 0 auto}
+/* POCSAG: BAUD, RIC and FUNC framed in the panel accent (green) */
+#pocsag-baud, #pocsag-addr, #pocsag-func{border-color:var(--accent)}
