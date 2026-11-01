@@ -3058,6 +3058,6 @@ body.theme-light #scan-clear{color:#9c2018}
 .hrf-power{min-width:64px; text-align:center; box-sizing:border-box}
 /* selcall TRANSMIT: outlined in the panel accent (no longer filled); red while sending;
    fixed width so "…" while sending does not shift the row */
-.sel-call:not(.tx){color:var(--tx); background:var(--ctrl-bg); border-color:var(--tx); font-weight:600}   /* it keys the transmitter: red */
-@media (hover:hover){ .sel-call:not(.tx):not(:disabled):hover{color:#fff; background:var(--tx); box-shadow:0 0 14px -4px var(--tx-glow)} }
+.sel-call:not(.tx){color:var(--tx); background:var(--ctrl-bg); border-color:var(--accent); font-weight:600}   /* red text: it keys the transmitter */
+@media (hover:hover){ .sel-call:not(.tx):not(:disabled):hover{color:#ff6b5e; box-shadow:0 0 14px -4px var(--accent-glow)} }
 .sel-call{min-width:96px; text-align:center; box-sizing:border-box}
