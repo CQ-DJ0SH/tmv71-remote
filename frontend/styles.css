@@ -3018,3 +3018,7 @@ body.theme-light #asr-log-clear{color:#9c2018}
 .asr-manual::placeholder{color:var(--text); opacity:.8}
 .debug-zone .asr-manual{font-weight:600; border-color:var(--sw-edge)}
 .debug-zone .asr-manual{font-size:13px}
+/* ASR CALLSIGN as wide as the logbook CALL field (150 px); the phone layout keeps its own */
+@media not ((orientation:landscape) and (max-height:600px)){
+  .debug-zone .asr-manual{width:150px; box-sizing:border-box}
+}
