@@ -3003,3 +3003,8 @@ body.theme-light .dual-note{color:#0c7b71}
 .debug-zone .panel-head .scan-clear{color:var(--text); background:var(--ctrl-bg); border-color:var(--accent)}
 #asr-log-clear{color:#b0342a}
 body.theme-light #asr-log-clear{color:#9c2018}
+@media (hover:hover){
+  .debug-zone .panel-head .scan-clear:hover{color:#9fb4c2; border-color:#9fb4c2}
+  body.theme-light .debug-zone .panel-head .scan-clear:hover{color:#435b69; border-color:#435b69}
+  #asr-log-clear:hover{color:#ff3b30; border-color:#ff3b30}
+}
