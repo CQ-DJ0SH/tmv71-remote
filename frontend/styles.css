@@ -2986,3 +2986,7 @@ body.theme-light .dual-note{color:#0c7b71}
 .asr-foot-lbl{font-family:var(--font-ui); font-size:10px; letter-spacing:.14em; color:var(--text-dim)}
 /* talk time a little in from the right edge (clear of the corner screw) */
 .asr-foot{padding-right:28px}
+/* settings: one action bar for every tab - a note on the left where changes
+   apply at once (no SAVE there), the buttons on the right, CLOSE always last */
+.modal-actions .actions-note{margin-right:auto; align-self:center; font-family:var(--font-ui);
+  font-size:10.5px; letter-spacing:.06em; color:var(--text-dim)}

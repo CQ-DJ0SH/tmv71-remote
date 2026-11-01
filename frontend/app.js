@@ -2409,9 +2409,8 @@ function bindSettings() {
     if (sysHistTimer) { clearInterval(sysHistTimer); sysHistTimer = null; }
     $("#settings").classList.remove("open");
   };
-  $("#set-cancel").addEventListener("click", close);
-  $("#set-cancel-audio")?.addEventListener("click", close);
-  $("#set-cancel-panels")?.addEventListener("click", close);
+  // every settings tab ends in the same bar; its CLOSE carries .set-close
+  $$("#settings .set-close").forEach(b => b.addEventListener("click", close));
   $("#set-panels-all")?.addEventListener("click", () => {
     if (!panelsOff.size) { toast("Every panel is already shown", "ok"); return; }
     [...panelsOff].forEach(k => setPanelHidden(k, false));   // copy: the set shrinks
@@ -5752,8 +5751,6 @@ function bindLogbook() {
   $("#log-qrz-test")?.addEventListener("click", testQrz);
   $("#log-wl-reload")?.addEventListener("click", () => { saveLogConfig(true).then(loadLogStations); });
   $("#log-save-cfg")?.addEventListener("click", () => saveLogConfig(false));
-  $("#set-cancel-logging")?.addEventListener("click",
-    () => $("#settings").classList.remove("open"));
   loadLogRecent();
 }
 

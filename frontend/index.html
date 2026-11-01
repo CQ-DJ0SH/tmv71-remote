@@ -861,7 +861,7 @@
         <p class="pane-hint cert-step"><span class="cert-os">iPhone · iPad</span> Two steps, and the second is the one everyone misses. The download arrives as a <em>profile</em>: install it under Settings → General → VPN &amp; Device Management → Downloaded Profile → Install (asks for the passcode). Then switch the trust on separately under Settings → General → About → Certificate Trust Settings → turn this certificate to full trust. Until that second switch, Safari warns exactly as before and the app still refuses to install — the profile alone changes nothing.</p>
       </div>
       <div class="modal-actions">
-        <button id="set-cancel" class="btn-ghost">CLOSE</button>
+        <button id="set-cancel" class="btn-ghost set-close">CLOSE</button>
         <button id="set-save" class="btn-primary">SAVE</button>
       </div>
     </section>
@@ -1022,7 +1022,8 @@
         <p class="pane-hint">TX BUFFER: mic backlog cap — lower = less TX latency, higher = more tolerant of network jitter (tick = recommended 150 ms; below ~80 ms the backlog is smaller than the bursts the browser delivers, which starves and overflows at the same time — audible as dropouts). TX TRAIL: how long TX stays keyed after you release, so the buffered tail isn't chopped (tick = recommended 110 ms). RX BUFFER: jitter buffer between the sound card and the WebRTC track, in 20 ms blocks. The card and the event loop run on different clocks; without a buffer a block is now and then sent twice or skipped, and every such seam is a click. Raise it if the received audio crackles, lower it for the shortest delay (tick = recommended 60 ms).</p>
       </div>
       <div class="modal-actions">
-        <button id="set-cancel-audio" class="btn-ghost">CLOSE</button>
+        <span class="actions-note">Changes apply immediately</span>
+        <button id="set-cancel-audio" class="btn-ghost set-close">CLOSE</button>
       </div>
     </section>
 
@@ -1035,8 +1036,9 @@
         <p class="pane-hint">Nothing is unloaded: a hidden panel keeps its live data and comes back complete, so this is a view setting, not a switch-off. The one exception is the HackRF — hiding it stops the sweep, because that one costs the Pi real work. Three panels hold controls that go with them: PTT the transmit button and the quick memories (the spacebar still keys), Audio the CONNECT button and the gain sliders, and the band panels the CTRL/PTT choice — the radio keeps both bands whatever is on screen. The contact columns in the margins are not a panel; they have their own handle in the title bar.</p>
       </div>
       <div class="modal-actions">
+        <span class="actions-note">Changes apply immediately · saved in this browser</span>
         <button id="set-panels-all" class="btn-ghost">SHOW ALL</button>
-        <button id="set-cancel-panels" class="btn-primary">CLOSE</button>
+        <button id="set-cancel-panels" class="btn-ghost set-close">CLOSE</button>
       </div>
     </section>
 
@@ -1051,7 +1053,9 @@
         <dt>Device type (TY)</dt><dd id="inf-type">—</dd>
       </dl>
       <div class="modal-actions">
+        <span class="actions-note">Read from the radio — nothing to save</span>
         <button id="info-refresh" class="btn-ghost">REFRESH</button>
+        <button class="btn-ghost set-close">CLOSE</button>
       </div>
     </section>
 
@@ -1086,7 +1090,9 @@
         The graph samples once a minute and survives a restart, so the hour before
         a reboot or a memory ceiling is still there to look at.</p>
       <div class="modal-actions">
+        <span class="actions-note">Live readings — nothing to save</span>
         <button id="sys-refresh" class="btn-ghost">REFRESH</button>
+        <button class="btn-ghost set-close">CLOSE</button>
       </div>
     </section>
 
@@ -1108,12 +1114,20 @@
           <tbody id="mem-body"><tr><td colspan="8" class="empty">Press “LOAD” to fetch channels.</td></tr></tbody>
         </table>
       </div>
+      <div class="modal-actions">
+        <span class="actions-note">Written to the radio per channel (SAVE in the channel editor)</span>
+        <button class="btn-ghost set-close">CLOSE</button>
+      </div>
     </section>
 
     <!-- DTMF (10 memories) -->
     <section class="tab-pane" data-pane="dtmf">
       <p class="pane-hint">10 DTMF memories (0–9), up to 16 digits each · allowed 0–9, A–D, ∗, #.</p>
       <div class="dtmf-list" id="dtmf-list"></div>
+      <div class="modal-actions">
+        <span class="actions-note">Written to the radio per memory (SAVE on its row)</span>
+        <button class="btn-ghost set-close">CLOSE</button>
+      </div>
     </section>
 
     <!-- LOGGING (Wavelog + QRZ.com) -->
@@ -1148,7 +1162,7 @@
       </div>
 
       <div class="modal-actions">
-        <button id="set-cancel-logging" class="btn-ghost">CLOSE</button>
+        <button id="set-cancel-logging" class="btn-ghost set-close">CLOSE</button>
         <button id="log-save-cfg" class="btn-primary">SAVE</button>
       </div>
     </section>
