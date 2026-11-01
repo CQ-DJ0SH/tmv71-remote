@@ -660,7 +660,6 @@
               title="Click a card, then mark it as moderator">MOD</button>
       <button class="scan-clear" id="asr-stats" type="button" title="Talk-time evaluation — every station ranked">STATS</button>
       <button class="scan-clear" id="asr-profiles" type="button" title="Show the learned voice profiles, and discard them one by one">PROFILES</button>
-      <button class="scan-clear" id="asr-jammer" type="button" title="The over in progress, or the one that just ended, was a jammer: learn that voice (profile JAMMER). With Auto-DROP on (Settings ▸ Voice ID) a jammer's over is then muted after about 3 s of speech.">JAMMER</button>
       <span class="asr-total" id="asr-total" title="Sum of the talk timers in this panel — stations marked as moderator (M) excluded">Σ 00:00:00</span>
       <button class="scan-clear" id="asr-log-clear" type="button" title="Remove every contact card">CLEAR ALL</button>
       <button class="scan-clear" id="asr-assign" type="button" aria-pressed="false"
@@ -670,7 +669,10 @@
       <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="debug-body" title="Show / hide the recognised contacts">▲</button>
     </div>
     <div class="panel-body" id="debug-body">
-      <div class="asr-voice-note" id="asr-voice-note"></div>
+      <div class="asr-voice-row">
+        <div class="asr-voice-note" id="asr-voice-note"></div>
+        <button class="scan-clear" id="asr-jammer" type="button" title="The over in progress, or the one that just ended, was a jammer: learn that voice (profile JAMMER). With Auto-DROP on (Settings ▸ Voice ID) a jammer's over is then muted after about 3 s of speech.">JAMMER</button>
+      </div>
       <div class="asr-cards" id="asr-log" aria-live="polite" role="log"
            data-empty="(no callsigns recognised yet)"></div>
     </div>

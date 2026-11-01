@@ -2980,3 +2980,7 @@ body.theme-light .dual-note{color:#0c7b71}
 .spk-jam:disabled{opacity:.4; cursor:default}
 .spk-row.spk-jammer b{color:#ff6b5e}
 #jam-threshold{--g-accent:#3fa6b3}
+/* JAMMER sits beside the voice verdict, under the head (the head is full) */
+.asr-voice-row{display:flex; align-items:center; gap:8px; margin:0 0 6px}
+.asr-voice-row .asr-voice-note{flex:1 1 auto; min-width:0; padding-bottom:0}
+.asr-voice-row #asr-jammer{flex:0 0 auto; margin-left:auto; padding:3px 10px; font-size:10px}
