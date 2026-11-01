@@ -3030,3 +3030,5 @@ body.theme-light #scan-clear{color:#9c2018}
 @media (hover:hover){ #scan-clear:hover{color:#ff3b30; border-color:#ff3b30} body.theme-light #scan-clear:hover{color:#d32f2f; border-color:#d32f2f} }
 /* DECODE now comes before STD: a little room between them */
 .selcall-zone .sel-std-field{margin-left:10px}
+/* DECODE now leads the head: a little room before the mode buttons */
+.digi-zone .panel-head > .digi-modes{margin-left:10px}
