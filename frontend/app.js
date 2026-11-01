@@ -4541,11 +4541,83 @@ function spkCountPaint(n) {
 // profile rests on — and the segmenter's own tally underneath, because "why has it
 // learned only one voice?" is the first question the bare count raises. Most
 // overs carry no callsign at all, and only an over that does can be filed.
+// Jammers have no callsign: each is a numbered profile (JAMMER-n) with an
+// optional nickname, how many overs taught it, how often it was dropped and
+// when last. Renamed in place: click the name (or ✎), Enter saves, Esc cancels.
+function spkJamPaint(k) {
+  const box = $("#spk-jam-list"); if (!box) return;
+  box.textContent = "";
+  const list = k.jammer_info || [];
+  const del = (key, btn) => async () => {
+    btn.disabled = true;
+    try { reflectSpk(await api("DELETE", "/api/asr/speaker/" + encodeURIComponent(key))); }
+    catch (err) { btn.disabled = false; toast("Jammer: " + err.message, "err"); }
+  };
+  for (const j of list) {
+    const row = document.createElement("div");
+    row.className = "spk-row spk-jammer";
+    const nm = document.createElement("b");
+    nm.textContent = j.name || callDisp(j.key);
+    nm.title = j.name ? `${j.key} — click to rename` : "Click to give it a name";
+    const info = document.createElement("span");
+    const last = j.last ? new Date(j.last * 1000).toLocaleString([], { dateStyle: "short", timeStyle: "short" }) : "";
+    info.textContent = `${j.n} over${j.n === 1 ? "" : "s"} · ${j.drops} drop${j.drops === 1 ? "" : "s"}`
+      + (last ? ` · last ${last}` : "");
+    const edit = document.createElement("button");
+    edit.type = "button"; edit.className = "spk-x spk-edit"; edit.textContent = "✎";
+    edit.title = "Rename";
+    const startEdit = () => {
+      const inp = document.createElement("input");
+      inp.className = "spk-name-in"; inp.maxLength = 24; inp.value = j.name || "";
+      inp.placeholder = j.key;
+      nm.replaceWith(inp); inp.focus(); inp.select();
+      let done = false;
+      const finish = async save => {
+        if (done) return; done = true;
+        if (!save) { inp.replaceWith(nm); return; }
+        try { reflectSpk(await api("PATCH", "/api/asr/speaker/" + encodeURIComponent(j.key)
+                                   + "/name", { name: inp.value })); }
+        catch (err) { toast("Rename: " + err.message, "err"); inp.replaceWith(nm); }
+      };
+      inp.addEventListener("keydown", e => {
+        if (e.key === "Enter") { e.preventDefault(); finish(true); }
+        if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); finish(false); }
+      });
+      inp.addEventListener("blur", () => finish(true));
+    };
+    nm.addEventListener("click", startEdit);
+    edit.addEventListener("click", startEdit);
+    const off = document.createElement("button");
+    off.type = "button"; off.className = "spk-jam on"; off.textContent = "JAM";
+    off.title = "Clear the jammer flag — the voice moves to VOICES and is no longer dropped";
+    off.addEventListener("click", async () => {
+      off.disabled = true;
+      try { reflectSpk(await api("POST", "/api/asr/speaker/" + encodeURIComponent(j.key)
+                                 + "/jammer", { on: false })); }
+      catch (err) { off.disabled = false; toast("Jammer flag: " + err.message, "err"); }
+    });
+    const x = document.createElement("button");
+    x.type = "button"; x.className = "spk-x"; x.textContent = "✕";
+    x.title = "Forget this jammer";
+    x.addEventListener("click", del(j.key, x));
+    row.append(nm, info, edit, off, x);
+    box.appendChild(row);
+  }
+  if (!list.length) {
+    const e = document.createElement("div");
+    e.className = "spk-row spk-empty";
+    e.textContent = "no jammer learned yet — press JAMMER while one speaks";
+    box.appendChild(e);
+  }
+}
 function spkListPaint(k) {
+  spkJamPaint(k);
   const box = $("#spk-list");
   if (box) {
     box.textContent = "";
+    const jamSet = new Set(k.jammers || []);
     for (const [call, n] of (k.calls || [])) {
+      if (jamSet.has(call)) continue;          // listed under JAMMERS
       const row = document.createElement("div");
       row.className = "spk-row";
       const c = document.createElement("b"); c.textContent = callDisp(call);
@@ -4672,9 +4744,10 @@ $("#asr-profiles")?.addEventListener("click", spkDlgOpen);
 $("#asr-jammer")?.addEventListener("click", async () => {
   try {
     const r = await api("POST", "/api/asr/jammer");
-    toast(r.learned === "current" ? "This over is learned as a jammer when it ends"
-        : r.learned === "previous" ? `Last over learned as a jammer (${r.n} over${r.n === 1 ? "" : "s"})`
-        : "Nothing to learn — Voice ID off, or no over in the last 12 s", r.learned ? "ok" : "err");
+    // "previous": filed already, the enrol push brings the toast with the name;
+    // "current": filed when the over ends
+    if (r.learned === "current") toast("This over is learned as a jammer when it ends", "ok");
+    else if (!r.learned) toast("Nothing to learn — Voice ID off, or no over in the last 12 s", "err");
   } catch (err) { toast("Jammer: " + err.message, "err"); }
 });
 function jamThrUi(v) {
@@ -4728,11 +4801,18 @@ function asrVoice(m) {
     // auto-DROP: a flagged jammer is speaking — the same DROP as the button,
     // released by the same pause / busy-edge rules
     if (!sqMuted) sqSetMute(true);
-    const who = callDisp(m.call);
+    const who = m.name || callDisp(m.call);
     toast(`Auto-DROP: ${who} (${Number(m.score).toFixed(2)})`, "err");
     voiceLast = `Auto-DROP: ${who} ${Number(m.score).toFixed(2)}`
       + (m.other ? ` (best regular ${callDisp(m.other)} ${Number(m.other_score).toFixed(2)})` : "");
     voicePaint();
+    return;
+  }
+  if (m.event === "enrol" && m.jammer) {
+    spkCountPaint(m.profiles);
+    toast(m.new ? `New jammer learned: ${m.name || m.call}`
+                : `Jammer ${m.name || m.call}: ${m.n} overs learned`, "ok");
+    api("GET", "/api/asr/speaker").then(reflectSpk).catch(() => {});
     return;
   }
   if (m.event === "enrol") {

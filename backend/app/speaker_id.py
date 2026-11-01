@@ -54,6 +54,9 @@ MAX_WEIGHT = 20
 # The profile a "this was a jammer" press files a voice under. Any profile can
 # carry the jammer flag (a known station too); this one is born with it.
 JAMMER = "JAMMER"
+# Jammers have no callsign, so each one gets a numbered key: JAMMER-1, -2 ...
+# A nickname ("whistler 70cm") is kept beside it for display.
+JAMMER_PREFIX = "JAMMER-"
 
 
 class SpeakerBook:
@@ -153,7 +156,8 @@ class SpeakerBook:
         else:
             mean, n = v, 1
         jam = bool(cur.get("jammer")) if cur else call == JAMMER
-        self._prof[call] = {"v": mean.tolist(), "n": n, "ts": int(time.time())}
+        keep = {k: cur[k] for k in ("name", "drops", "last") if cur and k in cur}
+        self._prof[call] = {"v": mean.tolist(), "n": n, "ts": int(time.time()), **keep}
         if jam:
             self._prof[call]["jammer"] = True
         self._save()
@@ -192,6 +196,49 @@ class SpeakerBook:
         self._save()
         return True
 
+    def learn_jammer(self, vec: list, same: float) -> tuple:
+        """File a jammer's over: into the jammer profile it resembles (score at
+        or above `same`), else into a new JAMMER-n. Returns (key, overs, new)."""
+        if not vec:
+            return "", 0, False
+        v = self._unit(vec)
+        best, key = -1.0, ""
+        for c, p in self._prof.items():
+            if p.get("jammer"):
+                sc = float(np.dot(v, self._unit(p["v"])))
+                if sc > best:
+                    best, key = sc, c
+        new = not key or best < same
+        if new:
+            nums = [int(c[len(JAMMER_PREFIX):]) for c in self._prof
+                    if c.startswith(JAMMER_PREFIX) and c[len(JAMMER_PREFIX):].isdigit()]
+            key = f"{JAMMER_PREFIX}{max(nums, default=0) + 1}"
+            self._prof[key] = {"v": v.tolist(), "n": 1, "ts": int(time.time()),
+                               "jammer": True}
+            self._save()
+            return key, 1, True
+        return key, self.enrol(key, vec), False
+
+    def set_name(self, call: str, name: str) -> bool:
+        """Nickname for a profile — what a callsign-less jammer is shown as."""
+        p = self._prof.get((call or "").upper())
+        if p is None:
+            return False
+        name = " ".join((name or "").split())[:24]
+        if name:
+            p["name"] = name
+        else:
+            p.pop("name", None)
+        self._save()
+        return True
+
+    def note_drop(self, call: str) -> None:
+        p = self._prof.get(call)
+        if p is not None:
+            p["drops"] = int(p.get("drops", 0)) + 1
+            p["last"] = int(time.time())
+            self._save()
+
     def has_jammers(self) -> bool:
         return any(p.get("jammer") for p in self._prof.values())
 
@@ -200,7 +247,8 @@ class SpeakerBook:
         jammer must be the best profile overall, at or above its own threshold,
         and clear of the best NON-jammer profile by the margin — a regular
         station that sounds alike must win the tie, not lose its audio."""
-        out = {"call": "", "score": 0.0, "other": "", "other_score": 0.0, "hit": False}
+        out = {"call": "", "name": "", "score": 0.0, "other": "", "other_score": 0.0,
+               "hit": False}
         if not vec:
             return out
         v = self._unit(vec)
@@ -212,6 +260,7 @@ class SpeakerBook:
             return out
         js, jc = max(jam)
         out["call"], out["score"] = jc, round(js, 3)
+        out["name"] = self._prof[jc].get("name", "")
         if oth:
             os_, oc = max(oth)
             out["other"], out["other_score"] = oc, round(os_, 3)
@@ -251,4 +300,10 @@ class SpeakerBook:
     def stats(self) -> dict:
         return {"profiles": len(self._prof),
                 "calls": sorted((c, int(p.get("n", 1))) for c, p in self._prof.items()),
-                "jammers": sorted(c for c, p in self._prof.items() if p.get("jammer"))}
+                "jammers": sorted(c for c, p in self._prof.items() if p.get("jammer")),
+                "jammer_info": sorted(
+                    ({"key": c, "name": p.get("name", ""), "n": int(p.get("n", 1)),
+                      "drops": int(p.get("drops", 0)), "last": int(p.get("last", 0)),
+                      "ts": int(p.get("ts", 0))}
+                     for c, p in self._prof.items() if p.get("jammer")),
+                    key=lambda j: j["key"])}

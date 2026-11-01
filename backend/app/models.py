@@ -244,6 +244,11 @@ class AsrSpeakerRequest(BaseModel):
     jam_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
+class AsrNameRequest(BaseModel):
+    """Nickname of a voice profile (a jammer has no callsign)."""
+    name: str = Field(default="", max_length=24)
+
+
 class AsrJammerFlagRequest(BaseModel):
     """Flag or clear a voice profile as a jammer."""
     on: bool

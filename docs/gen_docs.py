@@ -1598,9 +1598,17 @@ EN = [
     ("p", "A voice can be flagged as a jammer; while it speaks, the web audio is "
           "muted with the same DROP as the button in the PTT panel, released at "
           "the next pause. Teach it with JAMMER in the ASR panel while the jammer "
-          "speaks or right after (it learns the profile JAMMER), or flag any "
-          "learned voice with JAM under PROFILES. Switched on in Settings > "
-          "Audio > Voice ID > Auto-DROP on jammers."),
+          "speaks or right after, or flag any learned voice with JAM under "
+          "PROFILES. Switched on in Settings > Audio > Voice ID > Auto-DROP on "
+          "jammers."),
+    ("p", "Jammers have no callsign, so each gets a numbered profile: an over "
+          "taught with JAMMER is filed with the jammer it resembles, otherwise "
+          "it becomes a new JAMMER-n — two jammers are never averaged into one "
+          "voice. PROFILES lists them in a section of their own above the "
+          "callsign voices, with the overs learned, how often each was dropped "
+          "and when last; click the name to give it a nickname (\u201cwhistler "
+          "70cm\u201d), which the Auto-DROP message then shows. JAM clears the "
+          "flag, ✕ forgets the jammer."),
     ("ul", [
         "The over is checked while it runs, at about 3 s and 6 s of speech, on "
         "the last 4 s: the first seconds are always heard.",
@@ -2706,9 +2714,18 @@ DE = [
           "Web-Audio mit demselben DROP stummgeschaltet wie mit dem Knopf im "
           "PTT-Panel und in der nächsten Pause wieder freigegeben. Gelernt wird "
           "mit JAMMER im ASR-Panel, während der Störer spricht oder gleich "
-          "danach (Profil JAMMER), oder man markiert eine gelernte Stimme unter "
+          "danach, oder man markiert eine gelernte Stimme unter "
           "PROFILES mit JAM. Eingeschaltet wird es in Einstellungen > Audio > "
           "Voice ID > Auto-DROP on jammers."),
+    ("p", "Störer nennen kein Rufzeichen, daher bekommt jeder ein nummeriertes "
+          "Profil: Ein mit JAMMER gelernter Durchgang kommt zu dem Störer, dem "
+          "er ähnelt, sonst entsteht ein neuer JAMMER-n — zwei Störer werden nie "
+          "zu einer Stimme gemittelt. PROFILES führt sie in einem eigenen "
+          "Abschnitt über den Rufzeichen-Stimmen, mit gelernten Durchgängen, "
+          "Anzahl der Drops und letztem Treffer; ein Klick auf den Namen gibt "
+          "ihm einen Spitznamen („Pfeifer 70cm“), den dann auch die "
+          "Auto-DROP-Meldung zeigt. JAM nimmt die Markierung zurück, ✕ vergisst "
+          "den Störer."),
     ("ul", [
         "Geprüft wird während des Durchgangs, bei etwa 3 s und 6 s Sprache, "
         "jeweils auf den letzten 4 s: Die ersten Sekunden sind immer zu hören.",

@@ -74,6 +74,8 @@ Pi, so it follows you to every browser).*
     three seconds; the voice profiles are language-independent and survive it.
   - **Auto-DROP on jammers** — a voice flagged as a jammer (JAMMER in the ASR
     panel teaches it, or JAM on any profile under PROFILES) mutes the web audio
+    — each jammer gets its own profile (JAMMER-1, -2 …, listed under PROFILES
+    with a nickname, overs learned, drops and last hit) —
     for its over with the same DROP as the PTT-panel button. Checked at ~3 s and
     6 s of speech, so the first seconds are heard; the jammer must beat every
     regular profile by the margin, so similar voices keep their audio. Speech

@@ -660,7 +660,7 @@
               title="Click a card, then mark it as moderator">MOD</button>
       <button class="scan-clear" id="asr-stats" type="button" title="Talk-time evaluation — every station ranked">STATS</button>
       <button class="scan-clear" id="asr-profiles" type="button" title="Show the learned voice profiles, and discard them one by one">PROFILES</button>
-      <button class="scan-clear" id="asr-jammer" type="button" title="The over in progress, or the one that just ended, was a jammer: learn that voice (profile JAMMER). With Auto-DROP on (Settings ▸ Voice ID) a jammer's over is then muted after about 3 s of speech.">JAMMER</button>
+      <button class="scan-clear" id="asr-jammer" type="button" title="The over in progress, or the one that just ended, was a jammer: learn that voice (filed with the jammer it resembles, or as a new JAMMER-n). With Auto-DROP on (Settings ▸ Voice ID) a jammer's over is then muted after about 3 s of speech.">JAMMER</button>
       <button class="scan-clear" id="asr-log-clear" type="button" title="Remove every contact card">CLEAR ALL</button>
       <button class="scan-clear" id="asr-assign" type="button" aria-pressed="false"
               title="Assign stage">ASSIGN</button>
@@ -741,6 +741,9 @@
 <div class="modal" id="asr-spk-dlg" role="dialog" aria-modal="true" aria-labelledby="asr-spk-title">
   <div class="modal-card spk-card">
     <h3 id="asr-spk-title">VOICE PROFILES</h3>
+    <h4 class="spk-sec">JAMMERS <span>— no callsign; auto-DROP listens for them</span></h4>
+    <div class="spk-list spk-jam-list" id="spk-jam-list"></div>
+    <h4 class="spk-sec">VOICES <span>— learned from callsigns</span></h4>
     <div class="spk-list" id="spk-list"></div>
     <p class="spk-seg" id="spk-seg"></p>
     <div class="modal-actions">

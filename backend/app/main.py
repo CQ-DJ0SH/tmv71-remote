@@ -71,7 +71,7 @@ from .models import (AsrManualRequest, AudioDeviceRequest, AudioDualRequest, Aud
                      HackRFConfig,
                      LogConfigRequest, LogLookupRequest, LogQsoRequest,
                      LogDeleteRequest, AsrRenameRequest, AsrSpeakerRequest,
-                     AsrJammerFlagRequest)
+                     AsrJammerFlagRequest, AsrNameRequest)
 from . import aprs
 from . import kiss
 from . import mixer
@@ -746,6 +746,35 @@ class CallsignService:
     # how long after an over a hand-picked card still counts as its label
     MANUAL_BACK_S = 12.0
 
+    def mark_jammer(self) -> dict:
+        """JAMMER pressed: the over in progress (or the one just ended) was a
+        jammer. It is filed with the jammer profile it resembles, or becomes a
+        new JAMMER-n — two jammers must never be averaged into one voice."""
+        if not settings.spk_enabled or not self._spk.available:
+            return {"learned": ""}
+        now = time.monotonic()
+        if self._seg:                       # an over is in progress
+            self._marks.append((now, speaker_id.JAMMER, True))
+            return {"learned": "current"}
+        last = self._spk_last
+        if last and now - last[0] <= self.MANUAL_BACK_S:
+            self._spk_last = None
+            return {"learned": "previous", **self._file_jammer(last[1])}
+        return {"learned": ""}
+
+    def _file_jammer(self, vec) -> dict:
+        key, n, new = self._spk.learn_jammer(vec, settings.spk_threshold)
+        name = self._spk._prof.get(key, {}).get("name", "")
+        self._seg_stat["jamlearn"] = self._seg_stat.get("jamlearn", 0) + 1
+        self._broadcast({"t": "asrvoice", "event": "enrol", "call": key, "n": n,
+                         "dur": 0, "manual": True, "jammer": True, "new": new,
+                         "name": name, "profiles": self._spk.stats()["profiles"]})
+        return {"key": key, "n": n, "new": new, "name": name}
+
+    def spk_set_name(self, call: str, name: str) -> dict:
+        ok = self._spk.set_name(call, name)
+        return {"changed": bool(ok), **self.spk_status()}
+
     def spk_set_jammer(self, call: str, on: bool) -> dict:
         ok = self._spk.set_jammer(call, on)
         self._broadcast({"t": "status", **self.status()})
@@ -781,6 +810,7 @@ class CallsignService:
             if m["hit"] and self._seg and self._seg_t0 == t0 and not self._jam_hit:
                 self._jam_hit = True
                 self._seg_stat["jamdrop"] = self._seg_stat.get("jamdrop", 0) + 1
+                await asyncio.to_thread(self._spk.note_drop, m["call"])
                 self._broadcast({"t": "asrvoice", "event": "jam", **m})
         finally:
             self._jam_busy = False
@@ -1279,6 +1309,9 @@ class CallsignService:
             win, t0, t1, speech, callsign_asr.normalize_call(settings.callsign),
             self._calls)
         self._seg_stat[why] = self._seg_stat.get(why, 0) + 1
+        if call == speaker_id.JAMMER:        # JAMMER pressed during this over
+            self._file_jammer(vec)   # in the loop: it broadcasts
+            return
         if call:
             n = await asyncio.to_thread(self._spk.enrol, call, vec)
             # the panel shows the number of learned voices, so every change to
@@ -2702,7 +2735,13 @@ async def asr_speaker_set(req: AsrSpeakerRequest) -> dict:
 async def asr_jammer() -> dict:
     """The over in progress (or the one just ended) was a jammer: learn its
     voice under the JAMMER profile, which auto-DROP listens for."""
-    return callsign_svc.mark_manual(speaker_id.JAMMER)
+    return callsign_svc.mark_jammer()
+
+
+@app.patch("/api/asr/speaker/{call}/name")
+async def asr_speaker_name(call: str, req: AsrNameRequest) -> dict:
+    """Nickname of a voice profile — how a callsign-less jammer is shown."""
+    return callsign_svc.spk_set_name(call, req.name)
 
 
 @app.post("/api/asr/speaker/{call}/jammer")
