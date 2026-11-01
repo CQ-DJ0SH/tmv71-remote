@@ -1445,7 +1445,9 @@ async def _rx_squelch_loop() -> None:
         await asyncio.sleep(0.06)
         # Poll BUSY when the software squelch needs it (someone listening) OR when
         # callsign ASR is on (it gates recognition on the squelch being open).
-        want = (radio_audio.rx_squelch and radio_audio.peers > 0) or callsign_svc.enabled
+        # dual sound card: the listen band's squelch also gates its meters
+        want = ((radio_audio.rx_squelch or radio_audio.dual) and radio_audio.peers > 0) \
+            or callsign_svc.enabled
         if not want:
             radio_audio.rx_busy = True                 # feature idle -> don't gate
             continue

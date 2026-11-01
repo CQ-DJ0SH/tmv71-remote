@@ -326,6 +326,9 @@ const SM_PEAK_HOLD = 1000;                        // hold the peak marker (ms)
 // quieting the AF noise follows the modulation, not the signal strength).
 const S9_POS = 0.61;
 let lastRxDb = null, lastTxDb = null, lastRxS = null;  // Pi-measured RX/mic/S
+// dual sound card: second S-meter (speaker-jack card) + that band's squelch
+let lastDual = false, lastRxS2 = null, lastListenBusy = false;
+const DATA_BAND_RX = { 0: 0, 1: 1, 2: 1, 3: 0 };   // radio menu 38 -> band whose RX is on the data jack
 const smPeak = [{ seg: 0, t: 0 }, { seg: 0, t: 0 }];   // AF-bar peak-hold state
 
 function buildSmeter(band) {
@@ -378,6 +381,18 @@ function updateSmeters() {
       const f = (lastTxDb != null) ? (lastTxDb - VU_FLOOR) / (0 - VU_FLOOR) : 0;
       renderSmeter(b.band, f, true);
       renderSbar(b.band, 0);
+    } else if (lastDual) {
+      // Dual sound card: the band you hear (speaker jack) gets the AF bar and
+      // its own S-meter, both only while its squelch is open — SP1 also carries
+      // the other band while SP2 is free. The data band's S-meter comes from
+      // the data jack, measured there all along.
+      const lb = last.audio_band ?? 0, db = DATA_BAND_RX[last.data_band] ?? 0;
+      const isL = b.band === lb, isD = b.band === db;
+      const f = (isL && lastListenBusy && lastRxDb != null)
+        ? Math.max(0, (lastRxDb - VU_FLOOR) / (0 - VU_FLOOR)) : 0;
+      renderSmeter(b.band, f, false);
+      const s = isD ? lastRxS : (isL && lastListenBusy ? lastRxS2 : 0);
+      renderSbar(b.band, s != null ? s : 0);
     } else {
       // RX: Pi audio comes from the data band's RX side only, so show the
       // measured AF level on that band; the other band stays empty. Driven by
@@ -426,6 +441,7 @@ async function refreshAudio() {
     }
     // feed the in-display S-meter with the live RX / mic audio levels
     lastRxDb = a.rx_db; lastTxDb = a.tx_db; lastRxS = a.rx_s;
+    lastDual = !!(a.dual && a.listen_active); lastRxS2 = a.rx_s2; lastListenBusy = !!a.listen_busy;
     sqQuietCheck(a.rx_db);            // DROP: also release after 3 s of silence
     overQuietCheck(a.rx_db);          // and let go of the card on a long pause
     updateSmeters();

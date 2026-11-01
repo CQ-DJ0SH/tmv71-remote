@@ -117,6 +117,14 @@ SM_FLOOR_RMS = 30.0          # below this broadband RMS the input is dead, not S
 SM_ATTACK = 0.20             # weight toward a rising reading
 SM_RELEASE = 0.07            # weight toward a falling reading (slower = more inert)
 SM_DROP = 0.6                # fast release on carrier loss (noise floor returns)
+# Dual sound card: second meter on the speaker-jack card. The radio de-emphasises
+# and low-passes that output, so there is hardly any noise left above 6 kHz; the
+# quieting band moves down to 3.5–5.5 kHz (above most speech energy after
+# de-emphasis). Its level depends on the volume knob and the attenuator, so the
+# open-noise reference starts low and may adapt over a much wider range.
+SM2_BAND_HZ = (3500.0, 5500.0)
+SM2_OPEN_DBFS = -60.0
+SM2_REF_MIN_DBFS = -95.0
 
 # Software-squelch hang time: keep audio open this long after BUSY drops, so the
 # ~60 ms BUSY poll gaps and short speech pauses don't chop the audio.
@@ -356,6 +364,51 @@ def _level(samples, prev):
     return round(a * db + (1 - a) * prev, 1)
 
 
+class _QuietingMeter:
+    """FM-quieting S-meter: band noise inversely tracks signal strength,
+    auto-ranged between open-squelch noise (S0) and full quieting (S9). Fed the
+    raw, pre-gain RX so it reflects the signal, not the AF volume setting."""
+
+    def __init__(self, fs: float, hp_hz: float, lp_hz: Optional[float] = None,
+                 open_dbfs: float = SM_OPEN_DBFS, ref_min_dbfs: Optional[float] = None):
+        self._hp = _HighPass(hp_hz, fs, ntaps=127)
+        self._lp = _FIRLowpass(lp_hz, fs) if lp_hz else None
+        self._hi = open_dbfs                 # adaptive S0 reference (open-squelch noise)
+        self._ref_min = open_dbfs - 12.0 if ref_min_dbfs is None else ref_min_dbfs
+        self.s = 0.0                         # 0..9 displayed S value
+
+    def process(self, raw: np.ndarray) -> float:
+        y = self._hp.process(raw)            # keep the filters continuous
+        if self._lp is not None:
+            y = self._lp.process(y)
+        y = y.astype(np.float64)
+        bb = float(np.sqrt(np.mean(raw.astype(np.float64) ** 2))) if raw.size else 0.0
+        if bb < SM_FLOOR_RMS:                # dead/near-silent input is not "S9"
+            self.s = round(self.s * 0.7, 2)
+            return self.s
+        rms = float(np.sqrt(np.mean(y ** 2)))
+        cur = 20.0 * np.log10(max(rms, 1.0) / 32768.0)      # band level, dBFS
+        # open-squelch noise reference (S0): snap up to any louder noise (that IS
+        # the no-signal level), drift down only very slowly. Quieting depth below
+        # it maps linearly to S0..S9 over SM_S9_SPAN_DB, saturating at full quieting.
+        if cur > self._hi:
+            self._hi = cur
+        else:
+            self._hi = max(self._hi - SM_HI_DECAY, self._ref_min)
+        inst = min(9.0, max(0.0, 9.0 * (self._hi - cur) / SM_S9_SPAN_DB))
+        # Sluggish needle for normal fluctuations, but snap down on carrier loss:
+        # when the noise floor returns, inst collapses to ~S0 from a real reading
+        # -> drop fast; small dips (voice) keep the slow, inert release.
+        if inst > self.s:
+            a = SM_ATTACK
+        elif inst < 0.7 and self.s > 2.0:    # carrier lost -> back to noise
+            a = SM_DROP
+        else:
+            a = SM_RELEASE
+        self.s = round(a * inst + (1.0 - a) * self.s, 2)
+        return self.s
+
+
 class RadioAudio:
     """Owns the full-duplex NAD stream; fans RX out to WebRTC subscribers and
     accepts TX (browser mic) into the radio mic, gated by PTT."""
@@ -396,9 +449,12 @@ class RadioAudio:
         self._rx_hp = _HighPass(RX_HP_CUTOFF_HZ, SAMPLE_RATE)
         # FM-quieting S-meter (see SM_* constants): high-band noise auto-ranged
         # between open-squelch noise (S0) and full quieting (S9).
-        self._sm_hp = _HighPass(SM_HP_CUTOFF_HZ, SAMPLE_RATE, ntaps=127)
-        self._sm_hi = SM_OPEN_DBFS       # adaptive S0 reference (open-squelch noise)
-        self.rx_s: float = 0.0           # 0..9 displayed S value
+        self._sm = _QuietingMeter(SAMPLE_RATE, SM_HP_CUTOFF_HZ)
+        self.rx_s: float = 0.0           # 0..9 displayed S value (main card)
+        # dual sound card: own meter on the speaker-jack card (the band you hear)
+        self._sm2 = _QuietingMeter(SAMPLE_RATE, SM2_BAND_HZ[0], SM2_BAND_HZ[1],
+                                   SM2_OPEN_DBFS, SM2_REF_MIN_DBFS)
+        self.rx_s2: float = 0.0
         # Software squelch gated by the radio's BUSY status (for the always-open
         # discriminator/9600 output). rx_busy is updated by a fast CAT poller;
         # audio is muted once BUSY has been closed for longer than the hang time.
@@ -626,7 +682,9 @@ class RadioAudio:
         self._l_ts = time.monotonic()
         self.rx_frames2 += 1
         try:
-            self._rx_listen(indata[:, 0].copy(), frames, flat=False)
+            raw = indata[:, 0].copy()
+            self.rx_s2 = self._sm2.process(raw)       # S-meter of the band you hear
+            self._rx_listen(raw, frames, flat=False)
         except Exception as exc:  # noqa: BLE001
             now = time.monotonic()
             if now - self._xrun_logged > 60:
@@ -685,35 +743,8 @@ class RadioAudio:
         self._stop_stream()
 
     def _update_smeter(self, raw: np.ndarray) -> None:
-        """FM-quieting S-meter: high-band noise inversely tracks signal strength,
-        auto-ranged between open-squelch noise (S0) and full quieting (S9). Fed the
-        raw, pre-gain RX so it reflects the signal, not the AF volume setting."""
-        y = self._sm_hp.process(raw).astype(np.float64)     # keep filter continuous
-        bb = float(np.sqrt(np.mean(raw.astype(np.float64) ** 2))) if raw.size else 0.0
-        if bb < SM_FLOOR_RMS:                    # dead/near-silent input is not "S9"
-            self.rx_s = round(self.rx_s * 0.7, 2)
-            return
-        rms = float(np.sqrt(np.mean(y ** 2)))
-        cur = 20.0 * np.log10(max(rms, 1.0) / 32768.0)      # high-band level, dBFS
-        # open-squelch noise reference (S0): snap up to any louder noise (that IS
-        # the no-signal level), drift down only very slowly. Quieting depth below
-        # it maps linearly to S0..S9 over SM_S9_SPAN_DB, saturating at full quieting.
-        if cur > self._sm_hi:
-            self._sm_hi = cur
-        else:
-            self._sm_hi = max(self._sm_hi - SM_HI_DECAY, SM_OPEN_DBFS - 12.0)
-        inst = 9.0 * (self._sm_hi - cur) / SM_S9_SPAN_DB
-        inst = min(9.0, max(0.0, inst))
-        # Sluggish needle for normal fluctuations, but snap down on carrier loss:
-        # when the high-band noise floor returns, inst collapses to ~S0 from a real
-        # reading -> drop fast; small dips (voice) keep the slow, inert release.
-        if inst > self.rx_s:
-            a = SM_ATTACK
-        elif inst < 0.7 and self.rx_s > 2.0:      # carrier lost -> back to noise
-            a = SM_DROP
-        else:
-            a = SM_RELEASE
-        self.rx_s = round(a * inst + (1.0 - a) * self.rx_s, 2)
+        """S-meter of the main card (see _QuietingMeter)."""
+        self.rx_s = self._sm.process(raw)
 
     # -- PortAudio callback (runs in PortAudio thread) ---------------------
     def _callback(self, indata, outdata, frames, time_info, status):
@@ -1352,6 +1383,8 @@ class RadioAudio:
                 "digi_rx": self.digi_rx, "digi_tx": self.digi_tx_busy(),
                 "dual": self.dual, "listen_device": self.listen_device, "data_gain": self.data_gain,
                 "listen_active": self.listen_active, "listen_error": self.listen_error,
+                "rx_s2": self.rx_s2 if self.listen_active else 0.0,
+                "listen_busy": bool(self.rx_busy),   # squelch of the listen band (dual)
                 "transport": "webrtc", "web_client": self.peers > 0}
 
 

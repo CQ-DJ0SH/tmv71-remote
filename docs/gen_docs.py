@@ -1294,9 +1294,15 @@ EN = [
         "squelches and de-emphasises this output, so the software squelch and "
         "de-emphasis stay out of it — greyed out in Settings while dual is on — "
         "and the callsign recognition drops its own de-emphasis for it.",
-        "MAIN CARD (data connector): APRS and digimode decoders, KISS TNC, "
-        "S-meter and all transmitting, as before. The S-meter therefore shows "
-        "the TNC's band.",
+        "MAIN CARD (data connector): APRS and digimode decoders, KISS TNC and "
+        "all transmitting, as before.",
+        "TWO S-METERS: the data band's S-meter is measured on the data jack "
+        "(flat 9600 output, noise above 6 kHz). The band you hear gets its own, "
+        "measured on the speaker jack in the 3.5–5.5 kHz band, where the radio "
+        "leaves some noise — an estimate that calibrates itself to the card and "
+        "attenuator. It and the AF bar only move while that band's squelch is "
+        "open, so traffic on the other band does not show on it even with SP2 "
+        "free.",
         "TWO GAINS: RX GAIN in the audio panel then sets only the listening "
         "level of the second card. A DATA GAIN slider appears beside it for "
         "the data-jack card into the decoders and the KISS TNC.",
@@ -2340,9 +2346,16 @@ DE = [
         "bleiben Software-Squelch und De-Emphasis dort aus — in den "
         "Einstellungen sind sie dann ausgegraut —, und die Rufzeichenerkennung "
         "lässt ihre eigene De-Emphasis weg.",
-        "HAUPTKARTE (Datenbuchse): APRS- und Digimode-Decoder, KISS-TNC, "
-        "S-Meter und alles Senden, wie bisher. Das S-Meter zeigt daher das "
-        "Band des TNC.",
+        "HAUPTKARTE (Datenbuchse): APRS- und Digimode-Decoder, KISS-TNC und "
+        "alles Senden, wie bisher.",
+        "ZWEI S-METER: Das S-Meter des Datenbands wird an der Datenbuchse "
+        "gemessen (ungefilterter 9600-Ausgang, Rauschen über 6 kHz). Das "
+        "gehörte Band bekommt ein eigenes, gemessen an der Lautsprecherbuchse "
+        "im Bereich 3,5–5,5 kHz, wo das Funkgerät noch etwas Rauschen übrig "
+        "lässt — eine Schätzung, die sich selbst auf Karte und Abschwächer "
+        "einstellt. Es und der AF-Balken bewegen sich nur bei offener "
+        "Rauschsperre dieses Bandes, Verkehr auf dem anderen Band erscheint "
+        "dort also auch bei freiem SP2 nicht.",
         "ZWEI PEGEL: RX GAIN im Audio-Panel regelt dann nur den Hörpegel der "
         "zweiten Karte. Daneben erscheint ein Regler DATA GAIN für die Karte "
         "an der Datenbuchse, also für Decoder und KISS-TNC.",

@@ -438,8 +438,14 @@ USB sound card on the speaker jack **SP1** (through an attenuator to line level)
   de-emphasis for it. While SP2
   is unused the radio bridges it to SP1, so SP1 carries both bands; with a plug in
   SP2 (a speaker, or just a dummy plug) the bands are split between the two jacks and SP1 carries one band only.
-- **Main card (data connector):** APRS / digimode decoders, KISS TNC, S-meter and
-  all transmitting, as before.
+- **Main card (data connector):** APRS / digimode decoders, KISS TNC and all
+  transmitting, as before.
+- **Two S-meters:** the data band's S-meter is measured on the data jack (flat
+  9600 output, noise above 6 kHz). The band you hear gets its own, measured on
+  the speaker jack in the 3.5–5.5 kHz band (the radio filters the higher noise
+  off there) — an estimate that calibrates itself to the card and attenuator.
+  It and the AF bar only move while that band's squelch is open, so traffic on
+  the other band does not show on it even with SP2 free.
 - **Two gains:** RX GAIN in the audio panel sets the listening level (second
   card); a DATA GAIN slider appears beside it for the data-jack card into the
   decoders and the KISS TNC.
