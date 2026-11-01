@@ -3141,3 +3141,7 @@ body.theme-light #hrf-level{--g-accent:#6b7a85} body.theme-light #hrf-level-v{co
 /* selcall CALL: antenna icon before the label (it keys the transmitter) */
 .sel-call{display:inline-flex; align-items:center; justify-content:center; gap:6px}
 .sel-call .sc-ico{width:15px; height:15px; flex:none; margin-top:-1px}
+/* selcall CALL: text and antenna white (frame stays in the panel accent); dark text in the light theme */
+.sel-call:not(.tx){color:#fff}
+body.theme-light .sel-call:not(.tx){color:var(--text)}
+@media (hover:hover){ .sel-call:not(.tx):not(:disabled):hover{color:#fff} body.theme-light .sel-call:not(.tx):not(:disabled):hover{color:var(--text)} }
