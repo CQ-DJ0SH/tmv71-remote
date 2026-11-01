@@ -3106,3 +3106,22 @@ body.theme-light #scan-clear{color:#9c2018}
 #digi-params-aprs .digi-rx-toggle{flex:0 0 auto}
 /* POCSAG: BAUD, RIC and FUNC framed in the panel accent (green) */
 #pocsag-baud, #pocsag-addr, #pocsag-func{border-color:var(--accent)}
+/* Audio panel: MIC TEST and AGC as buttons (like DECODE); the hidden checkbox
+   keeps the logic. AGC on = panel violet, MIC TEST on = red (it records the mic) */
+.audio .mictest-toggle, .audio .audio-agc{
+  position:relative; display:inline-flex; align-items:center; gap:0; cursor:pointer; user-select:none;
+  font-family:var(--font-mono); font-weight:700; font-size:11px; letter-spacing:.08em;
+  padding:6px 12px; border-radius:7px; transition:.15s;
+  color:var(--text-dim); background:var(--ctrl-bg); border:1px solid var(--sw-edge)}
+.audio .mictest-toggle > .switch, .audio .audio-agc > .switch{
+  position:absolute; inset:0; width:100%; height:100%; margin:0; opacity:0; cursor:pointer}
+.audio .audio-agc:has(> .switch:checked){
+  color:#140d2e; background:var(--accent); border-color:var(--accent); box-shadow:0 0 12px -3px var(--accent-glow)}
+.audio .mictest-toggle:has(> .switch:checked){
+  color:#fff; background:var(--tx); border-color:var(--tx); box-shadow:0 0 12px -3px var(--tx-glow)}
+.audio .mictest-toggle:has(> .switch:focus-visible), .audio .audio-agc:has(> .switch:focus-visible){
+  outline:2px solid var(--cyan); outline-offset:2px}
+@media (hover:hover){
+  .audio .mictest-toggle:not(:has(> .switch:checked)):hover{color:var(--tx); border-color:var(--tx)}
+  .audio .audio-agc:not(:has(> .switch:checked)):hover{color:var(--accent); border-color:var(--accent)}
+}
