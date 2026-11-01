@@ -3098,10 +3098,7 @@ function hrfFrame(m) {
   setHrfAxis(m);
   updateHrfCenterline(m);
   hrfStat(`${m.t === "pan" ? "PAN" : "SWEEP"} · ${hrfMhz(m.center)} MHz`);
-  if (m.t === "pan" && hrf.follow) {
-    const inp = $("#hrf-center-in");
-    if (inp && document.activeElement !== inp) inp.value = hrfMhz(m.center);
-  }
+  // Center / Range are painted by hrfFieldsPaint (via setHrfAxis above)
 }
 
 function applyHrfStatus(s) {
