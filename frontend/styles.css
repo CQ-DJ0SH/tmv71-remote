@@ -1388,7 +1388,7 @@ body.theme-light .screw::before{
 /* DEBUG is the twin of the DECODE switch beside it and carries the same classes,
    so the two read as one pair; only the left margin, which positions DECODE
    after the mode tabs, is not wanted at the start of a parameter row. */
-#digi-params-aprs .digi-rx-toggle{margin-left:0; margin-right:18px}
+#digi-params-aprs .digi-rx-toggle{margin-left:18px; margin-right:0}   /* DEBUG after the frame stats */
 .digi-params select{font-family:var(--font-mono); font-size:12px; color:var(--text);
   background:var(--field-bg); border:1px solid var(--edge); border-radius:7px; padding:6px 8px}
 .digi-params .acd{display:flex; align-items:center; gap:8px;
