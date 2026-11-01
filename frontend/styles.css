@@ -3014,3 +3014,6 @@ body.theme-light #asr-log-clear{color:#9c2018}
 /* QRZ LOOKUP framed like the collapse button; hover in the panel accent as before */
 .log-zone #log-lookup{color:var(--text); border-color:var(--sw-edge)}
 @media (hover:hover){ .log-zone #log-lookup:hover{color:var(--accent); border-color:var(--accent)} }
+/* CALLSIGN field: clearer placeholder and text, framed like the buttons beside it */
+.asr-manual::placeholder{color:var(--text); opacity:.8}
+.debug-zone .asr-manual{font-weight:600; border-color:var(--sw-edge)}
