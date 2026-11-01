@@ -3180,3 +3180,5 @@ body.theme-light .sel-call:not(.tx){color:var(--text)}
 .digi-zone #digi-send{height:35px; box-sizing:border-box; padding-top:0; padding-bottom:0}
 /* APRS stats: text vertically centred in its 30 px box (line-height = inner height) */
 #aprs-stat{line-height:28px; vertical-align:middle}
+/* APRS params no taller than the other modes' heads (30 px controls) */
+#digi-params-aprs{min-height:30px}
