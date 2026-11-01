@@ -3192,6 +3192,13 @@ body.theme-light .sel-call:not(.tx){color:var(--text)}
   .selcall-zone .panel-head .sel-digits{gap:3px}
   .selcall-zone .panel-head .sel-call-field, .selcall-zone .panel-head .sel-own-field{gap:7px}
   .selcall-zone .sel-tone-row .sel-label{min-width:0; width:auto}
+  /* a little narrower so TX CALL … MUTE fits one line on small phones */
+  .selcall-zone .panel-head .sel-own-field{margin-left:12px}
+  .selcall-zone .panel-head .sel-call-field, .selcall-zone .panel-head .sel-own-field{gap:5px}
+  .selcall-zone .panel-head .sel-d{width:24px}
+  .selcall-zone .panel-head .sel-call{min-width:0; padding-left:10px; padding-right:10px}
+  .selcall-zone .panel-head .sel-mute{min-width:0; padding-left:12px; padding-right:12px; margin-left:4px}
+  .selcall-zone .panel-head .sel-label{letter-spacing:.12em}
   /* Wavelog: no comment field on the phone */
   .log-zone .log-f-cmt{display:none}
 }
