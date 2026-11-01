@@ -3132,3 +3132,6 @@ body.theme-light #scan-clear{color:#9c2018}
   display:inline-flex; gap:6px; white-space:nowrap; letter-spacing:normal}
 /* HackRF: Panadapter / Sweep in the head beside OFF/ON, visible even when collapsed */
 .hackrf-zone .panel-head > .hrf-modes{margin-left:4px}
+/* room for the values with their unit ("439.425 MHz", "438.425–440.425 MHz") */
+#hrf-center-in{width:108px}
+#hrf-range-in{width:164px}

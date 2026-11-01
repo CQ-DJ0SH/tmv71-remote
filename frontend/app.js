@@ -3228,7 +3228,7 @@ function drawHrfSpectrum(db) {
 }
 function dprOf() { return window.devicePixelRatio || 1; }
 
-// Center and Range always show what is (or would be) on screen, numbers only:
+// Center and Range always show what is (or would be) on screen, with the unit:
 // from the last frame while running, else worked out from the radio frequency.
 // A field being edited is left alone.
 function hrfFieldsPaint() {
@@ -3244,14 +3244,14 @@ function hrfFieldsPaint() {
     c = hrf.follow ? cf : (hrf.center || cf);
     if (c) { lo = c - 1e6; hi = c + 1e6; }      // the panadapter shows about 2 MHz
   }
-  if (c) set(ci, hrfMhz(c));
-  if (lo && hi) set(ri, `${hrfMhz(lo)}–${hrfMhz(hi)}`);
+  if (c) set(ci, hrfMhz(c) + " MHz");
+  if (lo && hi) set(ri, `${hrfMhz(lo)}–${hrfMhz(hi)} MHz`);
   // axis under the graph: the same span, the unit on the right end (as "4 kHz"
   // under the audio spectrum) — filled even while the HackRF is off
   if (lo && hi && c) {
     const a = $("#hrf-f0"), b = $("#hrf-fc"), z = $("#hrf-f1");
-    if (a) a.textContent = hrfMhz(lo);
-    if (b) b.textContent = hrfMhz(c);
+    if (a) a.textContent = hrfMhz(lo) + " MHz";
+    if (b) b.textContent = hrfMhz(c) + " MHz";
     if (z) z.textContent = hrfMhz(hi) + " MHz";
   }
 }
