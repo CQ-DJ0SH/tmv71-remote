@@ -3207,3 +3207,9 @@ body.theme-light .sel-call:not(.tx){color:var(--text)}
   /* Wavelog: no comment field on the phone */
   .log-zone .log-f-cmt{display:none}
 }
+/* desktop: MY ID now comes before TX CALL - the auto margin moves with it */
+.sel-own-field{margin-left:auto}
+.sel-call-field{margin-left:26px}
+/* selcall MUTE: crossed-out speaker before the label */
+.sel-mute{display:inline-flex; align-items:center; justify-content:center; gap:6px}
+.sel-mute .sm-ico{width:15px; height:15px; flex:none}

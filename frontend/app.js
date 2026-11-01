@@ -3864,7 +3864,7 @@ function bindSelcall() {
     selcallMuted = on;
     const a = $("#rx-audio"); if (a) a.muted = on || permMuted || sqMuted || micTestActive;
     muteBtn.classList.toggle("armed", on);
-    muteBtn.textContent = on ? "MUTED" : "MUTE";
+    (muteBtn.querySelector(".sm-lbl") || muteBtn).textContent = on ? "MUTED" : "MUTE";
     if (on && $("#sel-rx") && !$("#sel-rx").checked) { $("#sel-rx").checked = true; post({ rx: true }); }
   };
   muteBtn?.addEventListener("click", () => setMute(!muted));

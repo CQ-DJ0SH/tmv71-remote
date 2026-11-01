@@ -464,6 +464,17 @@
           <option value="eea">EEA</option>
         </select>
       </label>
+      <div class="sel-own-field">
+        <span class="sel-label">MY ID</span>
+        <div class="sel-digits" id="sel-own" data-target="own">
+          <input class="sel-d" maxlength="1" inputmode="numeric" aria-label="own digit 1">
+          <input class="sel-d" maxlength="1" inputmode="numeric" aria-label="own digit 2">
+          <input class="sel-d" maxlength="1" inputmode="numeric" aria-label="own digit 3">
+          <input class="sel-d" maxlength="1" inputmode="numeric" aria-label="own digit 4">
+          <input class="sel-d" maxlength="1" inputmode="numeric" aria-label="own digit 5">
+        </div>
+        <button class="sel-mute" id="sel-mute" title="Mute RX until your ID code is received"><svg class="sm-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"></path><path d="m22 9-6 6"></path><path d="m16 9 6 6"></path></svg><span class="sm-lbl">MUTE</span></button>
+      </div>
       <div class="sel-call-field">
         <span class="sel-label">TX CALL</span>
         <div class="sel-digits" id="sel-code" data-target="code">
@@ -474,17 +485,6 @@
           <input class="sel-d" maxlength="1" inputmode="numeric" aria-label="digit 5">
         </div>
         <button class="sel-call" id="sel-call" title="Transmit the 5-tone call (keys PTT)"><svg class="sc-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21V11"></path><path d="M8.5 7.5a5 5 0 0 1 7 0"></path><path d="M5.5 4.5a9 9 0 0 1 13 0"></path><circle cx="12" cy="10" r="1.5"></circle></svg><span class="sc-lbl">CALL</span></button>
-      </div>
-      <div class="sel-own-field">
-        <span class="sel-label">MY ID</span>
-        <div class="sel-digits" id="sel-own" data-target="own">
-          <input class="sel-d" maxlength="1" inputmode="numeric" aria-label="own digit 1">
-          <input class="sel-d" maxlength="1" inputmode="numeric" aria-label="own digit 2">
-          <input class="sel-d" maxlength="1" inputmode="numeric" aria-label="own digit 3">
-          <input class="sel-d" maxlength="1" inputmode="numeric" aria-label="own digit 4">
-          <input class="sel-d" maxlength="1" inputmode="numeric" aria-label="own digit 5">
-        </div>
-        <button class="sel-mute" id="sel-mute" title="Mute RX until your ID code is received">MUTE</button>
       </div>
       <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="selcall-body" title="Show / hide selcall">▲</button>
     </div>
