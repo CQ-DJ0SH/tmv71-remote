@@ -2948,7 +2948,7 @@ body.theme-light .log-recent-list{
 /* Digi Modes sliders (WPM, PITCH, MARK) outlined in the panel accent colour */
 .digi-zone input[type=range]{box-shadow:0 0 0 2px var(--ctrl-bg), 0 0 0 3px var(--accent)}
 /* Selcall standard picker (STD) outlined in the panel accent colour */
-.selcall-zone .sel-std-field select{border-color:var(--sw-edge)}   /* as the collapse button */
+.selcall-zone .sel-std-field select{border-color:var(--accent)}   /* panel accent */
 /* settings sliders (de-emphasis, roger level, audio timing) outlined in their accent colour */
 #settings input[type=range]{box-shadow:0 0 0 2px var(--ctrl-bg), 0 0 0 3px var(--g-accent, var(--accent))}
 /* settings switches: on = the dialog accent (cyan, like its title and active tab) instead of TX red */
@@ -3028,3 +3028,5 @@ body.theme-light #asr-log-clear{color:#9c2018}
 #scan-clear{color:#b0342a; background:var(--ctrl-bg); border-color:var(--sw-edge)}
 body.theme-light #scan-clear{color:#9c2018}
 @media (hover:hover){ #scan-clear:hover{color:#ff3b30; border-color:#ff3b30} body.theme-light #scan-clear:hover{color:#d32f2f; border-color:#d32f2f} }
+/* DECODE now comes before STD: a little room between them */
+.selcall-zone .sel-std-field{margin-left:10px}
