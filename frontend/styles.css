@@ -2754,8 +2754,8 @@ body.disconnected .console{opacity:.5; filter:grayscale(.4); transition:.4s}
   color:var(--text); background:var(--field-bg); border:1px solid var(--sw-edge); border-radius:6px}
 .hrf-field input[type=text]:disabled{opacity:.45}
 .hrf-field input[type=range]{width:74px; --g-accent:var(--accent)}
-#hrf-level{--g-accent:#6fd89a}     /* level slider matches the green spectrum trace */
-#hrf-level-v{color:#6fd89a}        /* …and its value readout */
+#hrf-level{--g-accent:#9aa6ae}     /* display level: neutral grey (it only scales the picture) */
+#hrf-level-v{color:#9aa6ae}        /* …and its value readout */
 .hrf-gains{display:inline-flex; align-items:center; gap:13px; flex-wrap:nowrap}
 .hrf-gv{min-width:18px; color:var(--accent); font-weight:600}
 .hrf-amp input, .hrf-follow input{accent-color:var(--accent)}
@@ -3135,3 +3135,4 @@ body.theme-light #scan-clear{color:#9c2018}
 /* room for the values with their unit ("439.425 MHz", "438.425–440.425 MHz") */
 #hrf-center-in{width:108px}
 #hrf-range-in{width:164px}
+body.theme-light #hrf-level{--g-accent:#6b7a85} body.theme-light #hrf-level-v{color:#5a6976}
