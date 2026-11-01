@@ -3032,3 +3032,20 @@ body.theme-light #scan-clear{color:#9c2018}
 .selcall-zone .sel-std-field{margin-left:10px}
 /* DECODE now leads the head: a little room before the mode buttons */
 .digi-zone .panel-head > .digi-modes{margin-left:10px}
+/* DECODE in Selcall and Digimodes as a button like the HackRF OFF/ON: the label
+   is the button, the checkbox inside stays (hidden) and keeps all the logic */
+.selcall-zone .sel-rx-toggle, .digi-zone .panel-head > .digi-rx-toggle{
+  position:relative; gap:0; cursor:pointer; user-select:none;
+  font-family:var(--font-mono); font-weight:700; font-size:12px; letter-spacing:.08em;
+  padding:6px 15px; border-radius:7px; transition:.15s;
+  color:var(--text-dim); background:var(--ctrl-bg); border:1px solid var(--sw-edge)}
+.selcall-zone .sel-rx-toggle .switch, .digi-zone .panel-head > .digi-rx-toggle .switch{
+  position:absolute; inset:0; width:100%; height:100%; margin:0; opacity:0; cursor:pointer}
+.selcall-zone .sel-rx-toggle:has(.switch:checked), .digi-zone .panel-head > .digi-rx-toggle:has(.switch:checked){
+  color:#06220f; background:var(--accent); border-color:var(--accent); box-shadow:0 0 12px -3px var(--accent-glow)}
+.selcall-zone .sel-rx-toggle:has(.switch:focus-visible), .digi-zone .panel-head > .digi-rx-toggle:has(.switch:focus-visible){
+  outline:2px solid var(--cyan); outline-offset:2px}
+@media (hover:hover){
+  .selcall-zone .sel-rx-toggle:not(:has(.switch:checked)):hover,
+  .digi-zone .panel-head > .digi-rx-toggle:not(:has(.switch:checked)):hover{color:var(--accent); border-color:var(--accent)}
+}
