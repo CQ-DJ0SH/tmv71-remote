@@ -416,16 +416,16 @@
     <div class="panel-head" id="hrf-head">
       <h2>HACKRF WATERFALL</h2>
       <button class="hrf-power" id="hrf-power" type="button" aria-pressed="false" title="Start / stop the HackRF">OFF</button>
+      <div class="hrf-modes" role="group" aria-label="Waterfall mode">
+        <button class="hrf-m active" data-mode="pan" title="Live panadapter centred on the frequency (~2 MHz span)">Panadapter</button>
+        <button class="hrf-m" data-mode="sweep" title="Wideband sweep across a range">Sweep</button>
+      </div>
       <span class="panel-stat" id="hrf-stat"></span>
       <span class="hrf-ready" id="hrf-ready" hidden><span class="dot"></span>HackRF ready</span>
       <button class="panel-toggle" type="button" aria-expanded="false" aria-controls="hrf-body" title="Show / hide the HackRF waterfall">▲</button>
     </div>
     <div class="panel-body" id="hrf-body">
       <div class="hrf-ctrls">
-        <div class="hrf-modes" role="group" aria-label="Waterfall mode">
-          <button class="hrf-m active" data-mode="pan" title="Live panadapter centred on the frequency (~2 MHz span)">Panadapter</button>
-          <button class="hrf-m" data-mode="sweep" title="Wideband sweep across a range">Sweep</button>
-        </div>
         <label class="hrf-follow"><input type="checkbox" id="hrf-follow" checked> follow</label>
         <label class="hrf-follow" title="Peak hold — a slowly-decaying max line over the live trace"><input type="checkbox" id="hrf-peak" checked> PH</label>
         <label class="hrf-field hrf-pan-only">Center<input type="text" id="hrf-center-in" inputmode="decimal" placeholder="MHz" disabled></label>
