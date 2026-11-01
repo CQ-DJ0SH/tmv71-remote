@@ -3081,3 +3081,8 @@ body.theme-light #scan-clear{color:#9c2018}
 /* APRS: more room after the mode buttons; the stats get a fixed width (counts grow,
    "1 station"/"12 stations") so DEBUG behind them no longer moves */
 #aprs-stat{display:inline-block; margin-left:24px; min-width:52ch; white-space:nowrap; font-variant-numeric:tabular-nums}
+/* APRS stats framed, with a STATS caption in front (a pseudo-element, so the
+   text the decoder writes into the span leaves it alone) */
+#aprs-stat{padding:4px 10px; border:1px solid var(--sw-edge); border-radius:7px; background:var(--ctrl-bg)}
+#aprs-stat::before{content:"STATS"; margin-right:10px; font-family:var(--font-ui); font-size:10px;
+  font-weight:600; letter-spacing:.16em; color:var(--text-dim)}
