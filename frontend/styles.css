@@ -3125,3 +3125,8 @@ body.theme-light #scan-clear{color:#9c2018}
   .audio .mictest-toggle:not(:has(> .switch:checked)):hover{color:var(--tx); border-color:var(--tx)}
   .audio .audio-agc:not(:has(> .switch:checked)):hover{color:var(--accent); border-color:var(--accent)}
 }
+/* MIC TEST REC / PLAYBACK badges hang off the end of the centred title, out of
+   the layout flow, so the title no longer moves when they appear */
+.audio-head .audio-title{position:relative}
+.mt-badges{position:absolute; left:100%; top:50%; transform:translateY(-50%); margin-left:12px;
+  display:inline-flex; gap:6px; white-space:nowrap; letter-spacing:normal}
