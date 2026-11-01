@@ -2967,3 +2967,9 @@ body.theme-light .dual-note{color:#0c7b71}
 .sql-row .sql-label{width:auto; margin-right:-3px}
 /* SQL slider a little longer (shuttle keeps the larger share) */
 .sql-row .sql-slider{flex-grow:1.3}
+/* level sliders (SQL, RX/DATA/TX gain, roger level, HackRF LNA/VGA/LEVEL, USB mixer):
+   a fader knob - upright rectangle with rounded corners instead of the round dot */
+#band-0 .sql-slider::-webkit-slider-thumb, #band-1 .sql-slider::-webkit-slider-thumb, #rx-gain::-webkit-slider-thumb, #data-gain::-webkit-slider-thumb, #tx-gain::-webkit-slider-thumb, #roger-level::-webkit-slider-thumb, #hrf-lna::-webkit-slider-thumb, #hrf-vga::-webkit-slider-thumb, #hrf-level::-webkit-slider-thumb, .mixer-row .mx-slider::-webkit-slider-thumb{
+  width:10px; height:18px; border-radius:3px}
+#band-0 .sql-slider::-moz-range-thumb, #band-1 .sql-slider::-moz-range-thumb, #rx-gain::-moz-range-thumb, #data-gain::-moz-range-thumb, #tx-gain::-moz-range-thumb, #roger-level::-moz-range-thumb, #hrf-lna::-moz-range-thumb, #hrf-vga::-moz-range-thumb, #hrf-level::-moz-range-thumb, .mixer-row .mx-slider::-moz-range-thumb{
+  width:10px; height:18px; border-radius:3px}
