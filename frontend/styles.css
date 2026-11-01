@@ -3147,3 +3147,6 @@ body.theme-light .sel-call:not(.tx){color:var(--text)}
 @media (hover:hover){ .sel-call:not(.tx):not(:disabled):hover{color:#fff} body.theme-light .sel-call:not(.tx):not(:disabled):hover{color:var(--text)} }
 /* selcall CALL: the antenna red (it keys the transmitter), the text stays white */
 .sel-call:not(.tx) .sc-ico{color:var(--tx)}
+/* selcall CALL: text grey like the other buttons (antenna stays red) */
+.sel-call:not(.tx), body.theme-light .sel-call:not(.tx){color:var(--text-dim)}
+@media (hover:hover){ .sel-call:not(.tx):not(:disabled):hover, body.theme-light .sel-call:not(.tx):not(:disabled):hover{color:var(--text)} }
