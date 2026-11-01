@@ -3076,3 +3076,5 @@ body.theme-light #scan-clear{color:#9c2018}
 @media (hover:hover){
   .digi-zone label:has(> .switch):not(:has(> .switch:checked)):hover{color:var(--accent); border-color:var(--accent)}
 }
+/* APRS frame stats brighter while DECODE is on */
+.digi-zone:has(#digi-rx:checked) #aprs-stat{color:var(--text)}
