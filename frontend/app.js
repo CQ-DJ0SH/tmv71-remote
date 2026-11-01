@@ -3741,6 +3741,9 @@ function reflectDigiPitch(p) {
 
 // APRS counters in the panel head — from the initial status and from every
 // "aprsstat" push while traffic runs
+// painted once at load with zeros: the fixed fields are in place before the
+// first counters arrive and while DECODE is off
+setTimeout(() => aprsStatPaint({ frames: 0, damaged: 0, stations: 0, noise: 0 }), 0);
 function aprsStatPaint(a) {
   const el = $("#aprs-stat");
   if (!el || !a) return;
@@ -3749,9 +3752,9 @@ function aprsStatPaint(a) {
   // each count in a right-aligned field of fixed width, so the words between
   // them stay put while the numbers grow (counts are numbers, never markup)
   const num = (v, w) => `<b class="as-n" style="--w:${w}">${Number(v) || 0}</b>`;
-  el.innerHTML = `${num(a.frames, 5)} frames · ${num(a.damaged, 3)} damaged · `
-    + `${num(a.stations, 3)} <span class="as-w">${a.stations === 1 ? "station" : "stations"}</span>`
-    + ` · ${num(a.noise, 5)}× noise`;
+  el.innerHTML = `${num(a.frames, 4)} frames · ${num(a.damaged, 3)} damaged · `
+    + `${num(a.stations, 2)} <span class="as-w">${a.stations === 1 ? "station" : "stations"}</span>`
+    + ` · ${num(a.noise, 4)}× noise`;
 }
 
 function connectDigiWS(decode) {

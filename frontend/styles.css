@@ -3093,3 +3093,14 @@ body.theme-light #scan-clear{color:#9c2018}
 #aprs-stat .as-n{display:inline-block; min-width:calc(var(--w) * 1ch); text-align:right; font-weight:inherit}
 #aprs-stat .as-w{display:inline-block; min-width:8ch}
 #aprs-stat{width:auto}
+/* APRS row on one line: tighter stats (smaller type, less padding and gaps) */
+#aprs-stat{font-size:11px; margin-left:14px; padding:4px 8px}
+#aprs-stat::before{margin-right:7px}
+#digi-params-aprs .digi-rx-toggle{margin-left:10px}
+#digi-params-aprs{flex-wrap:nowrap}
+/* APRS mode: the head stays on one line; if room runs short the stats box gives
+   way (clipped at its end) instead of DEBUG dropping to a second line */
+.digi-zone .panel-head:has(#digi-params-aprs:not([hidden])){flex-wrap:nowrap}
+#digi-params-aprs:not([hidden]){flex:1 1 auto; min-width:0}
+#aprs-stat{flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis}
+#digi-params-aprs .digi-rx-toggle{flex:0 0 auto}
