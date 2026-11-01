@@ -950,6 +950,13 @@ EN = [
           "bandwidth. The digit tuner lets you click bars above/below each digit "
           "to step the frequency; AIR Band tunes band A to the 118–137 MHz air "
           "band (receive-only)."),
+    ("p", "Under the meters sits the SQL slider with its value, and beside it "
+          "the frequency shuttle (as in FT-950 Remote): hold it left of the "
+          "centre to tune down, right to tune up — the further out, the bigger "
+          "the step: the band's channel step, 100 kHz, 1 MHz. The display "
+          "follows at once; the radio always gets the newest frequency, one "
+          "request at a time. Like the digit tuner it sets the VFO frequency. "
+          "Slider and shuttle are outlined in the band's colour."),
     ("p", "The S-meter is derived from FM quieting: the high-band noise on the flat "
           "RX is inverse to signal strength (loud hiss = no signal, full quieting = "
           "strong signal), so it estimates the received signal even though the "
@@ -1969,6 +1976,14 @@ DE = [
           "Bandbreite. Über die Ziffern-Abstimmung lässt sich jede Stelle per "
           "Klick auf die Balken hoch/runter stellen; AIR Band stellt Band A auf "
           "das Flugfunkband 118–137 MHz (nur Empfang)."),
+    ("p", "Unter den Anzeigen liegt der SQL-Regler mit seinem Wert, daneben der "
+          "Frequenz-Shuttle (wie in FT-950 Remote): links der Mitte gedrückt "
+          "halten stimmt nach unten ab, rechts nach oben — je weiter außen, "
+          "desto größer der Schritt: Kanalschritt des Bandes, 100 kHz, 1 MHz. "
+          "Die Anzeige läuft sofort mit; das Funkgerät bekommt immer die "
+          "neueste Frequenz, eine Anfrage nach der anderen. Wie die "
+          "Ziffern-Abstimmung setzt er die VFO-Frequenz. Regler und Shuttle "
+          "sind in der Farbe des Bandes umrandet."),
     ("p", "Das S-Meter wird aus dem FM-Quieting abgeleitet: Das Rauschen im oberen "
           "Frequenzband des flachen RX-Signals ist umgekehrt proportional zur "
           "Signalstärke (lautes Rauschen = kein Signal, volle Rauschunterdrückung = "

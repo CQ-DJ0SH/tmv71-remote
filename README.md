@@ -25,7 +25,9 @@ Pi, so it follows you to every browser).*
 
 - **Full live control** — both bands (A/B): frequency, VFO/memory mode, repeater
   shift & offset, CTCSS/DCS tone, step, control-band selection, and **PTT over
-  CAT** (no separate PTT line).
+  CAT** (no separate PTT line). Beside each band's SQL slider a **frequency
+  shuttle** (as in FT-950 Remote): hold left/right of the centre to tune down/up,
+  the further out the bigger the step (channel step · 100 kHz · 1 MHz).
 - **Memory channels (CHIRP-level)** — read, write, delete and rename any of the
   1000 channels, plus CSV import/export.
 - **Live status** — frequency, mode, tone, squelch/busy push to the browser over
