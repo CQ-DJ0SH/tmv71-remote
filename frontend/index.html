@@ -660,6 +660,7 @@
               title="Click a card, then mark it as moderator">MOD</button>
       <button class="scan-clear" id="asr-stats" type="button" title="Talk-time evaluation — every station ranked">STATS</button>
       <button class="scan-clear" id="asr-profiles" type="button" title="Show the learned voice profiles, and discard them one by one">PROFILES</button>
+      <button class="scan-clear" id="asr-jammer" type="button" title="The over in progress, or the one that just ended, was a jammer: learn that voice (profile JAMMER). With Auto-DROP on (Settings ▸ Voice ID) a jammer's over is then muted after about 3 s of speech.">JAMMER</button>
       <span class="asr-total" id="asr-total" title="Sum of the talk timers in this panel — stations marked as moderator (M) excluded">Σ 00:00:00</span>
       <button class="scan-clear" id="asr-log-clear" type="button" title="Remove every contact card">CLEAR ALL</button>
       <button class="scan-clear" id="asr-assign" type="button" aria-pressed="false"
@@ -961,6 +962,12 @@
           </select>
         </label>
         <p class="pane-hint">Attributes an over with <em>no</em> spoken callsign to a station whose voice has been heard with one before. Enrolment costs nothing: every recognised call labels its own audio. An over ends at the <em>pause in speech</em>, not at the carrier — through a repeater BUSY stays up for the whole round. Measured on two recordings of the same round: same station 0.62–0.79 cosine, strangers 0.33 on average; at a threshold of 0.55 with a 0.10 margin, 3 of 4 identified, none wrongly, and none of the 7 unknown stations mistaken for a known one. Below ~3 s of speech nothing is guessed at. "Observe" decides and reports only; "assign" moves the mark and the talk timer — a card picked <em>by hand</em> always wins. The voice profiles stay on the Pi (<span id="spk-profiles">0</span> stored) and are dropped with their card; PROFILES in the ASR panel lists them and discards them one by one.</p>
+        <label class="switch-label">
+          <input type="checkbox" id="set-jam-drop" class="switch">
+          <span>Auto-DROP on jammers</span>
+        </label>
+        <div class="audio-ctl"><label class="acg" title="How close a voice must come to a jammer profile before its over is muted. Higher = fewer wrong drops, but a jammer slips through more often.">THRESHOLD<input type="range" id="jam-threshold" min="0.55" max="0.90" step="0.01" value="0.65" style="--def-pct:28.6%"><span class="gv" id="jam-threshold-val">0.65</span></label></div>
+        <p class="pane-hint">Mutes the web audio for the over of a voice flagged as a jammer — the same DROP as the button in the PTT panel, released at the next pause. Teach it with JAMMER in the ASR panel while (or right after) the jammer speaks, or flag any profile under PROFILES. The over is checked at about 3 s and 6 s of speech, so the first seconds are always heard. The jammer must beat every regular profile by the margin, so a station with a similar voice is not dropped lightly — but on 3 s of speech a wrong hit can happen. Speech only: carriers, music or tones are not recognised. Only the web audio is muted; the radio, the recorder and the recognition keep listening. Needs Voice ID on.</p>
 
       </div>
       <div class="mixer-field">

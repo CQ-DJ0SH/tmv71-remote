@@ -698,6 +698,8 @@ API_DIGI = (
     "POST /api/asr/log           add a callsign by hand\n"
     "PATCH /api/asr/log/{call}   correct a callsign (profile follows)\n"
     "GET/POST /api/asr/speaker   voice ID: on/off, stage, limits\n"
+    "POST /api/asr/jammer        learn the current/last over as JAMMER\n"
+    "POST /api/asr/speaker/{call}/jammer  flag a voice as jammer\n"
     "DELETE /api/asr/log         empty the contact log (CLEAR ALL)\n"
     "DELETE /api/asr/log/{call}  drop a misrecognised contact\n"
     "WS   /ws/callsign           recognised-callsign events\n"
@@ -1590,6 +1592,24 @@ EN = [
         "a guess.",
         "It needs the callsign recognition switched on (it listens to the same "
         "audio tap), and it costs about 1.3 s of one core per over, afterwards.",
+    ]),
+    ("h3", "Auto-DROP on jammers"),
+    ("p", "A voice can be flagged as a jammer; while it speaks, the web audio is "
+          "muted with the same DROP as the button in the PTT panel, released at "
+          "the next pause. Teach it with JAMMER in the ASR panel while the jammer "
+          "speaks or right after (it learns the profile JAMMER), or flag any "
+          "learned voice with JAM under PROFILES. Switched on in Settings > "
+          "Audio > Voice ID > Auto-DROP on jammers."),
+    ("ul", [
+        "The over is checked while it runs, at about 3 s and 6 s of speech, on "
+        "the last 4 s: the first seconds are always heard.",
+        "Stricter than the identification: the jammer must reach its own "
+        "threshold (default 0.65) AND beat every regular profile by the margin, "
+        "so a station with a similar voice keeps its audio. On 3 s of speech a "
+        "wrong hit is still possible.",
+        "Speech only — carriers, music or tones are not recognised. Only the web "
+        "audio is muted; the radio, the recorder and the recognition keep "
+        "listening. Needs Voice ID on.",
     ]),
     ("h3", "Which callsign may become a profile"),
     ("p", "The first version of this learned from any over that carried exactly "
@@ -2679,6 +2699,25 @@ DE = [
         "Sie setzt die eingeschaltete Rufzeichenerkennung voraus (sie hört am "
         "selben Audio-Abgriff mit) und kostet je Durchgang etwa 1,3 s auf einem "
         "Kern, im Anschluss.",
+    ]),
+    ("h3", "Auto-DROP bei Störern"),
+    ("p", "Eine Stimme lässt sich als Störer markieren; spricht sie, wird das "
+          "Web-Audio mit demselben DROP stummgeschaltet wie mit dem Knopf im "
+          "PTT-Panel und in der nächsten Pause wieder freigegeben. Gelernt wird "
+          "mit JAMMER im ASR-Panel, während der Störer spricht oder gleich "
+          "danach (Profil JAMMER), oder man markiert eine gelernte Stimme unter "
+          "PROFILES mit JAM. Eingeschaltet wird es in Einstellungen > Audio > "
+          "Voice ID > Auto-DROP on jammers."),
+    ("ul", [
+        "Geprüft wird während des Durchgangs, bei etwa 3 s und 6 s Sprache, "
+        "jeweils auf den letzten 4 s: Die ersten Sekunden sind immer zu hören.",
+        "Strenger als die Zuordnung: Der Störer muss seine eigene Schwelle "
+        "erreichen (Standard 0,65) UND jedes reguläre Profil um den Abstand "
+        "schlagen, damit eine Station mit ähnlicher Stimme ihr Audio behält. "
+        "Auf 3 s Sprache ist ein Fehltreffer trotzdem möglich.",
+        "Nur Sprache — Träger, Musik oder Töne werden nicht erkannt. Nur das "
+        "Web-Audio wird stummgeschaltet; Funkgerät, Recorder und Erkennung "
+        "hören weiter mit. Setzt eingeschaltete Voice ID voraus.",
     ]),
     ("h3", "Welches Rufzeichen ein Profil werden darf"),
     ("p", "Die erste Fassung lernte aus jedem Durchgang, in dem genau ein "

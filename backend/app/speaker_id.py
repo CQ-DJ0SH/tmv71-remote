@@ -51,6 +51,9 @@ MAX_SEG_S = 30.0          # cap the buffer; nobody needs 30 s to be recognised
 # Profiles keep adapting, but an old profile must not be swamped by one noisy
 # over: the running mean is weighted, and the weight stops growing at 20 overs.
 MAX_WEIGHT = 20
+# The profile a "this was a jammer" press files a voice under. Any profile can
+# carry the jammer flag (a known station too); this one is born with it.
+JAMMER = "JAMMER"
 
 
 class SpeakerBook:
@@ -149,7 +152,10 @@ class SpeakerBook:
             n = int(cur.get("n", 1)) + 1
         else:
             mean, n = v, 1
+        jam = bool(cur.get("jammer")) if cur else call == JAMMER
         self._prof[call] = {"v": mean.tolist(), "n": n, "ts": int(time.time())}
+        if jam:
+            self._prof[call]["jammer"] = True
         self._save()
         return n
 
@@ -174,6 +180,46 @@ class SpeakerBook:
         out["accept"] = bool(out["score"] >= threshold and out["margin"] >= margin)
         return out
 
+    def set_jammer(self, call: str, on: bool) -> bool:
+        """Flag (or clear) a profile as a jammer: auto-DROP listens for it."""
+        p = self._prof.get((call or "").upper())
+        if p is None:
+            return False
+        if on:
+            p["jammer"] = True
+        else:
+            p.pop("jammer", None)
+        self._save()
+        return True
+
+    def has_jammers(self) -> bool:
+        return any(p.get("jammer") for p in self._prof.values())
+
+    def match_jammer(self, vec: list, threshold: float, margin: float) -> dict:
+        """Is this (partial) over a flagged jammer? Stricter than match(): the
+        jammer must be the best profile overall, at or above its own threshold,
+        and clear of the best NON-jammer profile by the margin — a regular
+        station that sounds alike must win the tie, not lose its audio."""
+        out = {"call": "", "score": 0.0, "other": "", "other_score": 0.0, "hit": False}
+        if not vec:
+            return out
+        v = self._unit(vec)
+        jam, oth = [], []
+        for c, p in self._prof.items():
+            sc = float(np.dot(v, self._unit(p["v"])))
+            (jam if p.get("jammer") else oth).append((sc, c))
+        if not jam:
+            return out
+        js, jc = max(jam)
+        out["call"], out["score"] = jc, round(js, 3)
+        if oth:
+            os_, oc = max(oth)
+            out["other"], out["other_score"] = oc, round(os_, 3)
+        else:
+            os_ = 0.0
+        out["hit"] = bool(js >= threshold and js - os_ >= margin)
+        return out
+
     def rename(self, old: str, new: str) -> bool:
         """Follow a corrected callsign. Without this a mis-heard call would keep
         a voice profile under a name that never existed — and the real station
@@ -187,8 +233,11 @@ class SpeakerBook:
             n = min(int(cur.get("n", 1)), MAX_WEIGHT)
             m = min(int(p.get("n", 1)), MAX_WEIGHT)
             mean = self._unit(np.asarray(cur["v"]) * n + np.asarray(p["v"]) * m)
+            jam = bool(cur.get("jammer") or p.get("jammer"))
             p = {"v": mean.tolist(), "n": int(cur.get("n", 1)) + int(p.get("n", 1)),
                  "ts": int(time.time())}
+            if jam:
+                p["jammer"] = True
         self._prof[new] = p
         self._save()
         return True
@@ -201,4 +250,5 @@ class SpeakerBook:
 
     def stats(self) -> dict:
         return {"profiles": len(self._prof),
-                "calls": sorted((c, int(p.get("n", 1))) for c, p in self._prof.items())}
+                "calls": sorted((c, int(p.get("n", 1))) for c, p in self._prof.items()),
+                "jammers": sorted(c for c, p in self._prof.items() if p.get("jammer"))}

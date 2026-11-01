@@ -70,7 +70,8 @@ from .models import (AsrManualRequest, AudioDeviceRequest, AudioDualRequest, Aud
                      SquelchRequest, StepRequest, VfoUpdate, WebRTCOffer,
                      HackRFConfig,
                      LogConfigRequest, LogLookupRequest, LogQsoRequest,
-                     LogDeleteRequest, AsrRenameRequest, AsrSpeakerRequest)
+                     LogDeleteRequest, AsrRenameRequest, AsrSpeakerRequest,
+                     AsrJammerFlagRequest)
 from . import aprs
 from . import kiss
 from . import mixer
@@ -672,6 +673,10 @@ class CallsignService:
                           # why a labelled over was still not learned from
                           "brief": 0, "early": 0, "void": 0, "order": 0}
         self._spk_last = None         # (ts, vector) of the last unlabelled over
+        # auto-DROP on a jammer: checks while the over is still running
+        self._jam_i = 0               # next entry of JAM_CHECK_S to run
+        self._jam_busy = False        # an embedding for the check is under way
+        self._jam_hit = False         # this over already dropped
 
     def _model_dir(self) -> str:
         if settings.asr_model_dir:
@@ -701,6 +706,8 @@ class CallsignService:
                 "act": bool(settings.spk_act),
                 "threshold": settings.spk_threshold,
                 "margin": settings.spk_margin,
+                "jam_drop": bool(settings.jam_drop),
+                "jam_threshold": settings.jam_threshold,
                 **self._spk.stats()}
 
     def mark_manual(self, call: str) -> dict:
@@ -739,6 +746,45 @@ class CallsignService:
     # how long after an over a hand-picked card still counts as its label
     MANUAL_BACK_S = 12.0
 
+    def spk_set_jammer(self, call: str, on: bool) -> dict:
+        ok = self._spk.set_jammer(call, on)
+        self._broadcast({"t": "status", **self.status()})
+        return {"changed": bool(ok), **self.spk_status()}
+
+    # --- auto-DROP on a jammer ------------------------------------------------
+    # An x-vector needs a few seconds of speech, so the over is checked twice
+    # while it runs — at 3 s and at 6 s of speech, on the last ~4 s collected.
+    # A check costs one embedding (~1 s on a Pi 4), so it is not run more often.
+    JAM_CHECK_S = (3.0, 6.0)
+    JAM_WINDOW_S = 4.0
+
+    def _jam_tick(self) -> None:
+        if (self._jam_hit or self._jam_busy or self._jam_i >= len(self.JAM_CHECK_S)
+                or not settings.jam_drop or not settings.spk_enabled
+                or self._seg_speech < self.JAM_CHECK_S[self._jam_i]
+                or not self._spk.has_jammers()):
+            return
+        self._jam_i += 1
+        n = int(self.JAM_WINDOW_S / self.FRAME_S)
+        pcm = np.concatenate([b for b in self._seg[-n:] if len(b)])
+        self._jam_busy = True
+        asyncio.create_task(self._jam_job(pcm, self._seg_t0))
+
+    async def _jam_job(self, pcm, t0: float) -> None:
+        try:
+            vec = await asyncio.to_thread(self._spk.embed, pcm)
+            if vec is None:
+                return
+            m = self._spk.match_jammer(vec, settings.jam_threshold, settings.spk_margin)
+            self._seg_stat["jamcheck"] = self._seg_stat.get("jamcheck", 0) + 1
+            # the over may have ended meanwhile; a hit then belongs to no one
+            if m["hit"] and self._seg and self._seg_t0 == t0 and not self._jam_hit:
+                self._jam_hit = True
+                self._seg_stat["jamdrop"] = self._seg_stat.get("jamdrop", 0) + 1
+                self._broadcast({"t": "asrvoice", "event": "jam", **m})
+        finally:
+            self._jam_busy = False
+
     def spk_forget(self, call: str) -> dict:
         """Drop one voice profile — for a station whose profile went bad (an
         over with two voices in it, a mis-heard call enrolled under it)."""
@@ -748,7 +794,12 @@ class CallsignService:
         return {"removed": bool(ok), **self.spk_status()}
 
     def spk_config(self, enabled=None, act=None, threshold=None,
-                   margin=None) -> dict:
+                   margin=None, jam_drop=None, jam_threshold=None) -> dict:
+        if jam_drop is not None:
+            settings.jam_drop = bool(jam_drop)
+        if jam_threshold is not None:
+            settings.jam_threshold = float(jam_threshold)
+        save_runtime(jam_drop=settings.jam_drop, jam_threshold=settings.jam_threshold)
         if enabled is not None:
             settings.spk_enabled = bool(enabled)
         if act is not None:
@@ -1129,6 +1180,7 @@ class CallsignService:
         if speech:
             if not self._seg:
                 self._seg_t0 = time.monotonic()
+                self._jam_i, self._jam_hit = 0, False
                 # a new over has started: the panel uses this to release a manual
                 # card selection, which only ever overrides the over it was made in
                 self._broadcast({"t": "asrvoice", "event": "start"})
@@ -1136,6 +1188,7 @@ class CallsignService:
                 self._seg.append(np.asarray(frame).copy())
             self._seg_speech += dt
             self._seg_quiet = 0.0
+            self._jam_tick()
             return
         if not self._seg:
             return
@@ -1197,6 +1250,7 @@ class CallsignService:
         """The over ended (pause long enough, or the carrier dropped)."""
         buf, speech, t0 = self._seg, self._seg_speech, self._seg_t0
         self._seg, self._seg_speech, self._seg_quiet = [], 0.0, 0.0
+        self._jam_i, self._jam_hit = 0, False
         # Below ~3 s of speech the x-vector is not worth trusting (measured:
         # d' 2.2 on 1.5–3 s pieces against 3.8 on whole overs), so a short
         # over is dropped rather than guessed at.
@@ -2640,7 +2694,21 @@ async def asr_speaker() -> dict:
 
 @app.post("/api/asr/speaker")
 async def asr_speaker_set(req: AsrSpeakerRequest) -> dict:
-    return callsign_svc.spk_config(req.enabled, req.act, req.threshold, req.margin)
+    return callsign_svc.spk_config(req.enabled, req.act, req.threshold, req.margin,
+                                   req.jam_drop, req.jam_threshold)
+
+
+@app.post("/api/asr/jammer")
+async def asr_jammer() -> dict:
+    """The over in progress (or the one just ended) was a jammer: learn its
+    voice under the JAMMER profile, which auto-DROP listens for."""
+    return callsign_svc.mark_manual(speaker_id.JAMMER)
+
+
+@app.post("/api/asr/speaker/{call}/jammer")
+async def asr_speaker_jammer(call: str, req: AsrJammerFlagRequest) -> dict:
+    """Flag or clear one voice profile as a jammer."""
+    return callsign_svc.spk_set_jammer(call, req.on)
 
 
 @app.delete("/api/asr/log/{call}")

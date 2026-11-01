@@ -151,6 +151,9 @@ class Settings(BaseSettings):
     spk_act: bool = False
     spk_threshold: float = 0.55
     spk_margin: float = 0.10
+    # auto-DROP: a profile flagged as a jammer mutes the web audio for its over
+    jam_drop: bool = False
+    jam_threshold: float = 0.65    # stricter than spk_threshold: a wrong hit mutes a station
 
     # Maidenhead locator of this station (Settings > General). Used as the
     # position of the APRS beacon; 6 characters or more, or the square is
@@ -214,7 +217,8 @@ _RUNTIME_KEYS = ("serial_port", "serial_baud", "gpio_power_pin",
                  "qrz_api_key", "qrz_username", "qrz_password",
                  "selcall_own", "selcall_code",
                  "boot_mem_a", "boot_mem_b", "boot_control_band",
-                 "spk_enabled", "spk_act", "spk_threshold", "spk_margin")
+                 "spk_enabled", "spk_act", "spk_threshold", "spk_margin",
+                 "jam_drop", "jam_threshold")
 
 
 def _load_runtime() -> dict:

@@ -4552,6 +4552,19 @@ function spkListPaint(k) {
       const c = document.createElement("b"); c.textContent = callDisp(call);
       const o = document.createElement("span");
       o.textContent = n === 1 ? "1 over" : n + " overs";
+      // jammer flag: auto-DROP listens for the flagged voices
+      const isJam = (k.jammers || []).includes(call);
+      row.classList.toggle("spk-jammer", isJam);
+      const j = document.createElement("button");
+      j.type = "button"; j.className = "spk-jam" + (isJam ? " on" : ""); j.textContent = "JAM";
+      j.setAttribute("aria-pressed", String(isJam));
+      j.title = isJam ? "Flagged as a jammer — click to clear" : "Flag this voice as a jammer (auto-DROP)";
+      j.addEventListener("click", async () => {
+        j.disabled = true;
+        try { reflectSpk(await api("POST", "/api/asr/speaker/"
+                                   + encodeURIComponent(call) + "/jammer", { on: !isJam })); }
+        catch (err) { j.disabled = false; toast("Jammer flag: " + err.message, "err"); }
+      });
       const x = document.createElement("button");
       x.type = "button"; x.className = "spk-x"; x.textContent = "✕";
       x.title = "Discard the voice profile of " + call;
@@ -4561,7 +4574,7 @@ function spkListPaint(k) {
                                    + encodeURIComponent(call))); }
         catch (err) { x.disabled = false; toast("Voice profile: " + err.message, "err"); }
       });
-      row.append(c, o, x);
+      row.append(c, o, j, x);
       box.appendChild(row);
     }
     if (!(k.calls || []).length) {
@@ -4588,6 +4601,12 @@ function spkListPaint(k) {
 }
 
 function reflectSpk(k) {
+  const jd = $("#set-jam-drop");
+  if (jd) { jd.checked = !!k.jam_drop; jd.disabled = !k.available; }
+  const jt = $("#jam-threshold");
+  if (jt && k.jam_threshold != null && document.activeElement !== jt) {
+    jt.value = k.jam_threshold; jamThrUi(k.jam_threshold);
+  }
   const sel = $("#set-spk-mode");
   if (sel) {
     sel.value = !k.enabled ? "off" : (k.act ? "act" : "observe");
@@ -4650,6 +4669,32 @@ function spkDlgClose() {
   document.removeEventListener("keydown", spkKey);
 }
 $("#asr-profiles")?.addEventListener("click", spkDlgOpen);
+// JAMMER: label the over in progress (or the one just ended) as a jammer
+$("#asr-jammer")?.addEventListener("click", async () => {
+  try {
+    const r = await api("POST", "/api/asr/jammer");
+    toast(r.learned === "current" ? "This over is learned as a jammer when it ends"
+        : r.learned === "previous" ? `Last over learned as a jammer (${r.n} over${r.n === 1 ? "" : "s"})`
+        : "Nothing to learn — Voice ID off, or no over in the last 12 s", r.learned ? "ok" : "err");
+  } catch (err) { toast("Jammer: " + err.message, "err"); }
+});
+function jamThrUi(v) {
+  const el = $("#jam-threshold-val"); if (el) el.textContent = Number(v).toFixed(2);
+  const sl = $("#jam-threshold");
+  if (sl) sl.style.setProperty("--gpct", ((v - sl.min) / (sl.max - sl.min) * 100) + "%");
+}
+$("#set-jam-drop")?.addEventListener("change", async e => {
+  const on = e.target.checked;
+  try {
+    reflectAsr(await api("POST", "/api/asr/speaker", on ? { enabled: true, jam_drop: true } : { jam_drop: false }));
+    toast(on ? "Auto-DROP on jammers on" : "Auto-DROP on jammers off", on ? "ok" : "");
+  } catch (err) { e.target.checked = !on; toast("Auto-DROP: " + err.message, "err"); }
+});
+$("#jam-threshold")?.addEventListener("input", e => jamThrUi(e.target.value));
+$("#jam-threshold")?.addEventListener("change", async e => {
+  try { reflectAsr(await api("POST", "/api/asr/speaker", { jam_threshold: Number(e.target.value) })); }
+  catch (err) { toast("Jammer threshold: " + err.message, "err"); }
+});
 $("#asr-spk-close")?.addEventListener("click", spkDlgClose);
 $("#asr-spk-dlg")?.addEventListener("mousedown", ev => {
   if (ev.target.id === "asr-spk-dlg") spkDlgClose();
@@ -4680,6 +4725,17 @@ $("#asr-voice")?.addEventListener("click", async () => {
 // reports what it would have decided; stage 2 moves the mark and the timer.
 function asrVoice(m) {
   if (m.event === "start") { overUnpin(); return; }      // new over
+  if (m.event === "jam") {
+    // auto-DROP: a flagged jammer is speaking — the same DROP as the button,
+    // released by the same pause / busy-edge rules
+    if (!sqMuted) sqSetMute(true);
+    const who = callDisp(m.call);
+    toast(`Auto-DROP: ${who} (${Number(m.score).toFixed(2)})`, "err");
+    voiceLast = `Auto-DROP: ${who} ${Number(m.score).toFixed(2)}`
+      + (m.other ? ` (best regular ${callDisp(m.other)} ${Number(m.other_score).toFixed(2)})` : "");
+    voicePaint();
+    return;
+  }
   if (m.event === "enrol") {
     spkCountPaint(m.profiles);
     // the list in Settings shows per-call counts, which the message does not

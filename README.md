@@ -72,6 +72,12 @@ Pi, so it follows you to every browser).*
     dump (823,264 active licences). A call that is not in the register is still
     shown, flagged **·VOID**. Switching reloads model and register in about
     three seconds; the voice profiles are language-independent and survive it.
+  - **Auto-DROP on jammers** — a voice flagged as a jammer (JAMMER in the ASR
+    panel teaches it, or JAM on any profile under PROFILES) mutes the web audio
+    for its over with the same DROP as the PTT-panel button. Checked at ~3 s and
+    6 s of speech, so the first seconds are heard; the jammer must beat every
+    regular profile by the margin, so similar voices keep their audio. Speech
+    only, web audio only. *Settings ▸ Audio ▸ Voice ID*.
 - **Band lock (CTRL / PTT)** — a switch in *Settings ▸ General* freezes the
   control and transmit band where they stand, so a stray tap on CTRL or PTT can
   no longer put you on the band you were not watching. The four buttons then carry

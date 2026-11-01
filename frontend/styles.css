@@ -2969,7 +2969,14 @@ body.theme-light .dual-note{color:#0c7b71}
 .sql-row .sql-slider{flex-grow:1.3}
 /* every slider (all except the TUNE shuttle, which is no range input): a fader
    knob - upright rectangle with rounded corners instead of the round dot */
-#band-0 .sql-slider::-webkit-slider-thumb, #band-1 .sql-slider::-webkit-slider-thumb, #rx-gain::-webkit-slider-thumb, #data-gain::-webkit-slider-thumb, #tx-gain::-webkit-slider-thumb, #roger-level::-webkit-slider-thumb, #hrf-lna::-webkit-slider-thumb, #hrf-vga::-webkit-slider-thumb, #hrf-level::-webkit-slider-thumb, .mixer-row .mx-slider::-webkit-slider-thumb, #digi-wpm::-webkit-slider-thumb, #digi-pitch::-webkit-slider-thumb, #digi-mark::-webkit-slider-thumb, #deemph-us::-webkit-slider-thumb, #tx-buffer::-webkit-slider-thumb, #ptt-tail::-webkit-slider-thumb, #rx-buffer::-webkit-slider-thumb{
+#band-0 .sql-slider::-webkit-slider-thumb, #band-1 .sql-slider::-webkit-slider-thumb, #rx-gain::-webkit-slider-thumb, #data-gain::-webkit-slider-thumb, #tx-gain::-webkit-slider-thumb, #roger-level::-webkit-slider-thumb, #hrf-lna::-webkit-slider-thumb, #hrf-vga::-webkit-slider-thumb, #hrf-level::-webkit-slider-thumb, .mixer-row .mx-slider::-webkit-slider-thumb, #digi-wpm::-webkit-slider-thumb, #digi-pitch::-webkit-slider-thumb, #digi-mark::-webkit-slider-thumb, #deemph-us::-webkit-slider-thumb, #tx-buffer::-webkit-slider-thumb, #ptt-tail::-webkit-slider-thumb, #rx-buffer::-webkit-slider-thumb, #jam-threshold::-webkit-slider-thumb{
   width:10px; height:18px; border-radius:3px}
-#band-0 .sql-slider::-moz-range-thumb, #band-1 .sql-slider::-moz-range-thumb, #rx-gain::-moz-range-thumb, #data-gain::-moz-range-thumb, #tx-gain::-moz-range-thumb, #roger-level::-moz-range-thumb, #hrf-lna::-moz-range-thumb, #hrf-vga::-moz-range-thumb, #hrf-level::-moz-range-thumb, .mixer-row .mx-slider::-moz-range-thumb, #digi-wpm::-moz-range-thumb, #digi-pitch::-moz-range-thumb, #digi-mark::-moz-range-thumb, #deemph-us::-moz-range-thumb, #tx-buffer::-moz-range-thumb, #ptt-tail::-moz-range-thumb, #rx-buffer::-moz-range-thumb{
+#band-0 .sql-slider::-moz-range-thumb, #band-1 .sql-slider::-moz-range-thumb, #rx-gain::-moz-range-thumb, #data-gain::-moz-range-thumb, #tx-gain::-moz-range-thumb, #roger-level::-moz-range-thumb, #hrf-lna::-moz-range-thumb, #hrf-vga::-moz-range-thumb, #hrf-level::-moz-range-thumb, .mixer-row .mx-slider::-moz-range-thumb, #digi-wpm::-moz-range-thumb, #digi-pitch::-moz-range-thumb, #digi-mark::-moz-range-thumb, #deemph-us::-moz-range-thumb, #tx-buffer::-moz-range-thumb, #ptt-tail::-moz-range-thumb, #rx-buffer::-moz-range-thumb, #jam-threshold::-moz-range-thumb{
   width:10px; height:18px; border-radius:3px}
+/* voice profiles: the jammer flag (auto-DROP listens for flagged voices) */
+.spk-jam{font:600 9px var(--font-ui); letter-spacing:.1em; padding:2px 6px; margin-right:6px; border-radius:5px; cursor:pointer;
+  color:var(--text-dim); background:transparent; border:1px solid var(--edge)}
+.spk-jam.on{color:#fff; background:#c1392f; border-color:#c1392f}
+.spk-jam:disabled{opacity:.4; cursor:default}
+.spk-row.spk-jammer b{color:#ff6b5e}
+#jam-threshold{--g-accent:#3fa6b3}

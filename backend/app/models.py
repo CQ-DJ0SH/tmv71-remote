@@ -240,6 +240,13 @@ class AsrSpeakerRequest(BaseModel):
     act: bool | None = None
     threshold: float | None = Field(default=None, ge=0.0, le=1.0)
     margin: float | None = Field(default=None, ge=0.0, le=1.0)
+    jam_drop: bool | None = None                                     # auto-DROP on a jammer
+    jam_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
+class AsrJammerFlagRequest(BaseModel):
+    """Flag or clear a voice profile as a jammer."""
+    on: bool
 
 
 class AudioRecordRequest(BaseModel):
