@@ -1519,7 +1519,8 @@ EN = [
           "the card it came from and picks up the new card's figure, so nothing "
           "is lost or counted twice. The display is fixed at hh:mm:ss, otherwise "
           "the button would change width as it counts."),
-    ("p", "The panel head carries the sum of all timers (Σ) and five controls:"),
+    ("p", "The sum of all timers (Σ, TALK TIME) sits in the panel's foot under "
+          "the cards; the head carries the controls:"),
     ("ul", [
         "The input field takes a callsign by hand when the recognition misses "
         "one — upper-case letters and digits only, filtered while typing. LOG "
@@ -2616,8 +2617,8 @@ DE = [
           "verbucht und der Wert der neuen übernommen, es geht also nichts "
           "verloren und nichts wird doppelt gezählt. Die Anzeige steht fest auf "
           "hh:mm:ss, sonst änderte der Knopf im Zählen seine Breite."),
-    ("p", "Die Titelzeile des Panels trägt die Summe aller Zähler (Σ) und fünf "
-          "Bedienelemente:"),
+    ("p", "Die Summe aller Zähler (Σ, TALK TIME) steht im Fuß des Panels unter "
+          "den Karten; die Titelzeile trägt die Bedienelemente:"),
     ("ul", [
         "Das Eingabefeld nimmt ein Rufzeichen von Hand auf, wenn die Erkennung "
         "eines verpasst — nur Großbuchstaben und Ziffern, bereits beim Tippen "
