@@ -3145,3 +3145,5 @@ body.theme-light #hrf-level{--g-accent:#6b7a85} body.theme-light #hrf-level-v{co
 .sel-call:not(.tx){color:#fff}
 body.theme-light .sel-call:not(.tx){color:var(--text)}
 @media (hover:hover){ .sel-call:not(.tx):not(:disabled):hover{color:#fff} body.theme-light .sel-call:not(.tx):not(:disabled):hover{color:var(--text)} }
+/* selcall CALL: the antenna red (it keys the transmitter), the text stays white */
+.sel-call:not(.tx) .sc-ico{color:var(--tx)}
