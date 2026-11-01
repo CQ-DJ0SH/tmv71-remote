@@ -3061,3 +3061,18 @@ body.theme-light #scan-clear{color:#9c2018}
 .sel-call:not(.tx){color:var(--tx); background:var(--ctrl-bg); border-color:var(--accent); font-weight:600}   /* red text: it keys the transmitter */
 @media (hover:hover){ .sel-call:not(.tx):not(:disabled):hover{color:#ff6b5e; box-shadow:0 0 14px -4px var(--accent-glow)} }
 .sel-call{min-width:96px; text-align:center; box-sizing:border-box}
+/* every switch in Digimodes as a button (DECODE, AUTO, DEBUG, ALPHA, LISTEN ALL):
+   the label is the button, the hidden checkbox inside keeps the logic */
+.digi-zone label:has(> .switch){
+  position:relative; display:inline-flex; align-items:center; gap:0; cursor:pointer; user-select:none;
+  font-family:var(--font-mono); font-weight:700; font-size:11px; letter-spacing:.08em;
+  padding:5px 12px; border-radius:7px; transition:.15s;
+  color:var(--text-dim); background:var(--ctrl-bg); border:1px solid var(--sw-edge)}
+.digi-zone label:has(> .switch) > .switch{
+  position:absolute; inset:0; width:100%; height:100%; margin:0; opacity:0; cursor:pointer}
+.digi-zone label:has(> .switch:checked){
+  color:#06220f; background:var(--accent); border-color:var(--accent); box-shadow:0 0 12px -3px var(--accent-glow)}
+.digi-zone label:has(> .switch:focus-visible){outline:2px solid var(--cyan); outline-offset:2px}
+@media (hover:hover){
+  .digi-zone label:has(> .switch):not(:has(> .switch:checked)):hover{color:var(--accent); border-color:var(--accent)}
+}
