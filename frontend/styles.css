@@ -2948,7 +2948,7 @@ body.theme-light .log-recent-list{
 /* Digi Modes sliders (WPM, PITCH, MARK) outlined in the panel accent colour */
 .digi-zone input[type=range]{box-shadow:0 0 0 2px var(--ctrl-bg), 0 0 0 3px var(--accent)}
 /* Selcall standard picker (STD) outlined in the panel accent colour */
-.selcall-zone .sel-std-field select{border-color:var(--accent)}
+.selcall-zone .sel-std-field select{border-color:var(--sw-edge)}   /* as the collapse button */
 /* settings sliders (de-emphasis, roger level, audio timing) outlined in their accent colour */
 #settings input[type=range]{box-shadow:0 0 0 2px var(--ctrl-bg), 0 0 0 3px var(--g-accent, var(--accent))}
 /* settings switches: on = the dialog accent (cyan, like its title and active tab) instead of TX red */
