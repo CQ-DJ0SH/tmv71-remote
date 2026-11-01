@@ -3136,3 +3136,5 @@ body.theme-light #scan-clear{color:#9c2018}
 #hrf-center-in{width:108px}
 #hrf-range-in{width:164px}
 body.theme-light #hrf-level{--g-accent:#6b7a85} body.theme-light #hrf-level-v{color:#5a6976}
+/* selcall CALL: larger text */
+.sel-call-field .sel-call{font-size:12px; letter-spacing:.14em}
