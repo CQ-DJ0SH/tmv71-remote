@@ -6,7 +6,7 @@ import os
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-APP_VERSION = "3.5"
+APP_VERSION = "4.1"
 
 
 class Settings(BaseSettings):
