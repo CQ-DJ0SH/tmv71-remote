@@ -3150,3 +3150,31 @@ body.theme-light .sel-call:not(.tx){color:var(--text)}
 /* selcall CALL: text grey like the other buttons (antenna stays red) */
 .sel-call:not(.tx), body.theme-light .sel-call:not(.tx){color:var(--text-dim)}
 @media (hover:hover){ .sel-call:not(.tx):not(:disabled):hover, body.theme-light .sel-call:not(.tx):not(:disabled):hover{color:var(--text)} }
+/* ===== one height per row ===================================================
+   Panel heads: every control 30 px (the collapse arrow stays small). Band heads:
+   AIR/CTRL/PTT/TX and the power button match the 50W/10W/5W group (30 px).
+   Band foot: VFO/MEMORY and ✓ at 28 px. Digimodes foot: SEND as tall as the
+   text field beside it. */
+.hackrf-zone .panel-head > .hrf-power, .hackrf-zone .panel-head > .hrf-modes,
+.selcall-zone .panel-head label:has(> .switch), .selcall-zone .panel-head select,
+.selcall-zone .panel-head .sel-call, .selcall-zone .panel-head .sel-mute,
+.digi-zone .panel-head label:has(> .switch), .digi-zone .panel-head .digi-modes,
+.digi-zone .panel-head select, .digi-zone .panel-head input[type=text], .digi-zone .panel-head #aprs-stat,
+.log-zone .panel-head .log-btn,
+.scan-zone .scan-head .scan-band, .scan-zone .scan-head .scan-clear,
+.debug-zone .panel-head .scan-clear, .debug-zone .panel-head .asr-manual,
+.audio .audio-conn .seg, .audio .audio-conn .mictest-toggle, .audio .audio-conn .audio-agc, .audio .audio-conn #audio-toggle{
+  height:30px; box-sizing:border-box; padding-top:0; padding-bottom:0}
+.hackrf-zone .panel-head > .hrf-power, .selcall-zone .panel-head .sel-call, .selcall-zone .panel-head .sel-mute,
+.log-zone .panel-head .log-btn, .scan-zone .scan-head .scan-band, .scan-zone .scan-head .scan-clear,
+.debug-zone .panel-head .scan-clear, .audio .audio-conn #audio-toggle{
+  display:inline-flex; align-items:center; justify-content:center}
+.hrf-modes .hrf-m, .digi-modes .digi-mode, .audio-conn .seg .sg{height:100%; padding-top:0; padding-bottom:0; box-sizing:border-box}
+.band .band-head .air-btn, .band .band-head .ctrl-band-btn, .band .band-head .ptt-band-btn,
+.band .band-head .tx-lamp, .band .band-head .band-power{
+  height:30px; box-sizing:border-box; padding-top:0; padding-bottom:0;
+  display:inline-flex; align-items:center; justify-content:center}
+.band .band-head .band-power{width:30px}
+.band .mode-toggle .mt, .band .spin-apply{height:28px; box-sizing:border-box; padding-top:0; padding-bottom:0}
+.band .mode-toggle{align-self:center}
+.digi-zone #digi-send{height:35px; box-sizing:border-box; padding-top:0; padding-bottom:0}
