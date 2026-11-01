@@ -3182,17 +3182,16 @@ body.theme-light .sel-call:not(.tx){color:var(--text)}
 #aprs-stat{line-height:28px; vertical-align:middle}
 /* APRS params no taller than the other modes' heads (30 px controls) */
 #digi-params-aprs{min-height:30px}
-/* phone (landscape PWA): Selcall head in three fixed rows — title · DECODE · STD,
-   then TX CALL and MY ID each on a line of their own with the same label width,
-   so digits and buttons stand exactly under each other */
+/* phone (landscape PWA): Selcall head in two rows — title · DECODE · STD, then
+   TX CALL … CALL and MY ID … MUTE side by side; digits closer together */
 @media (orientation:landscape) and (max-height:600px){
-  .selcall-zone .panel-head .sel-call-field, .selcall-zone .panel-head .sel-own-field{
-    flex:0 0 100%; margin-left:0; justify-content:flex-start}
-  .selcall-zone .panel-head .sel-call-field .sel-label, .selcall-zone .panel-head .sel-own-field .sel-label{
-    width:64px; min-width:64px; text-align:left}
-  .selcall-zone .panel-head .sel-call, .selcall-zone .panel-head .sel-mute{min-width:110px; margin-left:6px}
-  .selcall-zone .sel-tone-row .sel-label{width:64px; min-width:64px; text-align:left}
-  .selcall-zone .sel-tone-row{gap:9px}
+  .selcall-zone .panel-head > *{order:1}
+  .selcall-zone .panel-head::after{content:""; flex:0 0 100%; order:2; height:0}
+  .selcall-zone .panel-head .sel-call-field, .selcall-zone .panel-head .sel-own-field{order:3; margin-left:0}
+  .selcall-zone .panel-head .sel-own-field{margin-left:22px}
+  .selcall-zone .panel-head .sel-digits{gap:3px}
+  .selcall-zone .panel-head .sel-call-field, .selcall-zone .panel-head .sel-own-field{gap:7px}
+  .selcall-zone .sel-tone-row .sel-label{min-width:0; width:auto}
   /* Wavelog: no comment field on the phone */
   .log-zone .log-f-cmt{display:none}
 }
