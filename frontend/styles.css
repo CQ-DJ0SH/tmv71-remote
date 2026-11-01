@@ -3000,7 +3000,7 @@ body.theme-light .dual-note{color:#0c7b71}
 .spk-edit{font-size:11px}
 /* ASR head buttons look like the memory-scan buttons (filled, full-strength text),
    framed in the panel accent; the state rules (#asr-voice.on, #asr-mod.on …) still win */
-.debug-zone .panel-head .scan-clear{color:var(--text); background:var(--ctrl-bg); border-color:var(--accent)}
+.debug-zone .panel-head .scan-clear{color:var(--text); background:var(--ctrl-bg); border-color:var(--sw-edge)}   /* as the collapse button */
 #asr-log-clear{color:#b0342a}
 body.theme-light #asr-log-clear{color:#9c2018}
 @media (hover:hover){
