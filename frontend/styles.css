@@ -3178,3 +3178,5 @@ body.theme-light .sel-call:not(.tx){color:var(--text)}
 .band .mode-toggle .mt, .band .spin-apply{height:28px; box-sizing:border-box; padding-top:0; padding-bottom:0}
 .band .mode-toggle{align-self:center}
 .digi-zone #digi-send{height:35px; box-sizing:border-box; padding-top:0; padding-bottom:0}
+/* APRS stats: text vertically centred in its 30 px box (line-height = inner height) */
+#aprs-stat{line-height:28px; vertical-align:middle}
