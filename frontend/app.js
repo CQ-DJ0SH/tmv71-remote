@@ -3746,9 +3746,12 @@ function aprsStatPaint(a) {
   if (!el || !a) return;
   // damaged real frames and noise candidates are different statements: the
   // first says stations were lost, the second only that the channel is noisy
-  el.textContent = `${a.frames} frames · ${a.damaged} damaged · `
-    + (a.stations === 1 ? "1 station" : `${a.stations} stations`)
-    + ` · ${a.noise}× noise`;
+  // each count in a right-aligned field of fixed width, so the words between
+  // them stay put while the numbers grow (counts are numbers, never markup)
+  const num = (v, w) => `<b class="as-n" style="--w:${w}">${Number(v) || 0}</b>`;
+  el.innerHTML = `${num(a.frames, 5)} frames · ${num(a.damaged, 3)} damaged · `
+    + `${num(a.stations, 3)} <span class="as-w">${a.stations === 1 ? "station" : "stations"}</span>`
+    + ` · ${num(a.noise, 5)}× noise`;
 }
 
 function connectDigiWS(decode) {

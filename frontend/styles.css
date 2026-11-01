@@ -3089,3 +3089,7 @@ body.theme-light #scan-clear{color:#9c2018}
 /* reserve room for growing counts: the STATS caption sits inside the box too, so
    the width covers caption + "12345 frames · 999 damaged · 99 stations · 99999× noise" */
 #aprs-stat{min-width:0; width:calc(56ch + 64px); box-sizing:content-box; overflow:hidden; text-overflow:clip}
+/* APRS stats: fixed number fields, so the labels between them never move */
+#aprs-stat .as-n{display:inline-block; min-width:calc(var(--w) * 1ch); text-align:right; font-weight:inherit}
+#aprs-stat .as-w{display:inline-block; min-width:8ch}
+#aprs-stat{width:auto}
