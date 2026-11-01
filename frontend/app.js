@@ -242,6 +242,7 @@ function renderBand(b) {
 
 function render(st) {
   last = st;
+  try { hrfFieldsPaint(); } catch {}          // HackRF Center/Range follow the radio
   sqMuteCheck(st);                       // release the squelch mute when clear
   $("#stat-radio").classList.toggle("online", st.connected);
   $("#stat-radio").classList.toggle("fault", !st.connected && !!st.error);
@@ -3227,10 +3228,35 @@ function drawHrfSpectrum(db) {
 }
 function dprOf() { return window.devicePixelRatio || 1; }
 
+// Center and Range always show what is (or would be) on screen, numbers only:
+// from the last frame while running, else worked out from the radio frequency.
+// A field being edited is left alone.
+function hrfFieldsPaint() {
+  const m = hrf.meta, cf = hrfControlFreq() || hrf.center;
+  const ci = $("#hrf-center-in"), ri = $("#hrf-range-in");
+  const set = (el, v) => { if (el && document.activeElement !== el && v) el.value = v; };
+  let c = null, lo = null, hi = null;
+  if (m && hrf.ws) { c = m.center; lo = m.f0; hi = m.f1; }
+  else if (hrf.mode === "sweep") {
+    if (hrf.follow && cf) { lo = cf - 10e6; hi = cf + 10e6; } else { lo = hrf.sweepStart; hi = hrf.sweepStop; }
+    c = (lo + hi) / 2;
+  } else {
+    c = hrf.follow ? cf : (hrf.center || cf);
+    if (c) { lo = c - 1e6; hi = c + 1e6; }      // the panadapter shows about 2 MHz
+  }
+  if (c) set(ci, hrfMhz(c));
+  if (lo && hi) set(ri, `${hrfMhz(lo)}–${hrfMhz(hi)}`);
+  // axis under the graph: the same span, the unit on the right end (as "4 kHz"
+  // under the audio spectrum) — filled even while the HackRF is off
+  if (lo && hi && c) {
+    const a = $("#hrf-f0"), b = $("#hrf-fc"), z = $("#hrf-f1");
+    if (a) a.textContent = hrfMhz(lo);
+    if (b) b.textContent = hrfMhz(c);
+    if (z) z.textContent = hrfMhz(hi) + " MHz";
+  }
+}
 function setHrfAxis(m) {
-  $("#hrf-f0").textContent = hrfMhz(m.f0);
-  $("#hrf-fc").textContent = hrfMhz(m.center);
-  $("#hrf-f1").textContent = hrfMhz(m.f1);
+  hrfFieldsPaint();
 }
 
 // vertical marker at the currently tuned radio frequency (centre in follow mode)
@@ -3261,10 +3287,13 @@ function updateHrfPower() {
   $("#hackrf-zone")?.classList.toggle("hrf-off", !hrf.on);   // dim the panel when off
 }
 function updateHrfModeUi() {
+  setTimeout(hrfFieldsPaint, 0);
   $$(".hrf-m").forEach(x => x.classList.toggle("active", x.dataset.mode === hrf.mode));
   $$(".hrf-pan-only").forEach(x => x.hidden = hrf.mode !== "pan");
   $$(".hrf-sweep-only").forEach(x => x.hidden = hrf.mode !== "sweep");
   const ci = $("#hrf-center-in"); if (ci) ci.disabled = (hrf.mode === "pan" && hrf.follow);
+  // Range only takes input for a sweep without follow; otherwise it just shows the span
+  const ri = $("#hrf-range-in"); if (ri) ri.disabled = (hrf.mode === "pan" || hrf.follow);
 }
 
 function bindHackRF() {
