@@ -3011,3 +3011,6 @@ body.theme-light #asr-log-clear{color:#9c2018}
 /* selcall MUTE framed like the collapse button (as the ASR buttons); armed state and hover unchanged */
 .selcall-zone .sel-mute:not(.armed){color:var(--text); border-color:var(--sw-edge)}
 @media (hover:hover){ .selcall-zone .sel-mute:not(.armed):hover{color:var(--accent); border-color:var(--accent)} }
+/* QRZ LOOKUP framed like the collapse button; hover in the panel accent as before */
+.log-zone #log-lookup{color:var(--text); border-color:var(--sw-edge)}
+@media (hover:hover){ .log-zone #log-lookup:hover{color:var(--accent); border-color:var(--accent)} }
