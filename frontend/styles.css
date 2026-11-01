@@ -3086,3 +3086,6 @@ body.theme-light #scan-clear{color:#9c2018}
 #aprs-stat{padding:4px 10px; border:1px solid var(--sw-edge); border-radius:7px; background:var(--ctrl-bg)}
 #aprs-stat::before{content:"STATS"; margin-right:10px; font-family:var(--font-ui); font-size:10px;
   font-weight:600; letter-spacing:.16em; color:var(--text-dim)}
+/* reserve room for growing counts: the STATS caption sits inside the box too, so
+   the width covers caption + "12345 frames · 999 damaged · 99 stations · 99999× noise" */
+#aprs-stat{min-width:0; width:calc(56ch + 64px); box-sizing:content-box; overflow:hidden; text-overflow:clip}
