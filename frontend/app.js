@@ -2,6 +2,10 @@
 "use strict";
 
 const $ = (s, r = document) => r.querySelector(s);
+// One id per open tab: sent with the audio offer, PTT and MIC TEST, so the Pi
+// transmits only the mic of the tab that keyed — not every connected device.
+const CLIENT_ID = (crypto.randomUUID ? crypto.randomUUID()
+  : Date.now().toString(36) + Math.random().toString(36).slice(2)).slice(0, 36);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
 // Ham convention: show the zero in a callsign slashed, so DJ0SH cannot be misread
@@ -956,7 +960,7 @@ function bindControls() {
     // band regardless of the data-band setting — no audio-band/PTT-band check.)
     // RX is not muted for TX (see render()); keep only selcall/mic-test muting
     rxApplyMute();
-    try { await api("POST", "/api/ptt", { transmit: on }); }
+    try { await api("POST", "/api/ptt", { transmit: on, client: CLIENT_ID }); }
     catch (e) { toast("PTT: " + e.message, "err"); }
 
     // 1750 Hz tone call is a one-shot: auto-disable the hold after releasing PTT
@@ -1308,7 +1312,7 @@ function updatePttEnabled() {
 // End any active transmit (held key or latched lock) when audio goes away.
 function endTxOnAudioLoss() {
   if (pttLock && setPttLock) setPttLock(false);
-  else if (txActive) api("POST", "/api/ptt", { transmit: false }).catch(() => {});
+  else if (txActive) api("POST", "/api/ptt", { transmit: false, client: CLIENT_ID }).catch(() => {});
 }
 function teardownAudio() {
   if (audioGraceT) { clearTimeout(audioGraceT); audioGraceT = null; }
@@ -1386,7 +1390,7 @@ async function audioConnect() {
       setTimeout(res, 1500);   // LAN host candidates gather fast; cap the wait short
     });
     const ans = await api("POST", "/api/webrtc/offer",
-      { sdp: audioPc.localDescription.sdp, type: audioPc.localDescription.type });
+      { sdp: audioPc.localDescription.sdp, type: audioPc.localDescription.type, client: CLIENT_ID });
     await audioPc.setRemoteDescription(ans);
     toast("Audio connected", "ok");
   } catch (e) {
@@ -1634,7 +1638,7 @@ function bindAudio() {
       if (cb && cb.checked) { cb.checked = false; cb.dispatchEvent(new Event("change")); }
     }, 30000);
     try {
-      const st = await api("POST", "/api/audio/tones", { mic_test: on });
+      const st = await api("POST", "/api/audio/tones", { mic_test: on, client: CLIENT_ID });
       toast(on ? "Mic test ON (max 30 s) — speak; switch off to hear it back"
                : (st && st.echo_busy ? "Replaying your mic test…" : "Mic test off"),
             on || (st && st.echo_busy) ? "ok" : "");

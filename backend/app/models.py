@@ -89,6 +89,7 @@ class VfoUpdate(BaseModel):
 
 class PttRequest(BaseModel):
     transmit: bool
+    client: Optional[str] = Field(default=None, max_length=64)   # the tab whose mic goes out
 
 
 class ControlBandRequest(BaseModel):
@@ -172,6 +173,7 @@ class ScanStartRequest(BaseModel):
 class WebRTCOffer(BaseModel):
     sdp: str
     type: str
+    client: Optional[str] = Field(default=None, max_length=64)   # tab id, see PttRequest
 
 
 class AudioGainRequest(BaseModel):
@@ -206,6 +208,7 @@ class TonesRequest(BaseModel):
     rx_deemph_us: Optional[float] = Field(default=None, ge=10, le=500)
     rx_squelch: Optional[bool] = None
     mic_test: Optional[bool] = None
+    client: Optional[str] = Field(default=None, max_length=64)   # tab running the mic test
 
 
 class AudioDualRequest(BaseModel):

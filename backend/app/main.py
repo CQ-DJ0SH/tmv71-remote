@@ -1980,6 +1980,8 @@ async def scan_stop() -> dict:
 
 @app.post("/api/ptt", response_model=RadioStatus)
 async def set_ptt(req: PttRequest) -> RadioStatus:
+    if req.transmit:
+        radio_audio.tx_src = req.client or None    # only this tab's mic goes out
     await service.set_ptt(req.transmit)
     _set_remote_ptt(req.transmit)
     return service.status
@@ -2514,6 +2516,8 @@ async def set_audio_tones(req: TonesRequest) -> dict:
         save_runtime(roger_beep_level=req.roger_beep_level)
     if req.test_tone is not None:
         radio_audio.test_tone = req.test_tone
+    if req.mic_test:
+        radio_audio.tx_src = req.client or None    # meter/record this tab's mic only
     if req.mic_test is not None:
         # records while on; on switch-off, replays the take over RX (no keying)
         radio_audio.set_mic_test(req.mic_test)
@@ -2867,7 +2871,7 @@ async def webrtc_offer(req: WebRTCOffer) -> dict:
     @pc.on("track")
     def _on_track(track) -> None:
         if track.kind == "audio":
-            asyncio.ensure_future(consume_mic(track, radio_audio))
+            asyncio.ensure_future(consume_mic(track, radio_audio, req.client))
 
     pc.addTrack(RadioRxTrack(radio_audio))
     await pc.setRemoteDescription(

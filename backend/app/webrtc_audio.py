@@ -429,6 +429,11 @@ class RadioAudio:
         # and TX. The speaker output is already squelched and de-emphasised by
         # the radio, so the software squelch and de-emphasis stay out of it.
         self.dual = bool(dual)
+        # Every connected browser streams its mic all the time. Only the tab that
+        # keyed (PTT or MIC TEST) may feed the transmitter — two devices at once
+        # used to interleave both mics into one queue: twice the audio, half of it
+        # dropped at the cap, a pulsing modulation. None = accept every mic.
+        self.tx_src: Optional[str] = None
         self.data_gain = data_gain        # dual: gain of the data-jack card (decoders)
         self.listen_device = listen_device
         self._lstream: Optional[sd.InputStream] = None
@@ -1063,7 +1068,7 @@ class RadioAudio:
         return self._latest
 
     # -- TX (browser mic) --------------------------------------------------
-    def push_tx(self, pcm: np.ndarray) -> None:
+    def push_tx(self, pcm: np.ndarray, src: Optional[str] = None) -> None:
         # Only buffer mic audio while keyed. The browser mic streams over WebRTC
         # continuously (the track isn't gated by PTT), so between overs it would
         # otherwise pile up a full backlog; on the next key-up that stale audio
@@ -1073,6 +1078,8 @@ class RadioAudio:
         # it matches what TX would send) without routing anything to the radio.
         if not self._ptt_open and not self.mic_test:
             return
+        if self.tx_src and src and src != self.tx_src:
+            return                           # another tab's mic: not the one that keyed
         if self._digi_keyed:                 # CW/RTTY/POCSAG/APRS on the air
             return
         if self._tx_closing:                 # released: the over is complete
@@ -1484,7 +1491,8 @@ def _mic_pcm(frame) -> Optional[np.ndarray]:
     return np.clip(x.mean(axis=1), -32768, 32767).astype(np.int16)
 
 
-async def consume_mic(track: MediaStreamTrack, radio: RadioAudio) -> None:
+async def consume_mic(track: MediaStreamTrack, radio: RadioAudio,
+                      src: Optional[str] = None) -> None:
     """Incoming track: browser mic -> radio mic (48 kHz mono)."""
     resampler = None                 # built only if a frame ever needs one
     try:
@@ -1492,12 +1500,12 @@ async def consume_mic(track: MediaStreamTrack, radio: RadioAudio) -> None:
             frame = await track.recv()
             pcm = _mic_pcm(frame)
             if pcm is not None:
-                radio.push_tx(pcm)
+                radio.push_tx(pcm, src)
                 continue
             if resampler is None:
                 resampler = AudioResampler(format="s16", layout="mono",
                                            rate=SAMPLE_RATE)
             for f in resampler.resample(frame):
-                radio.push_tx(f.to_ndarray().reshape(-1).astype(np.int16))
+                radio.push_tx(f.to_ndarray().reshape(-1).astype(np.int16), src)
     except Exception:  # noqa: BLE001
         pass
