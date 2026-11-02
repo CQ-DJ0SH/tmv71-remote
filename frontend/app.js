@@ -594,9 +594,13 @@ function pushLevel(rxDb, txDb) {
 // Smooth-scroll render loop — decoupled from the 200 ms data poll. Runs at ~30fps
 // only while the graph is on-screen, audio is connected and the tab is visible;
 // otherwise it stops so it costs nothing when you're not watching it.
+// A dialog (Settings, channel editor, profiles …) covers the console: the
+// animations behind it pause — nobody sees them, and redrawing canvases under
+// an overlay is what doubled the CPU load while Settings was open.
+const uiCovered = () => !!document.querySelector(".modal.open");
 function startLevelLoop() { if (levelRAF == null) levelRAF = requestAnimationFrame(levelTick); }
 function levelTick(now) {
-  if (!audioConnected() || document.hidden || !graphOnScreen) {
+  if (!audioConnected() || document.hidden || !graphOnScreen || uiCovered()) {
     levelRAF = null; drawLevelGraph(0); return;      // settle at the final position
   }
   if (now - lastLvlDraw >= 33) {                     // ~30 fps
@@ -3082,6 +3086,7 @@ function closeHrfWs() { if (hrf.ws) { try { hrf.ws.close(); } catch {} hrf.ws = 
 let hrfPending = null, hrfRaf = 0;
 function hrfPaint() {
   hrfRaf = 0;
+  if (uiCovered()) return;            // behind a dialog: skip; the next frame after it closes draws
   const m = hrfPending; hrfPending = null;
   if (!m) return;
   hrfUpdateFloor(m.db);
@@ -6054,7 +6059,7 @@ if ($("#lg-peak")) $("#lg-peak").onclick = () => {
 showSpecPeak();
 function specDraw(t) {
   spec.raf = requestAnimationFrame(specDraw);
-  if (t - spec.last < 33 || document.hidden) return;              // ~30 fps
+  if (t - spec.last < 33 || document.hidden || uiCovered()) return;   // ~30 fps; paused behind a dialog
   spec.last = t;
   const cv = $("#spec-graph"); if (!cv) return;
   const dpr = window.devicePixelRatio || 1, r = cv.getBoundingClientRect();

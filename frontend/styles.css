@@ -2321,7 +2321,8 @@ body.theme-light .audio-graph, body.theme-light .scan-graph{border-color:var(--e
 .modal{
   position:fixed; inset:0; z-index:40; display:none;
   align-items:center; justify-content:center; padding:20px;
-  background:#04070acc; backdrop-filter:blur(4px);
+  background:#04070ae6;   /* solid dim, no backdrop-filter: blurring the whole console
+     behind the dialog is recomputed on every repaint and doubled the CPU load */
 }
 .modal.open{display:flex}
 /* the channel editor is a sub-dialog opened from inside the settings modal */
