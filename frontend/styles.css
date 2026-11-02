@@ -3214,3 +3214,7 @@ body.theme-light .sel-call:not(.tx){color:var(--text)}
 /* selcall MUTE: crossed-out speaker before the label */
 .sel-mute{display:inline-flex; align-items:center; justify-content:center; gap:6px}
 .sel-mute .sm-ico{width:15px; height:15px; flex:none}
+/* PTT panel MUTE / DROP with icons: crossed-out speaker = mute until pressed again,
+   speaker with a pause mark = blank this over only */
+.ptt-mute{display:inline-flex; align-items:center; justify-content:center; gap:5px}
+.ptt-mute .pm-ico{width:13px; height:13px; flex:none}
