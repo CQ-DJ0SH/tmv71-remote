@@ -4128,7 +4128,7 @@ function permSetMute(on) {
   if (b) {
     b.classList.toggle("armed", on);
     b.setAttribute("aria-pressed", String(on));
-    b.textContent = on ? "MUTED" : "MUTE";
+    (b.querySelector(".pm-lbl") || b).textContent = on ? "MUTED" : "MUTE";   // only the label: the icon stays
   }
   rxApplyMute();
 }
