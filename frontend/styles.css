@@ -3224,3 +3224,7 @@ body.theme-light .sel-call:not(.tx){color:var(--text)}
 /* selcall CALL keys the transmitter: framed in red like SEND / BEACON */
 .sel-call:not(.tx){border-color:var(--tx)}
 @media (hover:hover){ .sel-call:not(.tx):not(:disabled):hover{box-shadow:0 0 14px -4px var(--tx-glow)} }
+/* SEND / BEACON: red antenna before the label, like CALL in Selcall */
+.digi-zone .digi-send{display:inline-flex; align-items:center; justify-content:center; gap:6px}
+.digi-send .ds-ico{width:15px; height:15px; flex:none; margin-top:-1px; color:var(--tx)}
+.digi-send.tx .ds-ico{color:inherit}

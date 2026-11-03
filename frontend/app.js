@@ -15,6 +15,8 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 // rendered text. (Done as a character swap rather than the OpenType `zero`
 // feature: the self-hosted fonts are Google-Fonts subsets, which usually drop it.)
 const callDisp = c => (c || "").replace(/0/g, "Ø");
+// buttons with an icon keep it: only their label span is rewritten
+const setBtnLabel = (b, t) => { if (b) (b.querySelector(".ds-lbl, .sc-lbl, .sm-lbl") || b).textContent = t; };
 
 // RX mute sources (PTT panel), declared up here because render() reads them long
 // before their handlers are wired up: permMuted is the plain MUTE toggle, sqMuted
@@ -3614,7 +3616,7 @@ function bindDigi() {
     const sb = $("#digi-send");
     if (sb) {
       sb.disabled = false;
-      sb.textContent = mode === "aprs" ? "BEACON" : "SEND";
+      setBtnLabel(sb, mode === "aprs" ? "BEACON" : "SEND");
       sb.title = mode === "aprs"
         ? "Send a position beacon from the locator (keys PTT)"
         : "Encode & transmit (keys PTT)";
@@ -3692,12 +3694,12 @@ function bindDigi() {
   const send = async () => {
     const t = txt.value.trim();
     if (!t && digiMode() !== "aprs") return;
-    sendBtn.disabled = true; sendBtn.classList.add("tx"); sendBtn.textContent = "SENDING…";
+    sendBtn.disabled = true; sendBtn.classList.add("tx"); setBtnLabel(sendBtn, "SENDING…");
     try { const r = await api("POST", "/api/digi/tx", { text: t }); if (r && r.sent) txt.value = ""; }
     catch (e) { toast("Send: " + e.message, "err"); }
     finally {
       sendBtn.disabled = false; sendBtn.classList.remove("tx");
-      sendBtn.textContent = sendLabel();   // not always "SEND": APRS says BAKE
+      setBtnLabel(sendBtn, sendLabel());   // not always "SEND": APRS says BEACON
     }
   };
   sendBtn?.addEventListener("click", send);
@@ -3718,7 +3720,7 @@ function bindDigi() {
     $("#digi-params-pocsag").hidden = s.mode !== "pocsag";
     $("#digi-params-aprs").hidden = s.mode !== "aprs";
     if (sendBtn) {
-      sendBtn.textContent = s.mode === "aprs" ? "BEACON" : "SEND";
+      setBtnLabel(sendBtn, s.mode === "aprs" ? "BEACON" : "SEND");
       sendBtn.title = s.mode === "aprs"
         ? "Send a position beacon from the locator (keys PTT)"
         : "Encode & transmit (keys PTT)";
