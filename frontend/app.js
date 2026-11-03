@@ -5662,7 +5662,7 @@ function renderLogRecent(data) {
     onl.classList.toggle("on", !!data.online);
     onl.title = data.online ? "Wavelog connected" : "Wavelog not reachable";
     const t = onl.querySelector(".log-online-txt");
-    if (t) t.textContent = data.online ? "CONNECTED" : "OFFLINE";
+    if (t) t.textContent = data.online ? "ONLINE" : "OFFLINE";
   }
   const sEl = $("#log-stats");
   if (sEl) {
