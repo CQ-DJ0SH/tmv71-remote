@@ -3240,3 +3240,6 @@ body.theme-light .sel-call:not(.tx){color:var(--text)}
 .debug-zone .panel-head h2{color:color-mix(in srgb, var(--accent) 45%, #c9d3da)}
 body.theme-light .debug-zone .panel-head h2{color:var(--accent)}
 body.theme-light .scan-zone .scan-head h2{color:#5a6976}
+/* Wavelog status in words beside the LED (green CONNECTED / red OFFLINE) */
+.log-online-txt{font-family:var(--font-ui); font-size:10px; font-weight:600; letter-spacing:.14em}
+.log-online:not(.on) .log-online-txt{color:#cf6159}
