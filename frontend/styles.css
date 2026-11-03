@@ -3243,3 +3243,6 @@ body.theme-light .scan-zone .scan-head h2{color:#5a6976}
 /* Wavelog status in words beside the LED (green ONLINE / red OFFLINE) */
 .log-online-txt{font-family:var(--font-ui); font-size:10px; font-weight:600; letter-spacing:.14em}
 .log-online:not(.on) .log-online-txt{color:#cf6159}
+/* ONLINE / OFFLINE in the same type and colour as CAT in the title bar (the LED carries the state) */
+.log-online .log-online-txt, .log-online:not(.on) .log-online-txt, .log-online.on .log-online-txt{
+  font-family:var(--font-ui); font-size:11px; font-weight:400; letter-spacing:.24em; color:var(--text-dim)}
