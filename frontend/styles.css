@@ -3232,3 +3232,11 @@ body.theme-light .sel-call:not(.tx){color:var(--text)}
 .digi-zone .digi-send{font-family:var(--font-ui); font-size:12px; font-weight:600; letter-spacing:.14em; color:var(--text-dim)}
 @media (hover:hover){ .digi-zone .digi-send:not(:disabled):hover{color:var(--text)} }
 .digi-zone .digi-send.tx{color:#fff}
+/* panel titles from HackRF down in the panel accent (as BAND A/B, PTT, AUDIO).
+   ASR's accent is a dark grey that would vanish on the dark panel: its title
+   takes a lighter tint of it */
+.hackrf-zone .panel-head h2, .selcall-zone .panel-head h2, .digi-zone .panel-head h2,
+.log-zone .panel-head h2, .scan-zone .scan-head h2{color:var(--accent)}
+.debug-zone .panel-head h2{color:color-mix(in srgb, var(--accent) 45%, #c9d3da)}
+body.theme-light .debug-zone .panel-head h2{color:var(--accent)}
+body.theme-light .scan-zone .scan-head h2{color:#5a6976}
