@@ -43,7 +43,9 @@ def status() -> dict:
     behind = int(behind_p.stdout.strip() or 0) if behind_p.returncode == 0 else 0
     ahead = int(ahead_p.stdout.strip() or 0) if ahead_p.returncode == 0 else 0
     changes = _git("log", "--oneline", "-10", "HEAD..@{u}").stdout.strip()
-    dirty = bool(_git("status", "--porcelain").stdout.strip())
+    # only modified TRACKED files block an update: the hard reset below never
+    # touches untracked ones (a CA cert or notes dropped into the checkout)
+    dirty = bool(_git("status", "--porcelain", "--untracked-files=no").stdout.strip())
     return {
         "is_repo": True, "branch": branch, "current": cur,
         "behind": behind, "ahead": ahead, "changes": changes, "dirty": dirty,
