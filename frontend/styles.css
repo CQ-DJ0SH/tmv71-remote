@@ -3228,3 +3228,7 @@ body.theme-light .sel-call:not(.tx){color:var(--text)}
 .digi-zone .digi-send{display:inline-flex; align-items:center; justify-content:center; gap:6px}
 .digi-send .ds-ico{width:15px; height:15px; flex:none; margin-top:-1px; color:var(--tx)}
 .digi-send.tx .ds-ico{color:inherit}
+/* SEND / BEACON in the same type and colour as Selcall CALL */
+.digi-zone .digi-send{font-family:var(--font-ui); font-size:12px; font-weight:600; letter-spacing:.14em; color:var(--text-dim)}
+@media (hover:hover){ .digi-zone .digi-send:not(:disabled):hover{color:var(--text)} }
+.digi-zone .digi-send.tx{color:#fff}
