@@ -3218,3 +3218,6 @@ body.theme-light .sel-call:not(.tx){color:var(--text)}
    speaker with a pause mark = blank this over only */
 .ptt-mute{display:inline-flex; align-items:center; justify-content:center; gap:5px}
 .ptt-mute .pm-ico{width:13px; height:13px; flex:none}
+/* SEND / BEACON keys the transmitter: framed in red (no longer filled green) */
+.digi-zone .digi-send{color:var(--text); background:var(--ctrl-bg); border-color:var(--tx); font-weight:600}
+@media (hover:hover){ .digi-zone .digi-send:not(:disabled):hover{color:#fff; border-color:var(--tx); box-shadow:0 0 14px -4px var(--tx-glow)} }
