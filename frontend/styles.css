@@ -3246,3 +3246,7 @@ body.theme-light .scan-zone .scan-head h2{color:#5a6976}
 /* ONLINE / OFFLINE in the same type and colour as CAT in the title bar (the LED carries the state) */
 .log-online .log-online-txt, .log-online:not(.on) .log-online-txt, .log-online.on .log-online-txt{
   font-family:var(--font-ui); font-size:11px; font-weight:400; letter-spacing:.24em; color:var(--text-dim)}
+/* HackRF: the "ready" LED in the standard green of the status LEDs (CAT, USB Audio);
+   the panel accent a little darker than the old waterfall blue */
+.hrf-ready .dot{background:var(--ok); box-shadow:0 0 7px 1px color-mix(in srgb, var(--ok) 70%, transparent)}
+.hackrf-zone{--accent:#2b84d0; --accent-glow:#2b84d0}
