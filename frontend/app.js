@@ -741,7 +741,11 @@ function markDirty(band, on) {
 }
 function bump(band, idx, dir) {
   if (editHz[band] == null) editHz[band] = last?.bands?.[band]?.rx_freq || 0;
-  editHz[band] = Math.max(0, Math.min(999_999_900, editHz[band] + dir * PLACES[idx]));
+  // each digit rolls over on its own (9 → 0 up, 0 → 9 down) without carrying
+  // into the next digit — what you click is the only digit that changes
+  const P = PLACES[idx], hz = editHz[band];
+  const d = Math.floor(hz / P) % 10, nd = (d + dir + 10) % 10;
+  editHz[band] = Math.max(0, Math.min(999_999_900, hz + (nd - d) * P));
   markDirty(band, true); setSpinner(band, editHz[band]);
 }
 function onDigitType(band) { editHz[band] = readSpinner(band); markDirty(band, true); }
