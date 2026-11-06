@@ -3250,5 +3250,3 @@ body.theme-light .scan-zone .scan-head h2{color:#5a6976}
    the panel accent a little darker than the old waterfall blue */
 .hrf-ready .dot{background:var(--ok); box-shadow:0 0 7px 1px color-mix(in srgb, var(--ok) 70%, transparent)}
 .hackrf-zone{--accent:#2b84d0; --accent-glow:#2b84d0}
-/* spinner showing a memory's TX frequency (repeater shift): unit reads "MHz TX" in red */
-.freq-spin.is-tx .spin-unit{color:var(--tx); letter-spacing:.12em}

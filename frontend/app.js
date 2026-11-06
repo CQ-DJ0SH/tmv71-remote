@@ -210,14 +210,12 @@ function renderBand(b) {
 
   // mirror the live frequency into the tuner digits unless the user is editing
   // a memory channel with a repeater shift: the spinner shows the TRANSMIT
-  // frequency (tagged TX); entering one there sets the receive side accordingly
+  // frequency; entering one there sets the receive side accordingly
   const shown = spinShownHz(b);
   if (!dirty[i]) { editHz[i] = shown; setSpinner(i, shown); }
   const sp = document.getElementById(`spin-${i}`);
   if (sp) {
     const tx = txShiftHz(b) != null;
-    sp.classList.toggle("is-tx", tx);
-    const u = sp.querySelector(".spin-unit"); if (u) u.textContent = tx ? "MHz TX" : "MHz";
     sp.title = tx ? `Transmit frequency of this memory (RX ${fmtMHz(b.rx_freq)} ${b.shift === 1 ? "+" : "−"} ${(b.offset / 1e6).toFixed(3)} MHz)` : "";
   }
 
