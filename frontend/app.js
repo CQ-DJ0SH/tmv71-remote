@@ -209,7 +209,17 @@ function renderBand(b) {
   if (Date.now() >= shLive[i].until) $(`#freq-${i}`).textContent = fmtMHz(b.rx_freq);
 
   // mirror the live frequency into the tuner digits unless the user is editing
-  if (!dirty[i]) { editHz[i] = b.rx_freq; setSpinner(i, b.rx_freq); }
+  // a memory channel with a repeater shift: the spinner shows the TRANSMIT
+  // frequency (tagged TX); entering one there sets the receive side accordingly
+  const shown = spinShownHz(b);
+  if (!dirty[i]) { editHz[i] = shown; setSpinner(i, shown); }
+  const sp = document.getElementById(`spin-${i}`);
+  if (sp) {
+    const tx = txShiftHz(b) != null;
+    sp.classList.toggle("is-tx", tx);
+    const u = sp.querySelector(".spin-unit"); if (u) u.textContent = tx ? "MHz TX" : "MHz";
+    sp.title = tx ? `Transmit frequency of this memory (RX ${fmtMHz(b.rx_freq)} ${b.shift === 1 ? "+" : "−"} ${(b.offset / 1e6).toFixed(3)} MHz)` : "";
+  }
 
   $(`#step-${i}`).textContent = b.step_hz ? `${(b.step_hz / 1000).toString()} kHz` : "";
   $(`#fmode-${i}`).textContent = FMMODE[b.fm_mode] || "FM";   // AM auto in air band
@@ -739,8 +749,14 @@ function markDirty(band, on) {
   dirty[band] = on;
   document.getElementById(`spin-${band}`)?.classList.toggle("pending", on);
 }
+// TX frequency of a memory channel with a repeater shift, else null
+function txShiftHz(b) {
+  if (!b || b.mode !== 1 || !b.shift || !b.offset || !b.rx_freq) return null;
+  return b.shift === 1 ? b.rx_freq + b.offset : b.rx_freq - b.offset;
+}
+const spinShownHz = b => txShiftHz(b) ?? (b?.rx_freq || 0);
 function bump(band, idx, dir) {
-  if (editHz[band] == null) editHz[band] = last?.bands?.[band]?.rx_freq || 0;
+  if (editHz[band] == null) editHz[band] = spinShownHz(last?.bands?.[band]);
   // each digit rolls over on its own (9 → 0 up, 0 → 9 down) without carrying
   // into the next digit — what you click is the only digit that changes
   const P = PLACES[idx], hz = editHz[band];
@@ -750,7 +766,10 @@ function bump(band, idx, dir) {
 }
 function onDigitType(band) { editHz[band] = readSpinner(band); markDirty(band, true); }
 async function applySpinner(band) {
-  const hz = editHz[band] ?? readSpinner(band);
+  let hz = editHz[band] ?? readSpinner(band);
+  // the spinner showed (and was edited as) the TX frequency: back to RX
+  const b = last?.bands?.[band];
+  if (txShiftHz(b) != null) hz = b.shift === 1 ? hz - b.offset : hz + b.offset;
   await setFreqHz(band, hz);
   markDirty(band, false);
 }
