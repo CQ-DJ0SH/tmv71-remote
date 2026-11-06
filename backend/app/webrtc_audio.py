@@ -87,9 +87,12 @@ DEEMPH_TAU_US = 75.0
 
 # RX listen-path high-pass corner (−6 dB). The flat discriminator/9600 output
 # passes the CTCSS/PL sub-audible tone (67–254 Hz) plus DC, which de-emphasis
-# lifts further — audible as a low hum in the speaker. A ~180 Hz high-pass drops
-# it while leaving voice (≳300 Hz) untouched.
-RX_HP_CUTOFF_HZ = 180.0
+# lifts further — audible as a low hum in the speaker. 300 Hz (the usual floor of
+# a voice channel) drops the tone AND its harmonics: a repeater with a distorted
+# 67 Hz tone (DB0BLO, measured) put 201 Hz through at −51 dBFS with the old
+# 180 Hz corner — a buzz in every speech pause; at 300 Hz it is −125 dBFS, the
+# speech level unchanged.
+RX_HP_CUTOFF_HZ = 300.0
 
 # S-meter from FM quieting. On the flat discriminator output the high-band noise
 # is INVERSE to signal strength: loud HF hiss = no signal (S0), full quieting =
