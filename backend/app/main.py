@@ -130,7 +130,8 @@ radio_audio = RadioAudio(device=settings.audio_device,
                          rx_deemph_us=settings.rx_deemph_us,
                          dual=settings.audio_dual,
                          listen_device=settings.audio_listen_device,
-                         data_gain=settings.data_gain)
+                         data_gain=settings.data_gain,
+                         rx_hp_hz=settings.rx_hp_hz)
 pcs: set = set()      # active WebRTC peer connections
 
 
@@ -2535,6 +2536,10 @@ async def set_audio_tones(req: TonesRequest) -> dict:
         radio_audio.tx_comp = req.tx_comp
         settings.tx_comp_enabled = req.tx_comp
         save_runtime(tx_comp_enabled=req.tx_comp)
+    if req.rx_hp_hz is not None:
+        radio_audio.set_rx_hp(req.rx_hp_hz)
+        settings.rx_hp_hz = req.rx_hp_hz
+        save_runtime(rx_hp_hz=req.rx_hp_hz)
     if req.rx_lowpass is not None:
         radio_audio.rx_lowpass = req.rx_lowpass
         settings.rx_lowpass_enabled = req.rx_lowpass

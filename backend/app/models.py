@@ -204,6 +204,7 @@ class TonesRequest(BaseModel):
     tx_preemph: Optional[bool] = None
     tx_comp: Optional[bool] = None
     rx_lowpass: Optional[bool] = None
+    rx_hp_hz: Optional[Literal[0, 180, 300]] = None   # listen-path high-pass: off / 180 / 300 Hz
     rx_deemph: Optional[bool] = None
     rx_deemph_us: Optional[float] = Field(default=None, ge=10, le=500)
     rx_squelch: Optional[bool] = None

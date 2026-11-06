@@ -1598,6 +1598,7 @@ async function loadTones() {
     const tc = $("#set-tx-comp"); if (tc) tc.checked = !!s.tx_comp;
     const pe = $("#set-tx-preemph"); if (pe) pe.checked = !!s.tx_preemph;
     const rlp = $("#set-rx-lowpass"); if (rlp) rlp.checked = !!s.rx_lowpass;
+    const rhp = $("#set-rx-hp"); if (rhp && s.rx_hp_hz != null) rhp.value = String(s.rx_hp_hz);
     const rde = $("#set-rx-deemph"); if (rde) rde.checked = !!s.rx_deemph;
     const rsq = $("#set-rx-squelch"); if (rsq) rsq.checked = !!s.rx_squelch;
     if (s.rx_deemph_us != null) { const sl = $("#deemph-us"); if (sl) { sl.value = s.rx_deemph_us; setDeemphUi(s.rx_deemph_us); } }
@@ -1693,6 +1694,13 @@ function bindAudio() {
       await api("POST", "/api/audio/tones", { rx_lowpass: e.target.checked });
       toast(e.target.checked ? "RX low-pass on" : "RX low-pass off", e.target.checked ? "ok" : "");
     } catch (err) { toast("RX low-pass: " + err.message, "err"); e.target.checked = !e.target.checked; }
+  });
+  $("#set-rx-hp")?.addEventListener("change", async e => {
+    const hz = Number(e.target.value);
+    try {
+      await api("POST", "/api/audio/tones", { rx_hp_hz: hz });
+      toast(hz ? `RX high-pass ${hz} Hz` : "RX high-pass off", hz ? "ok" : "");
+    } catch (err) { toast("RX high-pass: " + err.message, "err"); }
   });
   $("#set-rx-deemph")?.addEventListener("change", async e => {
     try {

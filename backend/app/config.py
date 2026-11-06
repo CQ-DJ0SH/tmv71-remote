@@ -110,6 +110,7 @@ class Settings(BaseSettings):
     # Same voice low-pass on the received audio — cuts high-frequency hiss/noise
     # from the radio for more comfortable listening.
     rx_lowpass_enabled: bool = False
+    rx_hp_hz: int = 300              # listen-path high-pass corner; 0 = off
 
     # RX de-emphasis (6 dB/oct) for a flat discriminator / 9600-baud audio source.
     # On by default; the time constant (µs) is adjustable.
@@ -207,7 +208,7 @@ _RUNTIME_KEYS = ("serial_port", "serial_baud", "gpio_power_pin",
                  "kiss_enabled", "kiss_port", "kiss_allow_tx", "kiss_tx_band",
                  "gpio_power_on",
                  "callsign", "locator", "roger_beep_enabled", "roger_beep_level", "theme",
-                 "tx_lowpass_enabled", "rx_lowpass_enabled", "rx_deemph_enabled",
+                 "tx_lowpass_enabled", "rx_lowpass_enabled", "rx_hp_hz", "rx_deemph_enabled",
                  "tx_preemph_enabled", "tx_comp_enabled",
                  "rx_deemph_us", "rx_squelch_enabled", "asr_callsign_enabled",
                  "asr_region",

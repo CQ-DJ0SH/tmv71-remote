@@ -424,7 +424,8 @@ class RadioAudio:
                  rx_deemph_us: float = DEEMPH_TAU_US,
                  rx_buffer_ms: int = DEF_RX_BUFFER_MS,
                  tx_preemph: bool = True, tx_comp: bool = False,
-                 dual: bool = False, listen_device: str = "", data_gain: float = 1.0):
+                 dual: bool = False, listen_device: str = "", data_gain: float = 1.0,
+                 rx_hp_hz: int = int(RX_HP_CUTOFF_HZ)):
         self.device = device
         # Dual sound card mode: a second, capture-only card on the speaker jack
         # carries what the operator hears (web audio, recorder, ASR, selcall);
@@ -452,9 +453,11 @@ class RadioAudio:
         self.rx_deemph = rx_deemph
         self.rx_deemph_us = rx_deemph_us
         self._rx_deemph = _DeEmphasis(rx_deemph_us, SAMPLE_RATE)
-        # Sub-audio/CTCSS + DC hum removal on the listen path (always on — the flat
-        # RX feed always carries it; the decoder taps upstream keep the raw signal).
-        self._rx_hp = _HighPass(RX_HP_CUTOFF_HZ, SAMPLE_RATE)
+        # Sub-audio/CTCSS + DC hum removal on the listen path (Settings: off / 180 /
+        # 300 Hz; the decoder taps upstream keep the raw signal either way).
+        self.rx_hp_hz = 0
+        self._rx_hp: Optional[_HighPass] = None
+        self.set_rx_hp(rx_hp_hz)
         # FM-quieting S-meter (see SM_* constants): high-band noise auto-ranged
         # between open-squelch noise (S0) and full quieting (S9).
         self._sm = _QuietingMeter(SAMPLE_RATE, SM_HP_CUTOFF_HZ)
@@ -673,6 +676,13 @@ class RadioAudio:
         elif not self.dual:
             self.listen_error = None
 
+    def set_rx_hp(self, hz: int) -> None:
+        """Listen-path high-pass corner in Hz, 0 = off. The new filter is built
+        first and swapped in at once, so the audio callback never sees half of it."""
+        hz = int(hz or 0)
+        self._rx_hp = _HighPass(float(hz), SAMPLE_RATE) if hz > 0 else None
+        self.rx_hp_hz = hz
+
     def set_dual(self, on: bool, listen_device: Optional[str] = None) -> None:
         self.dual = bool(on)
         if listen_device is not None:
@@ -865,7 +875,9 @@ class RadioAudio:
         # live listen path only (after the decoder taps, which want the flat,
         # un-squelched signal); off for the echo replay / mic-test mute.
         if live:
-            pub = self._rx_hp.process(pub)      # drop CTCSS/sub-audio + DC hum
+            hp = self._rx_hp
+            if hp is not None:
+                pub = hp.process(pub)           # drop CTCSS/sub-audio + DC hum
             if self.rx_deemph and flat:
                 pub = self._rx_deemph.process(pub)
             if self.rx_squelch and flat:        # gate on the radio's BUSY status
@@ -1383,7 +1395,8 @@ class RadioAudio:
                 "tx_over_ms": round(self.tx_over_ms, 1),
                 "tx_queue_ms": round(self._pb_len * 1000.0 / SAMPLE_RATE, 1),
                 "comp_db": self._tx_comp.gain_db,     # live compressor gain
-                "rx_lowpass": self.rx_lowpass, "rx_deemph": self.rx_deemph,
+                "rx_lowpass": self.rx_lowpass, "rx_hp_hz": self.rx_hp_hz,
+                "rx_deemph": self.rx_deemph,
                 "rx_deemph_us": self.rx_deemph_us,
                 "rx_squelch": self.rx_squelch, "mic_test": self.mic_test,
                 "echo_busy": self.echo_busy(),

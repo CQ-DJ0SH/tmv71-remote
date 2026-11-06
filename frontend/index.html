@@ -915,6 +915,14 @@
           <span>Low-pass (voice only, ≤ 3.5 kHz)</span>
         </label>
         <p class="pane-hint">Band-limits the received radio audio to the voice range, cutting high-frequency hiss/noise above ~3.5 kHz for more comfortable listening.</p>
+        <div class="form-grid">
+          <label>High-pass<select id="set-rx-hp">
+            <option value="300">300 Hz (default)</option>
+            <option value="180">180 Hz</option>
+            <option value="0">Off</option>
+          </select></label>
+        </div>
+        <p class="pane-hint">Removes the CTCSS sub-audible tone (67–254 Hz) and hum from what you hear. 300 Hz also removes the harmonics of a distorted tone, which some repeaters send and which buzz in every pause; 180 Hz keeps a little more bass; Off passes everything. The decoders always get the unfiltered signal.</p>
       </div>
       <div class="mixer-field">
         <span class="logo-label">RX de-emphasis</span>
