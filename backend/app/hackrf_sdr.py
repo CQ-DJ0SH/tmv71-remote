@@ -158,8 +158,32 @@ class HackRFSpectrum:
     # -- lifecycle --------------------------------------------------------
     async def start(self, **cfg) -> dict:
         loop = asyncio.get_running_loop()
+        if not self.running:
+            # switching ON (not a reconfigure): prime the device first
+            await asyncio.to_thread(self._prime_sync)
         await asyncio.to_thread(self._start_sync, loop, cfg)
         return self.status()
+
+    def _prime_sync(self) -> None:
+        """A short throw-away capture before the real start.
+
+        The HackRF picks its reference clock (CLKIN, here a retro-fitted TCXO, or
+        its own 25 MHz crystal) when it enters a receive session. From cold the
+        TCXO is not oscillating yet at that moment, so the first session ran on the
+        crystal and drifted for minutes while the board warmed; the second session
+        found CLKIN and stood still at once. Half a second of capture into /dev/null
+        is that first session — the real one then starts on the TCXO."""
+        if not self.available:
+            return
+        self._kill_strays()
+        try:
+            subprocess.run(["hackrf_transfer", "-r", "/dev/null", "-f", str(self.center or 145_000_000),
+                            "-s", str(PAN_SAMPLE_RATE), "-n", str(PAN_SAMPLE_RATE // 2)],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=6)
+            log.info("hackrf primed (reference clock settled before start)")
+        except Exception as exc:  # noqa: BLE001
+            log.warning("hackrf prime failed: %s", exc)
+        time.sleep(0.3)                   # TCXO keeps running; let USB settle
 
     async def stop(self) -> dict:
         await asyncio.to_thread(self._stop_sync)
