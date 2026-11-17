@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import glob
+import json
 import gc
 import logging
 import math
@@ -655,7 +656,7 @@ class CallsignService:
         self._seen: dict = {}                  # callsign -> last-emit monotonic ts
         self._repeat_s = 90.0                  # suppress a repeat of the same call
         self._recent: list = []                # (ts, call) for repetition voting
-        self._log: list = []                   # ASR debug log (ring buffer of last N)
+        self._log: list = self._log_load()     # ASR contact log (ring buffer of last N), kept on disk
         self._calls: dict = {}       # call -> {class,name,city,zip,street} (empty: unverified)
         self._suspended = False                # off because the radio is powered down
         self._lock = asyncio.Lock()
@@ -985,10 +986,35 @@ class CallsignService:
         self._log.append(entry)
         if len(self._log) > 200:
             del self._log[:-200]
+        self._log_save()
         self._broadcast({"t": "asrlog", **entry})
 
     def log_history(self) -> list:
         return list(self._log)
+
+    # The contact log lived in RAM only, so every service restart (an update, a
+    # setting that needs one, the nightly reboot) wiped the cards of the day. It is
+    # now written to asr_log.json on every change (≤ 200 entries, a few kB) and
+    # read back at start. The file stays on the Pi (gitignored).
+    _LOG_FILE = os.path.join(os.path.dirname(__file__), "asr_log.json")
+
+    @classmethod
+    def _log_load(cls) -> list:
+        try:
+            with open(cls._LOG_FILE, encoding="utf-8") as f:
+                data = json.load(f)
+            return [e for e in data if isinstance(e, dict)][-200:] if isinstance(data, list) else []
+        except (OSError, ValueError):
+            return []
+
+    def _log_save(self) -> None:
+        try:
+            tmp = self._LOG_FILE + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(self._log, f, ensure_ascii=False)
+            os.replace(tmp, self._LOG_FILE)
+        except OSError as exc:
+            logging.getLogger("tmv71").warning("ASR log: save failed: %s", exc)
 
     def add_manual(self, call: str) -> dict:
         """Add a contact card by hand — for when the recognition missed a call
@@ -1022,6 +1048,7 @@ class CallsignService:
             return 0
         before = len(self._log)
         self._log = [e for e in self._log if e.get("call") != call]
+        self._log_save()
         self._seen.pop(call, None)                 # allow an immediate re-report
         self._recent = [(t, c) for (t, c) in self._recent if c != call]
         self._marks = [m for m in self._marks if m[1] != call]
@@ -1044,6 +1071,7 @@ class CallsignService:
         which is what deleting a single card (drop_call) means."""
         n = len(self._log)
         self._log = []
+        self._log_save()
         self._seen.clear()
         self._recent.clear()
         self._marks.clear()
@@ -1074,6 +1102,8 @@ class CallsignService:
                 e["klass"] = info.get("class", "")
                 e["valid"] = True          # a human typed it — see add_manual()
                 n += 1
+        if n:
+            self._log_save()
         self._seen[new] = self._seen.pop(old, time.monotonic())
         self._recent = [(t, new if c == old else c) for (t, c) in self._recent]
         self._marks = [(t, new if c == old else c, h) for (t, c, h) in self._marks]

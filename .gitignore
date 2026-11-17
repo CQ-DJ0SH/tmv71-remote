@@ -12,6 +12,8 @@ backend/app/runtime.json
 backend/app/logbook.json
 # voice profiles (biometric data — stays on the Pi, never committed)
 backend/app/speakers.json
+# ASR contact log (callsigns heard on the air) — stays on the Pi
+backend/app/asr_log.json
 
 # Vosk speech model for callsign recognition (downloaded on setup, ~90 MB) +
 # the extracted BNetzA callsign-list cache (models/rufzeichenliste.txt)
