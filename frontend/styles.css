@@ -1594,6 +1594,13 @@ body.radio-off .hackrf-zone{opacity:.32; filter:grayscale(.6) brightness(.78)}
 .display .unit{
   font-family:var(--font-mono); font-size:12px; letter-spacing:.25em; color:var(--text-dim);
 }
+/* AFU badge next to MHz when the frequency lies in a ham band */
+.display .afu-ind{
+  font-family:var(--font-disp); font-weight:700; font-size:11px; letter-spacing:.12em; line-height:1;
+  padding:2px 5px; border:1px solid var(--accent); border-radius:4px;
+  color:var(--accent); text-shadow:0 0 8px var(--accent-glow); align-self:center;
+}
+.display .afu-ind[hidden]{display:none}
 /* combined mode + channel-step field, right-aligned and vertically
    centred to the MHz unit, borderless */
 .freq-meta{

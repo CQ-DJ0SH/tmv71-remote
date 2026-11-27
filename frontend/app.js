@@ -170,6 +170,14 @@ function confirmDialog(message, opts = {}) {
 }
 
 const fmtMHz = (hz) => (hz / 1e6).toFixed(4);
+// German amateur radio bands within the TM-V71's range (Hz)
+const AFU_BANDS = [[144e6, 146e6], [430e6, 440e6]];
+const isAfu = (hz) => AFU_BANDS.some(([lo, hi]) => hz >= lo && hz <= hi);
+function showFreq(band, hz) {
+  $(`#freq-${band}`).textContent = fmtMHz(hz);
+  const ind = document.getElementById(`afu-${band}`);
+  if (ind) ind.hidden = !isAfu(hz);
+}
 const SHIFT = { 0: "SIMPLEX", 1: "SHIFT +", 2: "SHIFT −" };
 const FMMODE = { 0: "FM", 1: "NFM", 2: "AM" };
 
@@ -206,7 +214,7 @@ function setSqlUi(band, val) {
 function renderBand(b) {
   const i = b.band;
   // while the shuttle tunes, the display shows its target, not the lagging radio
-  if (Date.now() >= shLive[i].until) $(`#freq-${i}`).textContent = fmtMHz(b.rx_freq);
+  if (Date.now() >= shLive[i].until) showFreq(i, b.rx_freq);
 
   // mirror the live frequency into the tuner digits unless the user is editing
   // a memory channel with a repeater shift: the spinner shows the TRANSMIT
@@ -891,7 +899,7 @@ function bindShuttles() {
       const hz = frac < 0 ? Math.ceil(base / s - 1) * s : Math.floor(base / s + 1) * s;
       if (hz < 1e6) return;
       live.hz = hz; live.until = Date.now() + 1500;
-      $(`#freq-${band}`).textContent = fmtMHz(hz);
+      showFreq(band, hz);
       want = hz; send();
     };
     sh.addEventListener("pointerdown", (e) => {
